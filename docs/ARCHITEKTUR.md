@@ -2755,3 +2755,13 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 - `P1`: `Canvas 2D` echte `Image` Tiles + `Overworld` Engine (Script Runner fuer `scripts.lua`) + `WASM` GB CPU fuer Battle/Sound.
 
 **Verifikation v0.4.0:** `tsc 0`, `vitest 21/92`, `RealMapView` 9×9, `GameView` laedt 223 Maps (YELLOW), Warps/Signs/Auto-Save funktional.
+
+---
+
+## 77.8 v0.4.1 — Richtung (^v) + NPCs (M) + Farbcodierte Tiles — VERIFIZIERT 2026-09-25 18:28
+
+**Erweiterung zu 0.4.0:** Spieler Richtung (dir up/down/left/right, ^v + Pfeile = Richtung Legende ohne JSX < > Conflict), tileChar mit dir, tileColor nur label/secondaryLabel (kein style), RealMapView zeigt objects als M (NPCs) neben O/#, Auto-Save + Warps bleiben, MapGrid Fallback unveraendert.
+
+**Fixes:** Legend < > JSX Conflict gefixt, objHere → isObj && !isPlayer, foregroundStyle nur erlaubte Werte.
+
+**Verifikation:** tsc 0, vitest 21/92.

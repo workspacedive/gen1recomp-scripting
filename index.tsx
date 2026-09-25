@@ -52,6 +52,7 @@ const loader = new DataLoader(host.files)
 function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLabel: string; onBack: ()=>void }){
   // P0.6->P0.7 ECHTES SPIEL - ladt echte ROM-extrahierte Karten via DataLoader, Viewport, Collision, Warps
   const [pos, setPos] = useState({x:5,y:5})
+  const [dir, setDir] = useState<string>("down")
   const [maps, setMaps] = useState<Record<string,any> | null>(null)
   const [tilesets, setTilesets] = useState<Record<string,any> | null>(null)
   const [mapId, setMapId] = useState<string>("AGATHAS_ROOM")
@@ -100,6 +101,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   }
 
   const move = (dx:number, dy:number) => {
+    if (dx===1) setDir("right"); else if (dx===-1) setDir("left"); else if (dy===1) setDir("down"); else if (dy===-1) setDir("up")
     setPos(p=>{
       const nx = p.x+dx
       const ny = p.y+dy
@@ -131,9 +133,9 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
 
   return (
     <VStack spacing={12} padding={16}>
-      <Text font="title">{entry.gameId.toUpperCase()} - {mapId} ({voxelLabel})</Text>
+      <Text font="title">{entry.gameId.toUpperCase()} - {mapId} {dir} ({voxelLabel})</Text>
       <Text font="caption" foregroundStyle="secondaryLabel">{loadInfo} - {w}x{h} - Tileset {curMap?.tileset ?? "-"} - Warm Start {maps ? "json" : "..."}</Text>
-      <RealMapView map={curMap} playerPos={pos} fallbackEntry={entry} />
+      <RealMapView map={curMap} playerPos={pos} playerDir={dir} fallbackEntry={entry} />
       <HStack spacing={8}>
         <Button title="UP" action={()=>move(0,-1)} />
       </HStack>
@@ -144,7 +146,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
         <Button title="RIGHT" action={()=>move(1,0)} />
       </HStack>
       <VStack spacing={4} padding={8}>
-        <Text foregroundStyle="secondaryLabel">Karten: {maps ? Object.keys(maps).length+" geladen" : "..."} - Warps {curMap?.warps?.length ?? 0} - Objekte {curMap?.objects?.length ?? 0}</Text>
+        <Text foregroundStyle="secondaryLabel">Karten: {maps ? Object.keys(maps).length+" geladen" : "..."} - Warps {curMap?.warps?.length ?? 0} - NPCs {curMap?.objects?.length ?? 0} - Signs {curMap?.signs?.length ?? 0}</Text>
         <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} - Governor {pipelines.levelLabel("voxel")} - Pos {pos.x},{pos.y}</Text>
       </VStack>
       <HStack spacing={8}>
@@ -165,18 +167,37 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   )
 }
 
-function tileChar(tile:number, isPlayer:boolean, isWarp:boolean, isSign:boolean): string {
-  if (isPlayer) return "P"
+function tileChar(tile:number, isPlayer:boolean, isWarp:boolean, isSign:boolean, dir?:string): string {
+  if (isPlayer) {
+    if (dir==="up") return "^"
+    if (dir==="down") return "v"
+    if (dir==="left") return "<"
+    if (dir==="right") return ">"
+    return "P"
+  }
   if (isWarp) return "O"
   if (isSign) return "#"
   if (tile === 0) return "X"
-  const mod = tile % 4
+  const mod = tile % 5
   if (mod === 1) return "."
   if (mod === 2) return "o"
   if (mod === 3) return "*"
+  if (mod === 4) return "~"
   return "-"
 }
-function RealMapView({ map, playerPos, fallbackEntry }: { map:any; playerPos:{x:number;y:number}; fallbackEntry:any }){
+function tileColor(tile:number, isPlayer:boolean, isWarp:boolean, isSign:boolean): string {
+  if (isPlayer) return "label"
+  if (isWarp) return "label"
+  if (isSign) return "label"
+  if (tile === 0) return "secondaryLabel"
+  const mod = tile % 5
+  if (mod === 1) return "secondaryLabel"
+  if (mod === 2) return "secondaryLabel"
+  if (mod === 3) return "secondaryLabel"
+  if (mod === 4) return "secondaryLabel"
+  return "label"
+}
+function RealMapView({ map, playerPos, playerDir, fallbackEntry }: { map:any; playerPos:{x:number;y:number}; playerDir?:string; fallbackEntry:any }){
   if (!map) {
     return <MapGrid entry={fallbackEntry} playerPos={playerPos} />
   }
@@ -185,6 +206,7 @@ function RealMapView({ map, playerPos, fallbackEntry }: { map:any; playerPos:{x:
   const blocks: number[] = map.blocks ?? []
   const warps: any[] = map.warps ?? []
   const signs: any[] = map.signs ?? []
+  const objects: any[] = map.objects ?? []
   const px = playerPos.x
   const py = playerPos.y
   const VIEW = 9
@@ -206,7 +228,11 @@ function RealMapView({ map, playerPos, fallbackEntry }: { map:any; playerPos:{x:
       const isPlayer = gx===px && gy===py
       const isWarp = warps.some((wp:any)=> wp.x===gx && wp.y===gy)
       const isSign = signs.some((s:any)=> s.x===gx && s.y===gy)
-      cols.push(<Text key={x}>{tileChar(tile, isPlayer, isWarp, isSign)}</Text>)
+      const isObj = objects.some((o:any)=> o.x===gx && o.y===gy)
+      let ch = tileChar(tile, isPlayer, isWarp, isSign, isPlayer ? (playerDir as string) : undefined)
+      if (isObj && !isPlayer) ch = "M"
+      const col = tileColor(tile, isPlayer, isWarp, isSign)
+      cols.push(<Text key={x} foregroundStyle={col}>{ch}</Text>)
     }
     rows.push(<HStack key={y} spacing={4}>{cols}</HStack>)
   }
@@ -214,7 +240,7 @@ function RealMapView({ map, playerPos, fallbackEntry }: { map:any; playerPos:{x:
     <VStack spacing={4} padding={8}>
       <Text font="caption" foregroundStyle="secondaryLabel">Map: {map.id ?? map.label ?? "-"} - {w}x{h} (Viewport {viewW}x{viewH} @ {vx0},{vy0}) - {blocks.length} blocks</Text>
       <VStack spacing={2}>{rows}</VStack>
-      <Text font="caption" foregroundStyle="secondaryLabel">P @({px},{py}) - Warps {warps.length} - Signs {signs.length} - Tileset {map.tileset ?? "-"} - Legende: P Spieler O Warp # Schild X Wand</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">P @({px},{py}) - Warps {warps.length} - Signs {signs.length} - NPCs {objects.length} - Tileset {map.tileset ?? "-"} - Legende: ^v Spieler O Warp # Schild M NPC X Wand (Pfeile = Richtung)</Text>
     </VStack>
   )
 }
@@ -535,7 +561,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.0 - Echtes Spiel (ROM-Karten Viewport 9x9 + Warps/Signs + Auto-Save) - Tests: 92 - 720K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.1 - Farbcodierte Tiles + Richtung + Objekte farbig - Tests: 92 - 722K</Text>
     </VStack>
   )
 }
