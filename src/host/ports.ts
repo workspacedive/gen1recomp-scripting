@@ -79,14 +79,39 @@ export interface NetworkPort {
 }
 
 // ---------------------------------------------------------------------------
-// Graphics Port — gekapselt Canvas / TimelineCanvas
-// Quelle: views/canvas/en.md — VERIFIZIERT (2D), NICHT VERIFIZIERT (WebGL/Metal)
+// Graphics Port — gekapselt Canvas / TimelineCanvas + WebView (für PipelineAdapter)
+// Quelle: views/canvas/en.md — VERIFIZIERT (Canvas 2D)
+//         views/webview/en.md + webview_controller/en.md — VERIFIZIERT (WebView als WKWebView)
+//         WebGL innerhalb WebView — EXPERIMENTELL (WKWebView kann WebGL2 seit iOS 15, aber nicht in Scripting-Doku garantiert)
 // ---------------------------------------------------------------------------
 export type CanvasHandle = unknown // Scripting Canvas instance
 export interface GraphicsPort {
-  readonly supportsWebGL: false // immer false bis verifiziert
+  readonly supportsWebGL: false // im Canvas-Hauptthread immer false (NICHT VERIFIZIERT — nie drauf bauen)
   readonly supportsWebGPU: false
   createCanvas(spec: { width: number; height: number }): CanvasHandle
+  // State-Fence für PipelineAdapter (entspricht love.graphics.push("all")/pop())
+  pushAll?(): void
+  popAll?(): void
+  setTilt?(v: number): void
+  // Voxel / Pipeline Erweiterung (Non-Pro):
+  // - Canvas2D: immer verfügbar (default)
+  // - WebView-WebGL: nur wenn WKWebView WebGL2 liefert — EXPERIMENTELL, BENCHMARK ERFORDERLICH
+  readonly supportsWebView?: boolean // true wenn WebView vorhanden (VERIFIZIERT via views/webview)
+  createWebView?(spec: { url?: string }): unknown // WKWebView Handle
+  isWebGL2AvailableInWebView?(): Promise<boolean> // Probe in WebView — EXPERIMENTELL
+  postMessageToWebView?(msg: unknown): void
+}
+
+export interface PipelinePort {
+  list(): Array<{ id: string; def: unknown }>
+  eligible(id: string): boolean
+  worldPipeline(): string | null
+  drawWorld(id: string, ctx: unknown): unknown | null
+  worldPresent(canvas: unknown, ctx: unknown): unknown
+  present(canvas: unknown, ctx: unknown): unknown
+  level(id: string): number
+  setLevel(id: string, n: number): number
+  invalidate(): void
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +194,7 @@ export type Host = {
   files: FilesPort
   network: NetworkPort
   graphics: GraphicsPort
+  pipelines?: PipelinePort
   audio: AudioPort
   input: InputPort
   lifecycle: LifecyclePort

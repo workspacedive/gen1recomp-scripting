@@ -67,10 +67,17 @@
 
 ### 8. plugin-mod-architect
 
-- **Verantwortung:** Mod/Plugin-Architektur (§38), Dependency Graph (§39), Hook Dispatch (§32), Prepared Caches (§33–34), Lua-Performance (§35)
-- **Skills:** `hook-dispatch-optimization`
-- **Outputs:** Mod-Lifecycle, Manifest-Schema (v1/v2 kompatibel), Dependency-Plan (required/optional/version ranges/cycle detection), Prepared-Mod-Cache Key, Lua-Allocation-Analyse
-- **Regel:** Bestehende Gen1Recomp Mod API erhalten — keine zweite inkompatible API ohne Zwang
+- **Verantwortung:** Mod/Plugin-Architektur (§38), Dependency Graph (§39), Hook Dispatch (§32), Prepared Caches (§33–34), Lua-Performance (§35), Rendering Pipelines (§44.1)
+- **Skills:** `hook-dispatch-optimization`, `voxel-pipeline-adapter`
+- **Outputs:** Mod-Lifecycle, Manifest-Schema (v1/v2 kompatibel), Dependency-Plan (required/optional/version ranges/cycle detection), Prepared-Mod-Cache Key, Lua-Allocation-Analyse, **PipelineAdapter + Voxel-Asset-Pipeline (drawWorld/worldPresent/present)**
+- **Regel:** Bestehende Gen1Recomp Mod API erhalten — keine zweite inkompatible API ohne Zwang; `render_pipelines` (`mods/voxel_world` Diorama) 1:1 erhalten, `available` jeden Frame, `gate` nur für Input, `drawFx` für Feld-Effekte, `broken` bei Throw mit Fallback 2D
+
+### 9. voxel-graphics-specialist *(neu, aus iOS-Runtime abgeleitet, parallel)*
+
+- **Verantwortung:** 3D/Grafik-Fokus für Voxel — Canvas-2D Fallback + WebView-WebGL Experiment, Tile/Sprite Atlas, ShaderFX/PaletteFX Äquivalent, Memory/Battery
+- **Skills:** `voxel-pipeline-adapter`, `graphics-audio-input-adapter`
+- **Outputs:** `PipelineAdapter` (Canvas 2D + WebView Three.js), LOD-Strategie (OFF/15/35/50), Frustum/Preload/Budget Integration, Benchmark-Plan für WebGL Probe, `ctx.drawFx` Reprojektion, `invalidate` bei Resize
+- **Regel:** Kein `Metal`/`Native Bridge` ohne Pro — nur `Canvas` + `WebView` WebGL Probe; `BENCHMARK ERFORDERLICH` vor Entscheidung WebGL vs Canvas; kein Overengineering wenn `Canvas` p95 <12 ms
 
 ---
 

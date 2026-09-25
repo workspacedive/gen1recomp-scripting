@@ -201,6 +201,30 @@ Jeder Skill listet **Voraussetzung**, **Input**, **Output**, **Grenzen**, **Fehl
 
 ---
 
+### skill: voxel-pipeline-adapter
+
+- **Zweck:** 3D-Voxel-Mods (`render_pipelines` / `mods/voxel_world`) ohne Pro auf Scripting abbilden — `drawWorld`/`worldPresent`/`present` erhalten, `available`/`gate` respektieren
+- **Status:** TEILWEISE VERIFIZIERT (aus `src/render/Pipelines.lua`, `docs/modding.md` Rendering pipelines, `mods/voxel_world` Doku, `Schemas.lua` R.render_pipelines; Scripting Host: `Canvas` 2D VERIFIZIERT, `WebView` WKWebView vorhanden aber WebGL/OffscreenCanvas `NICHT VERIFIZIERT`)
+- **pro_required:** false — nutzt `Canvas` (2D Fallback) + `WebView` (WKWebView + WebGL) + `FileManager`/`mod.cache`/`Importers`, kein Pro
+- **Input:** Mod `render_pipelines` Record (`label`, `levels`, `hotkey`, `priority`, `available`, `gate`, `update`, `drawWorld(ctx)->canvas|nil`, `worldPresent(canvas,ctx)->canvas`, `present(canvas,ctx)->canvas`, `invalidate`), `ctx` (`state`, `cam`, `vw/vh`, `scale`, `level`, `paletteFor`, `spriteColors`, `drawFx`)
+- **Output:** `PipelineAdapter` mit zwei Backends + automatischem Fallback:
+  - **Canvas-2D Backend (default, VERIFIZIERT):** Isometrische / Billboarding-Diorama via `Canvas`/`ImageRenderer`/`TileRenderer` Atlas — kein echter Depth Buffer, aber `available()` liefert `true` sobald Canvas existiert; für `worldPresent` Farb-Grade als `ctx.filter`
+  - **WebView-WebGL Backend (EXPERIMENTELL, BENCHMARK ERFORDERLICH):** `WebView` mit Three.js/Babylon (ESM via `fetch` + `FileManager` Cache), rendert Voxel-Szene offscreen in `WebView` Canvas, liest via `ImageRenderer`/`Data` zurück oder composited direkt im `WebView` Overlay; `available()` prüft `WebGL2` Probe in WebView
+- **Adapter-Regeln:**
+  - `Pipelines` Auswahl unverändert: höchste `priority` gewinnt, `available()` jeden Frame neu, `gate` nur für Input (nie für draw), `ctx.drawFx(project,scale)` für Feld-Effekte (!, Heal, Fly, Fishing, Darkness) unter eigener Projektion — in WebGL via Raycast/Anchor-Reprojektion
+  - `drawWorld` Rückgabe `canvas|nil` validiert via `isCanvas` (userdata|table `getWidth`/`getHeight` Check) — vergessenes `return` → Fallback 2D, nie Blackscreen; Fehler → `broken[id]=true`, attribuiert an `ownerOf(id)`, Session deaktiviert, loggt einmal
+  - `worldPresent`/`present` falten über `isCanvas` geprüfte Canvases, `push("all")`/`pop()` State-Fence (in Scripting: `save()`/`restore()` + `resetTransform`)
+  - Tilt ↔ Welt-Pipeline gegenseitig exklusiv (`excludeTilt`), nur eine `drawWorld` aktiv — in Scripting gleiches `GraphicsPort` Lock
+- **Asset-Pfad:**
+  - Voxel-Modelle als `required_assets` / `Importers` Pack `kind: voxels` (z. B. `voxels/route1.bin`) oder `mod.cache:write("extract/v1/mesh", bytes)` (64 MiB cap) oder `mod.storage:writeBytes` (512 MiB, staged+byte-verified, 64 MiB in mod.cache, 512 MiB in storage) — Quelle nie redestribuiert, nur lokal generiert
+  - Import-Pipeline: `DocumentPicker` → `FileManager` → `Job` (Thread.runInBackground) Decode (z. B. MagicaVoxel → Mesh) → `mod.cache` + `PreparedAssetCache` (`hash(mod)+apiVersion+coreVersion+depHash`)
+  - Streaming: LOD (15/35/50 wie Beispiel `levels`), Frustum-Culling, `PreloadManager` Top-N Maps, `ResourceGovernor` Budget (Voxel Budget separat)
+- **Performance:**
+  - `drawWorld` Zeitbudget 6–8 ms pro Frame (TimelineCanvas ~60 fps) — bei Überschreitung `AdaptivePerformanceManager` stuft `HIGH→BALANCED` (Voxel LOD ↓, worldPresent aus, Shadow/Wasser aus)
+  - `Telemetry`: `drawWorldMs` p95, `worldPresentMs`, `voxelCacheHit`, `voxelTriangles`, `availableFalseFrames`
+- **Grenzen:** Keine erfundenen `Renderer3D` APIs — `Renderer3D.ok()` im Original prüft Depth-Canvas/Shader Verfügbarkeit; in Scripting → `WebGL2` Probe in WebView + `Canvas` Existenz; `love.graphics.newShader`/`newCanvas` → `Canvas`/`WebView` Canvas; kein `Metal`/`Native Bridge` ohne Pro
+- **Fehlerfälle:** Headless (`available()==false`) → 2D Pfad; vergessener Canvas → ignorieren; Throw → `broken` + Fallback; Resize → `invalidate()` leert GPU/Cache
+
 ### skill: observability-diagnostics
 
 - **Zweck:** Strukturiertes Logging, Telemetry, Diagnose-Bundle

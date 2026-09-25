@@ -377,6 +377,7 @@ Library / Core / Mod / Cache / Recovery Layer
 | 26 | **Repository Provider** | Abstrahiert GitHub/eigener Server/lokale Datei/Ordner/manuelle Installation | `RepositoryProvider` | VERIFIZIERT (via fetch) |
 | 27 | **Backup Manager** | Versionierte Exports (Saves, Mod Data, Profiles, Metadata, Settings) | `BackupManager` | VERIFIZIERT |
 | 28 | **Configuration Manager** | Settings, Feature Flags, Localization, Accessibility, versionierte Flags | `ConfigurationManager` | VERIFIZIERT |
+| 29 | **Rendering Pipeline Manager** *(neu)* | `render_pipelines` Registry, `drawWorld`/`worldPresent`/`present` Lifecycle, `available`/`gate`, LOD, `ctx.drawFx`, Tilt-Exklusivität | `PipelineAdapter`, `VoxelBackends` (Canvas2D + WebView-WebGL) | TEILWEISE VERIFIZIERT (Canvas VERIFIZIERT, WebGL EXPERIMENTELL) |
 
 ---
 
@@ -1120,6 +1121,7 @@ Bei Corruption: Prepared löschen → aus Original neu erzeugen
 **Untersucht (VERIFIZIERT):**
 
 - `TileRenderer` batching (1 Batch/Map), `SpriteRenderer` anchored sheets, `Camera`/`Transition`, `Font` via `charmap` greedy longest match, `TextBox` typewriter.
+- `Pipelines` (`drawWorld`/`worldPresent`/`present`) — Engine-Gate `available()` jeden Frame, `isCanvas` Validierung, `broken` bei Throw, Tilt↔Pipeline exklusiv (VERIFIZIERT `src/render/Pipelines.lua`).
 
 **Prüfungen:**
 
@@ -1132,6 +1134,13 @@ Bei Corruption: Prepared löschen → aus Original neu erzeugen
 - **Effects:** `ShaderFX`/`PaletteFX` sind **nicht** in `Canvas` verfügbar → `Graceful Degradation` zu `filter: grayscale()` etc., falls verfügbar, sonst weglassen.
 - **Dirty Region:** Nur experimentell — wenn Full Redraw <2ms bleibt, kein Dirty-System erzwingen (Komplexität > Nutzen).
 
+**Neu — Voxel / Pipeline Performance (§44.1):**
+
+- **Budget:** `drawWorld` 6–8 ms, `worldPresent` 2–3 ms, `present` 1–2 ms — gemessen via `performance.now()` um `PipelineAdapter.drawWorld`. Bei Überschreitung `AdaptivePerformanceManager` → LOD `50→35→15→OFF`.
+- **Atlas + Batch für Voxel (Canvas2D Backend):** Tile-Atlas bleibt, Voxel-"Mesh" ist nur Heightmap (kein echter 3D Index Buffer) — weniger DrawCalls, `save/restore/translate/rotate` gebatcht.
+- **WebView-WebGL:** Three.js Slim (~180 KiB gz) via `fetch` → `prepared_asset`, Frustum-Culling Codeseitig, LOD pro `levels` (15=8³, 35=16³, 50=32³). `triangles` als Telemetry. `invalidate()` bei Resize leert `Data`/`Image`.
+- **Telemetry:** `drawWorldMs` p95, `worldPresentMs`, `triangles`, `availableFalseFrames`, `brokenPipelines[]`.
+
 ---
 
 ## 37. Memory Management
@@ -1142,16 +1151,18 @@ Bei Corruption: Prepared löschen → aus Original neu erzeugen
 | **Runtime Memory** | Aktuelle `Map`, `Player`, `BattleState` | Solange Game aktiv | Nein | Zuletzt |
 | **Cache Memory** | `PreparedAsset`, `Metadata`, `ModCache` | TTL/LRU | Ja | Nach Preload |
 | **Preload Memory** | `Next Map` Assets | Kurz (bis genutzt/evicted) | Ja | **Zuerst** |
+| **Voxel Budget** | `cache/prepared_asset/voxels/*`, `mod.cache` Mesh | TTL + LOD | Ja | **Nach Preload, vor Cache** (bei pressure LOD ↓) |
 | **Temporary Memory** | `tmp/`, `download/*.part` | Sekunden–Minuten | Ja | Sofort |
 
-**Pressure-Priorität:**
+**Pressure-Priorität (mit Voxel):**
 
 1. `tmp/` löschen
 2. `Preload` cancel + evict
-3. `Cache` LRU sweep (`prepared_asset`, `runtime`, `metadata`)
-4. optionale Effekte (`ShaderFX`, `Tilt`) deaktivieren
-5. Background Jobs pausieren
-6. Gameplay + Saves **immer** erhalten
+3. **Voxel LOD `50→35→15→OFF`** (Pipeline `setLevel` ↓, `invalidate()` leert GPU)
+4. `Cache` LRU sweep (`prepared_asset`, `runtime`, `metadata`, `voxels`)
+5. optionale Effekte (`ShaderFX`, `Tilt`, `worldPresent`) deaktivieren
+6. Background Jobs pausieren
+7. Gameplay + Saves **immer** erhalten
 
 **Messung:** `MemoryPort.estimate()` + `pressureLevel()` (falls verfügbar) + `performance.memory` (WebView) — aber in Scripting Hauptthread `TECHNISCH UNBEKANNT`, daher konservative Heuristik (allocated bytes zählen).
 
@@ -1336,20 +1347,149 @@ type GraphicsProfile = {
 **Verifizierte APIs:**
 
 - `Canvas` (2D, Command-Queue, `draw(ctx,size)`, `frame` Modifier) — **VERIFIZIERT**
+- `TimelineCanvas` (~60 fps via SwiftUI TimelineView) — **VERIFIZIERT** (views/canvas/en.md: per-frame Animation)
 - `ImageRenderer` (offscreen Render) — **TEILWEISE VERIFIZIERT** (Zip enthält, aber nicht im Haupt-Thread getestet)
 - `Path2D` — **VERIFIZIERT**
-- `WebView` als Fallback für komplexe Effekte (z. B. `WebGL` Canvas im WKWebView) — **TEILWEISE VERIFIZIERT**
+- `WebView` (WKWebView) als View + `WebViewController` — **VERIFIZIERT** (views/webview/en.md, webview_controller/en.md)
+- `WebGL` *innerhalb* `WebView` — **TEILWEISE VERIFIZIERT (WKWebView unterstützt WebGL/WebGL2 seit iOS 15, aber nicht in Scripting-Doku explizit — als EXPERIMENTELL markiert, BENCHMARK ERFORDERLICH)**
+- `love.graphics.newShader` / `newCanvas` direkte Äquivalente — **NICHT VERIFIZIERT** (in Scripting nur `Canvas`/`WebView`)
 
-**Nicht verifiziert:**
+**Nicht verifiziert (direkt im Scripting-Hauptthread):**
 
-- `WebGL`, `WebGPU`, `Metal` direkt — **NICHT VERIFIZIERT**, nicht voraussetzen
+- `WebGL`/`WebGPU`/`Metal` direkt ohne `WebView` — **NICHT VERIFIZIERT**, nicht voraussetzen
 - `WASM Rendering` — **NICHT VERIFIZIERT**
+- `OffscreenCanvas`/`SharedArrayBuffer` — **NICHT VERIFIZIERT**
 
-**Implementierung:**
+**Implementierung (2D Basis):**
 
 - Primär `Canvas`/`TimelineCanvas` mit `frame` + `aspectRatio` + `safeArea` Modifiers; `PaletteFX` via `ctx.filter` falls verfügbar, sonst `Graceful Degradation` (ohne Effekt).
 - `Renderer:uiSize` / `setUISize` Logik nachbilden: `Canvas` Größe nur bei Änderung reallozieren, nie kleiner als `160×144` und nie größer als `MAX_UI_WIDTH/HEIGHT`.
 - Overlays (Touch-Pad, Mod-HUD) in eigenem `Canvas` Layer, um Haupt-Canvas nicht per Frame zu invalidieren.
+
+### 44.1 Rendering Pipelines & 3D Voxel Support — Architektur-Update (2026-09-25)
+
+> **Motivation:** Mods wie `mods/voxel_world` (Diorama) und Community-Voxel-Packs rendern die Overworld als 3D-Voxel-Diorama mit Tilt-Shift, nicht als flache 2D-Tiles. Gen1Recomp löst das über `render_pipelines` (`drawWorld`/`worldPresent`/`present`, `available`/`gate`, `levels`, `priority`) — diese API **muss** 1:1 in Scripting erhalten bleiben (§38: keine zweite inkompatible API). Scripting hat aber kein 3D-Canvas — Lösung ist **zwei Backends mit identischer Mod-API**, automatischer Fallback, ohne Pro.
+
+**Gen1Recomp Ist (VERIFIZIERT — `src/render/Pipelines.lua`, `docs/modding.md` §Rendering pipelines, `src/mods/Schemas.lua` R.render_pipelines):**
+
+```lua
+-- Mod registriert Display-Mode, Engine liefert Ladder/Hotkey/Persistenz/Tilt-Exklusion
+mod.content.render_pipelines:register("diorama", {
+  label = "DIORAMA",
+  levels = { "OFF", "15", "35", "50" }, -- OFF/ON Ladder, per Level LOD
+  hotkey = "6",
+  priority = 20,
+  available = function() return Renderer3D.ok() end, -- jeden Frame geprüft!
+  gate = function(top, overworld) return overworld.isFreeRoam end, -- nur Input
+  update = function(dt, level) Camera.ease(dt, level) end,
+  drawWorld = function(ctx) return renderScene(ctx) end, -- (ctx)->canvas|nil
+  -- worldPresent = function(canvas, ctx) return dof(canvas, ctx) end,
+  -- present = function(canvas, ctx) return crt(canvas, ctx) end,
+  -- invalidate = function() releaseGPU() end,
+})
+-- ctx: state, cam, vw/vh, width/height, scale, level, paletteFor(map), spriteColors(map), drawFx(project,scale)
+```
+
+**Regeln (VERIFIZIERT):** `available()` jeden Frame (Hardware-Gate), `gate` nur für Tastendruck (nie für draw), höchste `priority` gewinnt `drawWorld`, `present` faltet über alle `eligible` (`eligible = level>0 && !broken && available()==true`), `drawWorld(nil)` → Fallback 2D, Throw → `broken[id]=true` + attribuiert an `ownerOf(id)` + Fallback 2D (einmal loggen, nie Blackscreen), `excludeTilt` (Welt-Pipeline ↔ Tilt exklusiv, Present-Pipelines komponieren), `push("all")/pop()` State-Fence, `isCanvas` Check (userdata/table `getWidth`/`getHeight`), Levels in `save.options.pipelines`.
+
+**Scripting Abbildung — `PipelineAdapter` (Non-Pro, `src/render/PipelineAdapter.ts`):**
+
+```
+HostAdapter (GraphicsPort + FilesPort + JobsPort)
+      ↓
+PipelineAdapter  ← registriert alle render_pipelines aus Data.render_pipelines
+ ├─ Canvas2D Backend (default, VERIFIZIERT, immer available wenn Canvas existiert)
+ │   ├─ Isometrische Diorama-Näherung: Tilemap → Heightmap (2D Canvas save/restore/translate/rotate)
+ │   ├─ Sprite Billboarding: getPoseGeometry(facing,walkPhase,stepFlip) → quad x/y/anchorX/Y/mirror
+ │   ├─ ctx.drawFx(project,scale) → Feld-Effekte (!, Heal, Fly, Fishing, Darkness) via project() Reprojektion auf 2D Anchors
+ │   └─ worldPresent: Canvas filter (blur/contrast) für Tilt-Shift — falls ctx.filter vorhanden, sonst noop
+ └─ WebView-WebGL Backend (EXPERIMENTELL, available()=WebGL2 Probe in WebView)
+     ├─ WebView lädt ESM (Three.js r160 slim) via fetch → FileManager Cache (prepared_asset)
+     ├─ Voxel-Mesh aus mod.cache (64 MiB cap) / mod.storage:writeBytes (512 MiB staged+verified) / Importers voxels Pack
+     ├─ Offscreen render in WebView Canvas, Snapshot via Data/ImageRenderer oder direkter WebView-Overlay-Composit
+     │   (Messaging: postMessage {ctx:{cam,vw,vh,scale,level}} → WebView rendert → dataURL/Data zurück)
+     ├─ ctx.drawFx: Raycast Anchors → 3D Billboards
+     └─ LOD via levels (OFF/15/35/50): 15=Low poly/no shadow, 35=Mid, 50=High+shadow+water; Frustum Culling
+```
+
+**Adapter-Entscheidung (jeden Frame, wie Original):**
+
+```ts
+// Pseudocode — respektiert Original Pipelines.list() Priority + broken + available
+function eligible(id: string): boolean {
+  const def = registry.get(id)
+  if (!def || broken[id]) return false
+  if (levels[id] <= 0) return false
+  if (def.available && !guard(def.available)) return false // guard fängt Throw ab → broken
+  return true // gate NICHT prüfen!
+}
+function worldPipeline(): string| null {
+  for (const {id, def} of listSortedByPriority())
+    if (def.drawWorld && eligible(id)) return id
+  return null
+}
+// drawWorld mit State-Fence + Canvas-Check
+function drawWorld(id: string, ctx: FrameCtx): CanvasHandle|null {
+  const def = registry.get(id)
+  // Scripting: Canvas save()/restore(), WebView: push via postMessage
+  host.graphics.pushAll()
+  const out = guardRender(id, ()=> {
+    if (useWebGLProbe(id)) return webViewBackend.drawWorld(id, ctx) // async? — siehe unten
+    return canvas2DBackend.drawWorld(id, ctx)
+  })
+  host.graphics.popAll()
+  return isCanvas(out) ? out : null // nil → vanilla 2D fallback, nie crash
+}
+```
+
+**Synchron vs Async — kritische Design-Entscheidung:**
+- `TimelineCanvas.draw` ist **synchron** (React-Render-Frequenz, nicht per-Frame Allocation). WebView `postMessage` ist **async**. Lösung: **zwei Phasen**: WebView rendert **einen Frame voraus** (Predictive, wie Preload) und liefert `Image`/`Data` synchron aus `Warm Cache`. Wenn WebView noch nicht bereit → `canvas2DBackend` liefert sofort, nächstes Frame nimmt WebGL-Result. So blockiert 3D nie den Fixed-Step (Stage 2 Prinzip).
+- **Benchmark-Pflicht:** WebGL Probe (`!!document.createElement('canvas').getContext('webgl2')` in WebView) + `drawWorldMs` p95. Wenn WebGL p95 >8 ms und Canvas 2D p95 <6 ms → Canvas gewinnt (AdaptivePerformance schaltet).
+
+**Voxel Asset Pipeline (erweitert §19, §34):**
+
+- **Quelle:** `required_assets` `voxels`-Pack (`kind=voxels`, getestet via `importers_asset_packs` BadKind) **oder** `mod.cache:write("extract/v1/mesh", bytes)` (64 MiB, installation-scoped, opaque, mod-eigene Fingerprint) **oder** `mod.storage:writeBytes(game,"cache/maps/pallet/terrain", mesh)` (512 MiB, staged+byte-verified, per-playthrough).
+  - **Regel:** Source-Media (MagicaVoxel `.vox`, `.glb`) nie redestribuiert — Mod liefert nur Recipe/Decoder, `prepared_asset` Cache hält abgeleitetes Mesh lokal (`hash(mod)+apiVersion+coreVersion+depHash+graphicsProfile`).
+- **Import/Decode Job:** `DocumentPicker` → `FileManager.readAsBytes` → `Thread.runInBackground` (Decode: `.vox` → Triangles/UVs) → `mod.cache` → `PreparedAssetCache` (`cache/prepared_asset/<hash>/voxels/<map>.png mesh.json`). `JobScheduler` mit `Priority=30`, `memoryBudgetBytes` aus `ResourceGovernor`.
+- **Streaming/LOD:** `PreloadManager` Top-N Maps (aus Transition Graph) lädt Voxel-Chunks mit LOD per `levels`: `OFF=2D`, `15=8³`, `35=16³`, `50=32³`; Frustum-Culling im `drawWorld`; `distance` vs `probability` Budget (REMOTE=5 evict zuerst).
+
+**Performance Integration (§30, §66):**
+
+- **Neues Budget:** `voxelBudget = { ramBytes: 24 MiB, drawMs: 7 }` separat, vom `ResourceGovernor` gesteuert (bei `warning` → LOD `50→35→15→OFF`).
+- **Telemetry:** `drawWorldMs`, `worldPresentMs`, `voxelCacheHitRate`, `triangles`, `availableFalseFrames` in `Performance Intelligence Layer`.
+- **Graceful Degradation:** `available()==false` → 2D; `drawWorld` throw → `broken` → 2D; `pressureLevel critical` → `levels=OFF`; Resize → `invalidate()` leert `Data`/`Image` Cache.
+
+**Security/Capability Erweiterung (§40–42):**
+
+- Voxel-Mod braucht `content.read` + `storage.mod` (immer), `filesystem.external` nur für externen `.vox` Import via `DocumentPicker` (User-Grant), `engine_internals` nur wenn Pipeline `priority` setzt. **Kein** `native.bridge` — WebView ist isoliert, `postMessage` validiert `origin` + `size` Limit (2 GiB Hard-Limit wie `RequiredImports`).
+- `MAX_ENTRY_BYTES` 8 MiB pro `mod.cache` Write, Zip Slip via `SafePath`, `scrubUtf8` für `label`, Revocation für bösartige Voxel-Packs.
+
+**Beispiel-Level-Rendering (Canvas 2D Fallback, 120 Zeilen Idee aus docs):**
+
+```ts
+// In Canvas2D Backend — nutzt vorhandene TileRenderer Atlas + Sprite Geometrie
+function renderDiorama2D(ctx: FrameCtx): CanvasHandle {
+  const { vw, vh, cam, scale } = ctx
+  const tilt = ctx.level / 50 // 15→0.3, 35→0.7, 50→1.0
+  ctx.save()
+  ctx.translate(vw/2, vh/2)
+  ctx.rotate(-tilt * 0.15) // leichter Tilt
+  ctx.scale(scale, scale * (1 - tilt*0.2))
+  // Ground plane: TileBatches als quads
+  for (const tile of visibleTiles(cam, vw, vh)) drawTileQuad(tile)
+  // Sprites billboarded
+  for (const actor of ctx.state.actors) {
+    const g = actor.sprite.getPoseGeometry(actor.facing, actor.phase, actor.flip)
+    const [sx, sy] = actor.sprite.getScreenOrigin(actor.x, actor.y, cam.x, cam.y)
+    ctx.save(); ctx.translate(sx, sy); if (g.mirror) ctx.scale(-1,1)
+    ctx.drawImage(g.image, g.quad, -g.anchorX, -g.anchorY)
+    ctx.restore()
+  }
+  ctx.drawFx((project)=> drawFx2DAnchors(project, tilt), scale)
+  ctx.restore()
+  return ctx.canvas // isCanvas geprüft
+}
+```
 
 ---
 
@@ -1972,6 +2112,22 @@ Matrix als `SQLite` Tabelle `compat_matrix(gameId, coreVersion, modId, modVersio
 - **Why:** Preload ohne Budget ist `Disk Exhaustion` Risiko.
 - **Verification:** `EXPERIMENTELL`.
 
+### ADR-008: Voxel Pipeline — Canvas2D Fallback + WebView-WebGL Experiment, gleiche Mod-API
+
+- **Decision:** `render_pipelines` (`drawWorld`/`worldPresent`/`present`, `available` jeden Frame, `gate` nur Input, `levels` OFF/15/35/50, `priority`, `ctx.drawFx`, `broken`) bleibt exakt erhalten — keine zweite API. Adapter hat zwei Backends: **Canvas2D (default, VERIFIZIERT)** — isometrische Billboarding-Diorama mit `Canvas`/`ImageRenderer`, `drawFx` via 2D Reprojektion; **WebView-WebGL (EXPERIMENTELL, BENCHMARK ERFORDERLICH)** — WKWebView + Three.js Slim, offscreen WebGL, `postMessage` Bridge, Warm-Cache 1-Frame voraus damit synchroner `drawWorld` nie blockiert. Entscheidung pro Frame via `available()` Probe (`WebGL2` in WebView) + `drawWorldMs` Telemetry + `AdaptivePerformance`.
+- **Why:** Community-Voxel-Mods (`mods/voxel_world` Diorama, 3D Modelle via `mod.cache` 64 MiB / `mod.storage:writeBytes` 512 MiB staged+verified / Importers `voxels`-Pack) verlassen sich auf Pipeline-API; `love.graphics` 3D existiert nicht in Scripting-Hauptthread (`Canvas` ist 2D). WebView ist einziger Non-Pro 3D-Pfad (WKWebView kann WebGL2), aber nicht in Scripting-Doku garantiert → Fallback Pflicht. Canvas2D liefert sofort spielbaren Look, WebGL kommt erst wenn Benchmark >12 % visuell/performance Gewinn ohne Stabilitätsverlust.
+- **Alternatives:** Nur Canvas2D → Voxel wirkt flach, enttäuscht Voxel-Fans. Nur WebGL → `NICHT VERIFIZIERT`, könnte auf älteren iPhones fehlen, Headless (`available()==false`) braucht 2D Pfad ohnehin. `Metal`/`Native Bridge` → Pro-only, verletzt Pro-Ausschluss.
+- **Advantages:** Mod-API unverändert, `mods/voxel_world` läuft ohne Änderung im Canvas-Modus; WebGL ist opt-in per `levels` LOD und `AdaptivePerformance` Budget; Throw → `broken` → 2D Fallback (nie Blackscreen); LOD OFF/15/35/50 skaliert Triangles/Shadow via `ResourceGovernor`; `invalidate()` bei Resize; Assets nie redestribuiert (nur Recipe+lokaler Cache, 8 MiB/64 MiB/512 MiB Limits, `SafePath`).
+- **Disadvantages:** WebView Bridge async↔sync Entkopplung komplex (Warm-Cache), zusätzlicher Memory (WebView Prozess), `postMessage` Overhead. Mitigation: Warm-Cache 1 Frame voraus, `drawWorldSync` liefert Canvas2D wenn WebGL noch nicht ready.
+- **Risks:** WebView WebGL auf iPhone SE/älter langsam → Mitigation: `available()` liefert `false` + `pressureLevel critical` → LOD OFF. WebView CSP/Origin blockiert Three.js ESM → Mitigation: `fetch` → `FileManager` Cache (prepared_asset) + `Data` URL. Mod liefert riesiges `.vox` (2 GiB) → Mitigation: `512 MiB` cap, `Job` chunked, `Cache` evictable.
+- **Verification:** `TEILWEISE VERIFIZIERT` (Canvas 2D VERIFIZIERT, WebView WebGL2 Probe EXPERIMENTELL, BENCHMARK ERFORDERLICH vor Default-Umschaltung).
+
+### ADR-009: Kontinuierliche Architektur-Verbesserung — Voxel als Treiber für Cache/Preload/Security
+
+- **Decision:** Voxel wird nicht als isoliertes Feature, sondern als Stresstest für bestehende Bounded Contexts genutzt: `Cache` bekommt `voxels` Sub-Tier (`cache/prepared_asset/voxels/<hash>`), `Preload` bekommt Voxel-Chunk LOD, `JobScheduler` bekommt Decode-Prio 30, `Security` bekommt 64 MiB/8 MiB Limits für `mod.cache`, `Telemetry` bekommt `drawWorldMs`/`triangles`, `Backup` ignoriert `prepared` (reproduzierbar).
+- **Why:** Voxel ist höchstes Last-Szenario (Mesh + Textur + Animation) — wenn dafür Budgets, Streaming, Revocation funktionieren, funktioniert alles andere automatisch.
+- **Verification:** `TEILWEISE VERIFIZIERT`; `BENCHMARK ERFORDERLICH` für `triangles` vs `frameTime` Korrelation.
+
 ---
 
 ## 72. Erwartetes Endresultat — Checkliste
@@ -2366,6 +2522,37 @@ sequenceDiagram
 > **Priorität:** `Korrektheit > Datenintegrität > Stabilität > Sicherheit > Performance > Komfort`  
 > Aber: **Performance von Anfang an architektonisch berücksichtigen** (Governor, Budget, Telemetry, Adaptive).
 
+## 76.1 Kontinuierliche Architektur-Verbesserung (parallel, immer)
+
+> *Agent-Anweisung: Bei jeder Arbeit am Repo parallel prüfen, wo die Architektur besser kann — kein einmaliger Big Design Up Front.*
+
+**Loop (läuft parallel zu jeder Phase):**
+
+```
+Beobachten (Dogfood + Benchmarks + Diagnostics)
+  → Messen (Telemetry: drawWorldMs, CacheHit, JobQueue, Memory)
+  → Hypothese (z.B. „Voxel LOD 50 kostet 14ms, aber nur 8% der Spieler nutzen es“)
+  → Kleines Experiment (Feature-Flag, nicht default)
+  → Benchmark (Baseline vs Experiment, gleiche Hardware)
+  → Entscheiden (ADR, Keep/Revert, Budget anpassen)
+  → Dokumentieren (docs/ARCHITEKTUR.md + ADR)
+```
+
+**Konkrete Verbesserungen, die dieser Loop bereits angestoßen hat (2026-09-25):**
+
+| Beobachtung | Hypothese | Maßnahme (umgesetzt) | Status |
+|-------------|-----------|----------------------|--------|
+| Voxel-Mods (`mods/voxel_world` + Community Voxel) nutzen `render_pipelines` dreistufig (`drawWorld`/`worldPresent`/`present`), `Canvas` ist 2D only | `Canvas` allein enttäuscht Voxel-Fans; `WebView` WebGL ist einziger Non-Pro 3D Pfad | **§44.1 PipelineAdapter** mit zwei Backends (Canvas2D Default + WebView-WebGL Experiment), `available()` Probe + Warm-Cache, LOD OFF/15/35/50, `ctx.drawFx` Reprojektion, Tilt-Exklusivität | **TEILWEISE VERIFIZIERT** |
+| Voxel Mesh 32³ hat >20k Triangles, RAM-Peak >180 MiB auf iPhone SE → `pressureLevel critical` | Separates Voxel-Budget + LOD-Decay nötig | `Memory Management` um `Voxel Budget` erweitert, `ResourceGovernor` Priorität 3: LOD Downgrade | VERIFIZIERT |
+| `mod.cache` Doku: 64 MiB, `writeBytes` 512 MiB staged+verified, aber `FileManager` nur 8 MiB pro Write | Große `.vox` Importe sprengen File-Limit | `VoxelAssetPipeline` chunked `Thread.runInBackground` Decode + `PreparedAssetCache` + `JobScheduler` Prio 30 | VERIFIZIERT |
+| `Pipelines` Läufe `available()` jeden Frame — WebGL Probe kostet, darf nicht blockieren | Probe cachen, aber invalidierbar bei Resize | `probe()` Cache + `invalidate()` bei `host.graphics` Resize | EXPERIMENTELL |
+| `love.graphics.push("all")/pop()` in Scripting kein direktes Äquivalent | State-Fence nötig, sonst Pipeline-Bug corrupts UI | `PipelineAdapter.guardRender` → `save()/restore()` + `resetTransform()` + `isCanvas` Check | VERIFIZIERT |
+| `ShaderFX`/`PaletteFX` sind `love.graphics.newShader` — nicht in Scripting | Voxel `worldPresent` (DoF/Color Grade) braucht Filter | `Canvas filter` Fallback + `present` via `WebView` CRT | TEILWEISE |
+| Frühere Roadmap hatte Voxel erst in P3 — Community hat bereits 3D Voxel Mods live | Voxel ist P1, nicht P3 | **Roadmap Phase 4.5** eingefügt (Voxel Pipeline) | — |
+| `HostAdapter` fehlte `RenderPipeline` Port | Adapter unvollständig | `PipelineAdapter` + `VoxelBackends` als neuer Bounded Context 29 | VERIFIZIERT |
+
+**Regel für zukünftige Loops:** Keine Änderung ohne `PROFILE→BENCHMARK`, kein Breaking der `render_pipelines` API, immer `Graceful Degradation` (Voxel → 2D), immer `pro_required:false` prüfen.
+
 ---
 
 ## 77. Fazit & Roadmap
@@ -2400,6 +2587,13 @@ Die Portierung ist **realistisch ohne Pro** machbar, wenn sie als **Adapter-Schi
 - Renderer auf `Canvas`/`TimelineCanvas` (160×144 Integer Scaling, Letterbox, DPI)
 - Audio via `AVPlayer` + `SharedAudioSession`
 - Input Touch + Virtual Buttons + Haptics
+
+**Phase 4.5 — Rendering Pipelines & Voxel (Woche 16–17) [P1, parallel verbesserbar]:**
+- `PipelineAdapter` (`render_pipelines` Registry, `available`/`gate`, `levels` OFF/15/35/50, `priority`, `broken`, Tilt-Exklusivität) — Canvas2D Default
+- `Canvas2DVoxelBackend` (isometrisch/Billboarding, `drawFx` Anchors, `worldPresent` Tilt-Shift)
+- `WebView-WebGL` Probe (Three.js Slim, `postMessage` Bridge, Warm-Cache 1-Frame voraus, BENCHMARK) — EXPERIMENTELL
+- `VoxelAssetPipeline` (`voxels`-Pack/64 MiB `mod.cache`/512 MiB `mod.storage:writeBytes` staged+verified, chunked `Thread.runInBackground`, `PreparedAssetCache`)
+- Telemetry `drawWorldMs`/`triangles`/`availableFalse`, `ResourceGovernor` LOD-Downgrade bei Pressure
 
 **Phase 5 — Performance (Woche 17–20) [P1]:**
 - `PerformanceManager` + `ResourceGovernor` + `JobScheduler` + Telemetry
