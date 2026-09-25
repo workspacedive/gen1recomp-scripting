@@ -23,7 +23,7 @@ V0–V3 were done in the development sandbox; V4 needs a device (§5).
 | Scripting typings pinned + verified | V0 | `npm run fetch-types` | `global.d.ts` 710 261 B, `scripting.d.ts` 456 732 B, SHA-256 match (Honye/scripting-scripts @41f3d238) |
 | Host code vs. Scripting API | V0 | `npm run typecheck` | 0 errors |
 | Free tier only | V0 | skill S1, [scripting-pro-vs-free.md](scripting-pro-vs-free.md) | every used API/page free |
-| Pure host logic | V1 | `npm test` | 18/18 tests (ZIP policy, manifests, RDPK, paths incl. 24 WebView-guard attack vectors, bridge schema, launch plans, settings, Lua table parser on a real save sample, checksum cross-check, UI text lint) |
+| Pure host logic | V1 | `npm test` | 20/20 tests (ZIP policy, manifests, RDPK, paths incl. 24 WebView-guard attack vectors, bridge schema, launch plans incl. "never the proprietary launcher", settings, Lua table parser on a real save sample, checksum cross-check, UI text lint, mandatory attribution, version consistency) |
 | Our Lua parses on 5.1 | V0 | `npm run lint:lua` | 20 files, 0 problems |
 | `bit` library | V2 | `tools/verify-lua.sh` | identical to LuaJIT on 21 700 output lines |
 | Escape transform | V2 | `tools/verify-lua.sh` | 44 files / 8592 literals / 322 rewrites identical; shipped archive 27 files / 2921 literals / 149 rewrites; idempotent; compiles (2 documented non-game exceptions) |
@@ -46,6 +46,9 @@ npm run harness -- --game .cache/game-0.3.14.love --lovejs .cache/lovejs/compat 
   --transport chunks --duration 30 --shots 12,30 --selftest --out .cache/runs/e2e
 ```
 
+The harness starts the unmodified archive without launch arguments, so the
+game shows its own launcher — this only exercises the official release
+locally; RecompDeck itself never starts that (proprietary) launcher.
 `report.json` contains every host message, console line, stats sample and
 the self-test results; the screenshots show the official launcher in its
 portrait mobile layout (game selector, MODS/FIND/ONLINE/SKINS/IMPORT tabs,

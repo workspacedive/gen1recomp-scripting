@@ -1,6 +1,9 @@
 // Builds the game launch request (command-line arguments + environment) from
 // the host state, using ONLY the game's documented launch interface
 // (src/core/LaunchOptions.lua and the POKEPORT_* variables in main.lua).
+// By design there is no way to open the game's own launcher: it is
+// proprietary (gen1recomp LICENSE.MD, Additional Terms §2) and RecompDeck
+// provides its own native launcher carrying the required credit.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { BRIDGE_ENV, GAME_IDENTITY, GameId, isGameId } from './constants'
@@ -12,8 +15,6 @@ export interface LaunchRequest {
   slot?: string
   /** Path of a staged ROM inside the love.js FS -> headless import. */
   importRomPath?: string
-  /** Open the official launcher instead of booting a game. */
-  launcher?: boolean
 }
 
 export interface LaunchPlan {
@@ -36,8 +37,6 @@ export function buildLaunchPlan(req: LaunchRequest, settings: Settings): LaunchP
     if (!/^\/rd\/rom\/[A-Za-z0-9_.-]+$/.test(req.importRomPath)) throw new Error('invalid ROM staging path')
     env.POKEPORT_IMPORT_ROM = req.importRomPath
     if (req.game && isGameId(req.game)) env.POKEPORT_VERSION = req.game
-  } else if (req.launcher) {
-    args.push('--launcher')
   } else if (req.game) {
     if (!isGameId(req.game)) throw new Error('unknown game ' + req.game)
     // "--game=red" spelling: "--game red" would be taken as a game path by

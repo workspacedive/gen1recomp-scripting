@@ -206,6 +206,10 @@ test('launch: plans use only documented options', () => {
   assert.equal(imp.env.RECOMPDECK_BRIDGE, '1');
   assert.throws(() => launch.buildLaunchPlan({ game: 'red', slot: '../x' }, s));
   assert.throws(() => launch.buildLaunchPlan({ importRomPath: '/etc/passwd' }, s));
+  // the proprietary launcher can never be requested (license term 2)
+  for (const req of [{}, { launcher: true }, { game: 'red', launcher: true }]) {
+    assert.ok(!launch.buildLaunchPlan(req, s).args.includes('--launcher'), JSON.stringify(req));
+  }
   assert.deepEqual(launch.requestFromQuery({ game: 'Yellow', slot: '3' }), { game: 'yellow', slot: 'slot3' });
   assert.equal(launch.requestFromQuery({ game: 'mars' }), null);
   // idle render governor: off by default, documented POKEPORT_IDLE_* when enabled
@@ -230,6 +234,24 @@ test('pins: archive checksum sources must agree', () => {
   assert.throws(() => pins.expectedArchiveSha256({ sums: A, pinned: X }), /pinned digest/);
   assert.equal(pins.GAME_SOURCE.testedDigests['0.3.14'], A);
   for (const v of pins.GAME_SOURCE.testedVersions) assert.match(pins.GAME_SOURCE.testedDigests[v], /^[0-9a-f]{64}$/, v);
+});
+
+test('license: mandatory attribution is present everywhere (gen1recomp Additional Terms §1)', () => {
+  const constants = require(B + 'constants.js');
+  const CREDIT = 'Based on the Pokemon Gen 1 Recompilation Project by BOIS CLUB GAMES, LLC (https://github.com/bryanthaboi/gen1recomp)';
+  assert.equal(constants.CREDIT_LINE, CREDIT);
+  const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+  assert.ok(read('README.md').includes(CREDIT), 'README');
+  assert.ok(read('LICENSE').includes('Based on the Pokemon Gen 1 Recompilation Project by BOIS CLUB GAMES, LLC'), 'LICENSE');
+  assert.ok(read('scripting/RecompDeck/runtime/web/player.html').includes(CREDIT), 'loading screen');
+  for (const v of ['HomeView.tsx', 'AboutView.tsx']) assert.match(read(`scripting/RecompDeck/src/ui/${v}`), /\{CREDIT_LINE\}/, v);
+});
+
+test('release: script.json version equals APP_VERSION', () => {
+  const constants = require(B + 'constants.js');
+  const sj = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripting/RecompDeck/script.json'), 'utf8'));
+  assert.equal(sj.version, constants.APP_VERSION);
+  assert.match(sj.version, /^\d+\.\d+\.\d+$/);
 });
 
 test('ui: no JSX text that is an unevaluated expression (e.g. <Text>t.key</Text>)', () => {

@@ -52,8 +52,8 @@ Dependency rule: `ui → app → (runtime|data|player) → (core|platform)`;
    **play** (`--game=<id> [--slot=slotN] --no-sync`) when an import cache for
    the installed game version exists, otherwise a **headless import**
    (`POKEPORT_IMPORT_ROM`, `POKEPORT_VERSION`) when a verified ROM is present;
-   otherwise the user is asked to add the ROM. The game's own launcher is
-   never shown by the UI (RecompDeck replaces it natively).
+   otherwise the user is asked to add the ROM. The game's own (proprietary)
+   launcher is never started — `buildLaunchPlan` cannot express it.
 2. `PlayerSession.prepare()`:
    - copies `player.html/js/css` and `love.js` into `Documents/RecompDeck/player/`;
    - publishes `love.wasm`, the game archive, the Lua bootstrap pack, the save

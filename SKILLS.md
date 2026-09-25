@@ -150,11 +150,21 @@ permission.
 
 **Trigger:** preparing a release of RecompDeck.
 
-1. `npm run check` (typecheck + unit tests + Lua syntax).
-2. `npm run package` → `dist/RecompDeck.scripting` (reproducible zip of the
-   project dir) and `dist/RecompDeck.scripting.sha256`.
-3. Update `CHANGELOG.md`, bump `script.json` `version`.
-4. Verify the import link in README points at the release tag.
+1. Bump `version` in `scripting/RecompDeck/script.json` **and** `APP_VERSION`
+   in `src/core/constants.ts` (a unit test enforces equality); update
+   `CHANGELOG.md`.
+2. `npm run release` → `release/RecompDeck.scripting` (+ `.sha256`), the
+   committed package the README import links point at (reproducible ZIP with
+   the project folder at the top level, directory entries included).
+   `npm run package` builds the same into `dist/` for ad-hoc use.
+3. `npm run check` (typecheck + unit tests + Lua syntax + `check:release`,
+   which fails if the committed package is stale).
+4. After pushing, verify the link target: the blob SHA from
+   `gh api "repos/<owner>/<repo>/contents/release/RecompDeck.scripting?ref=<branch>" --jq .sha`
+   must equal `git hash-object release/RecompDeck.scripting`. Import links are
+   `https://scripting.fun/import_scripts?urls=` + URL-encoded JSON array of
+   `https://github.com/<owner>/<repo>/raw/refs/heads/<branch>/release/RecompDeck.scripting`
+   (the fully qualified `refs/heads/` form also works for branch names with `/`).
 
 ## S9 — Documentation sync
 

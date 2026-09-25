@@ -14,7 +14,7 @@ Arguments (parsed by the game's `src/core/LaunchOptions.lua`):
 | `--game=<id>` | play | `red`, `blue`, `yellow`, `gold`, `silver`, `crystal` (`--game <id>` with a space would be taken as a game *path* by LÖVE's `boot.lua`) |
 | `--slot=slotN` | play a specific slot | validated `^slot\d{1,4}$` |
 | `--no-sync` | play | the game's save sync needs a server and the network |
-| `--launcher` | supported by `buildLaunchPlan`, unused by the UI | RecompDeck replaces the launcher natively |
+| ~~`--launcher`~~ | never | not expressible in `buildLaunchPlan` (unit-tested): the game's launcher is proprietary (LICENSE.MD Additional Terms §2); RecompDeck ships its own native launcher with the required credit |
 
 Environment variables (overlay on `os.getenv`, set before the official
 `conf.lua` runs). The game reads 85 variables in v0.3.14; RecompDeck sets:
