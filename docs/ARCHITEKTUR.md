@@ -757,9 +757,11 @@ Bei Fehler: Restore from *.bak + Diagnose
 | 2 | Core Store | `cores/<ver>/` | Bundle + `core.json` | `version + hash + apiVersion` | Nein (Retention) | **Ja** |
 | 3 | Generated Asset Cache | `library/<id>/generated/` | `data/generated`, `assets/generated`, `rom-cache.complete` | `contentHash + FormatVersion` (v12/v17) | Nein (isReady) | **Ja** |
 | 4 | Prepared Asset Cache | `cache/prepared_asset/<hash>/` | Binär-vorbereitete Assets (z. B. Atlas) | `assetHash + graphicsProfile + coreVersion + buildParams` | Ja | Nein |
+| 4b | Voxel Prepared Cache *(Sub-Tier, neu)* | `cache/prepared_asset/<modHash>/voxels/<mapId>.bin` | Voxel Mesh/Triangulation per Map + `Image` Quads | `modHash+apiVersion+coreVersion+depHash+graphicsProfile+lod(15/35/50)` | Ja (LRU, evict zuerst nach Preload) | Nein |
 | 5 | Runtime Resource Cache | `cache/runtime/<gameId>/` | Dekodierte Maps/Sprites im RAM (plus `Image` Objekte) | `contentHash + mapId + palette` | Ja (LRU) | Nein |
 | 6 | Metadata Cache | `SQLite` + `Storage` | `LibraryEntry`, `ModIndex`, `Diagnostics` | `id + schemaVersion` | Ja (TTL) | Nein |
 | 7 | Mod Cache | `mods/<id>/` + `cache/prepared_mod/<modHash>/` | Bundle + prepared state | `modHash + apiVersion + coreVersion + depHash` | Ja (LRU) | Nein (Bundle ist kritisch) |
+| 7b | Voxel Mod Cache | `mods/<id>/cache/voxels/` (via `mod.cache`) + `mod.storage:writeBytes` | Staged Voxel Mesh Bytes (64MiB cap) | `modId+mapId+lod` via Guard | Ja (cap) | Nein |
 | 8 | Warm Start Cache | `cache/warmstart/<gameId>-<coreVer>-<modSetHash>.json` | Häufige Assets + Profile | `gameId + coreVersion + modSetHash + graphicsProfile` | Ja | Nein |
 
 **Cache Key enthält:** `Content Hash` + `Core Version` + `Mod Hash` + `Asset Type` + `Graphics Profile` + `Language` + `Build Parameters` + `Schema Version`.
