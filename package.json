@@ -1,0 +1,24 @@
+{
+  "name": "recompdeck",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RecompDeck \u2013 unofficial iOS (Scripting app) frontend for the gen1recomp L\u00d6VE game, running the official release on love.js",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "fetch-types": "node tools/fetch-scripting-types.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "build:test": "node tools/build-test.mjs",
+    "test": "npm run build:test && node --test \"tests/node/*.test.mjs\"",
+    "lint:lua": "node tools/check-lua.mjs",
+    "check": "npm run typecheck && npm test && npm run lint:lua",
+    "package": "node tools/package-scripting.mjs",
+    "harness:setup": "node tools/harness/setup.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

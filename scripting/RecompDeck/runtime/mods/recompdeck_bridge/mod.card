@@ -1,0 +1,8 @@
+return {
+  summary = "Native-launcher bridge for the RecompDeck iOS frontend.",
+  author = "RecompDeck",
+  tags = { "tool", "platform" },
+  differences = { changed = {}, added = { "Returns to the RecompDeck launcher on quit" }, known = {} },
+  credits = {},
+  compat = { engine = ">=0.0.0-0 <2.0.0", modApi = 2 },
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <!--
+    Content Security Policy: the player only ever loads files from its own
+    runtime directory. No inline script, no remote script, no frames, no
+    forms. 'unsafe-eval' / 'wasm-unsafe-eval' are required to instantiate
+    the LÖVE WebAssembly module. Network access (connect-src) is limited to
+    the page's own files.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' file:; img-src 'self' file: data: blob:; media-src 'self' file: blob: data:; connect-src 'self' file: blob: data:; font-src 'self' file:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'">
+  <title>RecompDeck Player</title>
+  <link rel="stylesheet" href="player.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="canvas" tabindex="-1" aria-label="Game screen"></canvas>
+  </div>
+
+  <div id="overlay" class="visible" role="dialog" aria-live="polite">
+    <div class="panel">
+      <div class="title">RecompDeck</div>
+      <div id="status" class="status">Preparing…</div>
+      <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
+      <button id="start" class="start hidden" type="button">Tap to start</button>
+      <pre id="error" class="error hidden"></pre>
+      <div class="credit">Based on the Pokemon Gen 1 Recompilation Project by BOIS CLUB GAMES, LLC (https://github.com/bryanthaboi/gen1recomp)</div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Standalone "lua5.1 + RecompDeck compat layer" interpreter for running the
+# upstream gen1recomp test tiers with the exact VM semantics of love.js.
+#   RD_LUA51=/path/to/lua5.1 tools/lua51compat tests/run_engine.lua
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export RD_ROOT="$HERE"
+export RD_LUA_WRAPPER="$HERE/tools/lua51compat"
+export LUA_INIT="@$HERE/tests/lua/prelude_lua51.lua"
+exec "${RD_LUA51:-lua5.1}" "$HERE/tests/lua/run_main.lua" "$@"

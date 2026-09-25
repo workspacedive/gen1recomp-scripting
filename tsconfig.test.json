@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "outDir": ".cache/test-build",
+    "rootDir": "./scripting/RecompDeck/src/core",
+    "declaration": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["./scripting/RecompDeck/src/core/**/*.ts"]
+}

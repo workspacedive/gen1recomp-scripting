@@ -1,0 +1,17 @@
+{
+  "id": "recompdeck_bridge",
+  "name": "RecompDeck Platform Bridge",
+  "version": "1.0.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "TOOL",
+  "games": ["all"],
+  "game_version": ">=0.0.0-0 <2.0.0",
+  "priority": 1000,
+  "dependencies": [],
+  "optional_dependencies": [],
+  "conflicts": [],
+  "force_enable_env": "RECOMPDECK_BRIDGE",
+  "description": "Platform bridge for the unofficial RecompDeck iOS frontend (Scripting app). Uses only the documented process-lifecycle hooks: returns to the native launcher when the player quits and pauses the simulation while a native sheet covers the game. Installed and force-enabled by RecompDeck; inert anywhere else."
+}

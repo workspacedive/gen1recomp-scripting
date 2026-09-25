@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["esnext"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "jsx": "react",
+    "jsxFactory": "createElement",
+    "jsxFragmentFactory": "Fragment",
+    "types": [],
+    "paths": {
+      "scripting": ["./types/scripting/scripting.d.ts"]
+    }
+  },
+  "include": [
+    "./types/scripting/global.d.ts",
+    "./scripting/RecompDeck/**/*.ts",
+    "./scripting/RecompDeck/**/*.tsx"
+  ]
+}

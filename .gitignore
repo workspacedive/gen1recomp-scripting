@@ -1,0 +1,14 @@
+# local caches, harness output, downloaded runtimes
+.cache/
+node_modules/
+dist/
+*.log
+.DS_Store
+# never commit game content
+*.gb
+*.gbc
+*.gba
+*.love
+*.sav
+# Scripting declarations are fetched (npm run fetch-types), not vendored
+types/scripting/*.d.ts
