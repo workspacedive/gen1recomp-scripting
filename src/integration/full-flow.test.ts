@@ -18,7 +18,7 @@ class MemFiles {
   async isFile(p:string){ return this.store.has(p) }
   async isDirectory(p:string){ return this.dirs.has(p) }
   async isLink(){ return false }
-  async createDirectory(p:string){ const parts=p.split("/"); let cur=""; for(const part of parts){ if(!part) continue; cur+="/"+part; this.dirs.add(cur)} }
+  async createDirectory(p:string, _rec?:boolean){ const parts=p.split("/"); let cur=""; for(const part of parts){ if(!part) continue; cur+="/"+part; this.dirs.add(cur)} }
   async readDirectory(p:string){ const pref=p+"/"; const out=new Set<string>(); for(const k of this.store.keys()) if(k.startsWith(pref)) out.add(k.slice(pref.length).split("/")[0]); for(const d of this.dirs) if(d.startsWith(pref) && d!==p) out.add(d.slice(pref.length).split("/")[0]); return [...out].filter(Boolean)}
   async readAsString(p:string){ const b=this.store.get(p); if(!b) throw new Error("miss "+p); return new TextDecoder().decode(b)}
   readAsStringSync(p:string){ return new TextDecoder().decode(this.store.get(p)!)}
