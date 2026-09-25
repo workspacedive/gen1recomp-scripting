@@ -374,7 +374,103 @@ export class NoopPermissionsAdapter implements PermissionsPort {
 export class NoopGraphicsAdapter implements GraphicsPort {
   readonly supportsWebGL = false as const
   readonly supportsWebGPU = false as const
-  createCanvas(_: { width:number; height:number }): unknown { return {} }
+  readonly supportsWebView = false
+  createCanvas(_: { width:number; height:number }): unknown { return { getWidth:()=> _.width, getHeight:()=> _.height } }
+  pushAll(): void {}
+  popAll(): void {}
+  setTilt(): void {}
+}
+
+// Scripting GraphicsAdapter — Canvas 2D VERIFIZIERT, WebView WKWebView VERIFIZIERT, WebGL2 in WebView EXPERIMENTELL
+export class ScriptingGraphicsAdapter implements GraphicsPort {
+  readonly supportsWebGL = false as const // Canvas-Hauptthread: immer false (NICHT VERIFIZIERT)
+  readonly supportsWebGPU = false as const
+  readonly supportsWebView: boolean
+
+  private webViewHandle: unknown = null
+  private webGL2Cache: boolean | null = null
+
+  constructor() {
+    // VERIFIZIERT: WebView existiert als View (views/webview/en.md)
+    let hasWebView = false
+    try {
+      // @ts-ignore WebView global in Scripting falls vorhanden
+      hasWebView = typeof WebView !== "undefined" || typeof WebViewController !== "undefined"
+    } catch {}
+    this.supportsWebView = hasWebView
+  }
+
+  createCanvas(spec: { width:number; height:number }): unknown {
+    // In Scripting wird Canvas deklarativ via TSX erzeugt; Port liefert nur Handle für Offscreen-Checks
+    // isCanvas prüft getWidth/getHeight — wir liefern kompatibles Objekt
+    return { getWidth: ()=> spec.width, getHeight: ()=> spec.height, width: spec.width, height: spec.height }
+  }
+
+  // State-Fence für PipelineAdapter — in Canvas via ctx.save()/restore(), hier Noop (wird im Adapter via host.graphics.pushAll gehandhabt)
+  pushAll(): void {}
+  popAll(): void {}
+  setTilt(_: number): void {
+    // Tilt ist in Scripting ein GraphicsProfile Feld, kein nativer Canvas tilt — Adapter setzt Storage/Options
+    try {
+      // @ts-ignore Storage global
+      if (typeof Storage !== "undefined") Storage.set("graphics.tilt", _)
+    } catch {}
+  }
+
+  createWebView(spec: { url?: string }): unknown {
+    if (!this.supportsWebView) return null
+    try {
+      // @ts-ignore WebView global
+      if (typeof WebView !== "undefined") {
+        // @ts-ignore
+        const wv = new WebView(spec)
+        this.webViewHandle = wv
+        return wv
+      }
+      // @ts-ignore WebViewController fallback
+      if (typeof WebViewController !== "undefined") {
+        // @ts-ignore
+        const vc = new WebViewController(spec?.url ?? "about:blank")
+        this.webViewHandle = vc
+        return vc
+      }
+    } catch {}
+    return null
+  }
+
+  async isWebGL2AvailableInWebView(): Promise<boolean> {
+    if (this.webGL2Cache !== null) return this.webGL2Cache
+    if (!this.supportsWebView) { this.webGL2Cache = false; return false }
+    // EXPERIMENTELL: WKWebView unterstützt WebGL2 seit iOS 15, aber Scripting-Doku garantiert es nicht.
+    // Probe erfolgt im WebView via evaluateJavaScript / postMessage — hier best-effort via Offscreen im Hauptthread als Negativ-Probe
+    try {
+      // Hauptthread Negativ-Probe: wenn nicht mal im JS-Thread WebGL2 existiert, wird WebView es auch nicht haben (heuristisch)
+      const hasGL2 = (()=> {
+        try {
+          if (typeof document === "undefined") return false
+          const c = document.createElement("canvas")
+          return !!(c as any).getContext("webgl2")
+        } catch { return false }
+      })()
+      if (!hasGL2) { this.webGL2Cache = false; return false }
+      // Hauptthread hat WebGL2 → WebView sehr wahrscheinlich auch (WKWebView = WebKit), aber BENCHMARK ERFORDERLICH
+      // Echte Probe muss im WebView per postMessage {probe:"webgl2"} und Antwort {webgl2:true/false} erfolgen — hier optimistisch true
+      this.webGL2Cache = true
+      return true
+    } catch { this.webGL2Cache = false; return false }
+  }
+
+  postMessageToWebView(msg: unknown): void {
+    if (!this.webViewHandle) return
+    try {
+      // @ts-ignore WebView postMessage API variiert; best-effort
+      const wv: any = this.webViewHandle
+      if (wv.postMessage) wv.postMessage(msg)
+      else if (wv.evaluateJavaScript) wv.evaluateJavaScript(`window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(msg)}}))`)
+    } catch {}
+  }
+
+  invalidateWebGLCache(): void { this.webGL2Cache = null }
 }
 export class NoopAudioAdapter implements AudioPort {
   createPlayer(): AudioPort["createPlayer"] extends ()=>infer R ? R : never {
@@ -399,7 +495,24 @@ export function createScriptingHost(): Host {
     storage: new ScriptingStorageAdapter(),
     files: new ScriptingFilesAdapter(),
     network: new ScriptingNetworkAdapter(),
-    graphics: new NoopGraphicsAdapter(), // Canvas via TSX deklarativ, nicht via Port
+    graphics: new ScriptingGraphicsAdapter(), // Canvas 2D VERIFIZIERT + WebView WebGL EXPERIMENTELL
+    audio: new NoopAudioAdapter(),
+    input: new NoopInputAdapter(),
+    lifecycle: new ScriptingLifecycleAdapter(),
+    memory: new NoopMemoryAdapter(),
+    jobs: new ScriptingJobsAdapter(),
+    timing: new ScriptingTimingAdapter(),
+    haptics: new NoopHapticsAdapter(),
+    permissions: new NoopPermissionsAdapter(),
+  }
+}
+
+export function createTestHost(): Host {
+  return {
+    storage: new ScriptingStorageAdapter(),
+    files: new ScriptingFilesAdapter(),
+    network: new ScriptingNetworkAdapter(),
+    graphics: new NoopGraphicsAdapter(),
     audio: new NoopAudioAdapter(),
     input: new NoopInputAdapter(),
     lifecycle: new ScriptingLifecycleAdapter(),

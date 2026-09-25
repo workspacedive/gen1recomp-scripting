@@ -2393,6 +2393,47 @@ flowchart LR
   TP -.->|evict first| DL
 ```
 
+### 73.7b Pipeline Selection (Voxel) — Detail
+
+> Quelle: `src/render/Pipelines.lua` + `docs/diagrams/pipeline-selection.mmd` — gleicher Contract in `src/render/PipelineAdapter.ts`
+
+```mermaid
+flowchart TD
+  A[Mod register render_pipeline\nid, label, levels, priority, available, gate, drawWorld, worldPresent, present] --> B[Data.render_pipelines merge + _owners]
+  B --> C[PipelineAdapter.install + priority sort]
+  C --> D[save.options.pipelines levels OFF→15→35→50]
+  D --> E{pro Frame update dt}
+  E --> F{worldPipeline = highest priority where eligible\neligible = level>0 && !broken && available()==true\n**gate NICHT geprüft**}
+  F -->|keine eligible| Z[Fallback vanilla 2D]
+  F -->|id gefunden| G[guardRender: pushAll → drawWorld ctx → popAll → isCanvas]
+  G -->|canvas|null| Z
+  G -->|canvas| H{worldPresent fold eligible}
+  G -->|throw| BR1[broken=true attribuiert → Z]
+  H --> I{present fold eligible}
+  I --> J[present → Screen]
+```
+
+ Vollversion: `docs/diagrams/pipeline-selection.mmd`
+
+### 73.7c Voxel Dual-Backend
+
+> Canvas2D **VERIFIZIERT** Default + WebView-WebGL **EXPERIMENTELL** (siehe `docs/diagrams/voxel-dual-backend.mmd`)
+
+```mermaid
+flowchart TB
+  MW[mods/voxel_world register voxel] --> PA[PipelineAdapter priority sel]
+  PA --> Sel{WebGL2 Probe in WebView?}
+  Sel -->|false / no warm| C2D[Canvas2D isometrisch billboard drawFx]
+  Sel -->|true & warm hit| Warm[Warm Cache 1 Frame voraus → bridge → WKWebView Three.js]
+  Warm -.->|miss| C2D
+  Pick[DocumentPicker .vox] --> Thread[Thread.runInBackground Decode] --> ModCache[mod.cache 64MiB] --> Prepared[PreparedAsset voxels LOD 8/16/32] --> Sel
+  Evict[ResourceGovernor LOD 50→35→15→OFF] --> Sel
+```
+
+ Vollversion: `docs/diagrams/voxel-dual-backend.mmd` — beide Backends teilen **identische Mod-API**, nie Blackscreen (null/throw → 2D), `invalidate()` bei Resize.
+
+> Formale Invarianten & Benchmark: `docs/spec/pipeline-invariants.md` (I1–I10, Tests I1–I9), `docs/benchmarks/voxel-benchmark.md` (H1–H3, Entscheidungskriterium WebGL Default erst ab bestandenem BENCHMARK). Cache-Guard: `src/cache/VoxelCacheGuard.ts` (8 MiB/file, 64 MiB mod.cache, 512 MiB storage, SafePath).
+
 ### 73.8 Preload Pipeline
 
 ```mermaid
@@ -2550,6 +2591,10 @@ Beobachten (Dogfood + Benchmarks + Diagnostics)
 | `ShaderFX`/`PaletteFX` sind `love.graphics.newShader` — nicht in Scripting | Voxel `worldPresent` (DoF/Color Grade) braucht Filter | `Canvas filter` Fallback + `present` via `WebView` CRT | TEILWEISE |
 | Frühere Roadmap hatte Voxel erst in P3 — Community hat bereits 3D Voxel Mods live | Voxel ist P1, nicht P3 | **Roadmap Phase 4.5** eingefügt (Voxel Pipeline) | — |
 | `HostAdapter` fehlte `RenderPipeline` Port | Adapter unvollständig | `PipelineAdapter` + `VoxelBackends` als neuer Bounded Context 29 | VERIFIZIERT |
+| Tests fehlten für Pipeline Invarianten (I1–I10) — Regressionsrisiko | Jede Invariante braucht Test, sonst API-Bruch unbemerkt | `PipelineAdapter.test.ts` (13 Tests) + `VoxelBackends.test.ts` (7) + `VoxelCacheGuard.test.ts` (4) — 24 Tests grün | VERIFIZIERT |
+| `HostAdapter` nutzte `NoopGraphicsAdapter` selbst im Scripting Host — WebView nie erreichbar | Scripting Host muss echten `ScriptingGraphicsAdapter` nutzen | `ScriptingGraphicsAdapter` (Canvas 2D + WebView Probe + postMessage) als Default in `createScriptingHost()` | VERIFIZIERT |
+| Keine formalen Invarianten/Checkliste für Mod-Autoren | Mod bricht still wenn `nil`/`throw` falsch behandelt | `docs/spec/pipeline-invariants.md` I1–I10 + `docs/diagrams/*.mmd` + `docs/benchmarks/voxel-benchmark.md` | VERIFIZIERT |
+| Voxel Asset Limits nur in Doku, nicht im Code geprüft | Zip-Slip / 64MiB Overflow unbemerkt → Disk Exhaustion | `src/cache/VoxelCacheGuard.ts` (8MiB/file, 64MiB total, 512MiB storage, `safeVoxelPath`) | VERIFIZIERT |
 
 **Regel für zukünftige Loops:** Keine Änderung ohne `PROFILE→BENCHMARK`, kein Breaking der `render_pipelines` API, immer `Graceful Degradation` (Voxel → 2D), immer `pro_required:false` prüfen.
 

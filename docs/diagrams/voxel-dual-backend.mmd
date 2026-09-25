@@ -1,0 +1,49 @@
+%% Voxel Dual-Backend — Canvas 2D Fallback + WebView WebGL Experiment
+%% Non-Pro: Canvas VERIFIZIERT, WebView WKWebView VERIFIZIERT, WebGL2 in WebView EXPERIMENTELL
+flowchart TB
+  subgraph Mod["Mod Layer (unverändert)"]
+    MW[mods/voxel_world\nregister voxel\nlabel VOXEL\nlevels OFF/15/35/50\ndrawWorld drawFx]
+  end
+
+  subgraph Adapter["PipelineAdapter (src/render)"]
+    PA[PipelineAdapter\nworldPipeline priority sel\neligible guard\npushAll/popAll isCanvas]
+  end
+
+  subgraph Backend2D["Canvas2D Backend\nVERIFIZIERT — Default"]
+    C2D[Canvas2DVoxelBackend\ndrawWorld: save/translate/rotate\nvisibleTiles quads + billboard sprites\ndrawFx project anchors\nworldPresent: blur filter]
+    C2DMesh[Heightmap 16x16\nAtlas Image reuse\nBudget 6ms p95]
+  end
+
+  subgraph BackendGL["WebView-WebGL Backend\nEXPERIMENTELL — Benchmark"]
+    WV[WKWebView ESM Loader\nfetch three.module.js slim\n→ FileManager Cache prepared_asset\n→ Data URL]
+    Probe[WebGL2 Probe\ncanvas.getContext webgl2\ncached + invalidate on resize]
+    Bridge[postMessage Bridge\n{cam,vw,vh,scale,level}\n↔ dataURL/Data]
+    Warm[Warm Cache 1 Frame voraus\nSync drawWorldSync liefert warm\n→ async next Frame im Hintergrund]
+    MeshGL[Mesh from mod.cache 64MiB\nor mod.storage:writeBytes 512MiB staged\nor Importers voxels pack\nLOD 8/16/32 Frustum]
+  end
+
+  subgraph Asset["Asset Pipeline (Cache)"]
+    Pick[DocumentPicker .vox/.glb]
+    Thread[Thread.runInBackground Decode]
+    ModCache[mod.cache 64MiB cap\n8MiB per file]
+    Prepared[PreparedAssetCache\nvoxels/x/map.bin\nkey = mod+api+core+dep+profile]
+    Evict[ResourceGovernor\nLOD 50→35→15→OFF\non warning/critical]
+  end
+
+  MW --> PA
+  PA -->|eligible & level>0| Sel{useWebGLProbe?}
+  Sel -->|Probe false / no warm| C2D
+  Sel -->|Probe true & warm hit| Warm
+  Warm --> Bridge --> WV --> Probe --> MeshGL
+  Warm -.->|miss null fallback| C2D
+  C2D --> C2DMesh
+  Bridge -.->|Telemetry drawWorldMs triangles| Telemetry[Performance Intelligence\nAdaptivePerformance HIGH→BALANCED→LOW]
+
+  Pick --> Thread --> ModCache --> Prepared --> MeshGL
+  Prepared -.->|Preload Top-N Maps| C2D
+  Evict -->|downgrade| Sel
+
+  classDef verified fill:#0a0,stroke:#040,color:#fff
+  classDef experimental fill:#fa0,stroke:#840,color:#000
+  class C2D,C2DMesh verified
+  class WV,Probe,Bridge,Warm,MeshGL experimental
