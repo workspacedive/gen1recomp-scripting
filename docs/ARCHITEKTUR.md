@@ -2611,6 +2611,8 @@ Beobachten (Dogfood + Benchmarks + Diagnostics)
 | Library Future (Gold/Silver/Crystal/FireRed/LeafGreen) nur erwähnt | Keine Tests für 11 Hashes + 6 FORMAT_VERSION | `src/library/GameLibrary.future.test.ts` 4 Tests (KNOWN_SHA1, FORMAT_VERSION, reject, isReady für crystal) | VERIFIZIERT |
 | `BackupManager` war nur Doku (§60) | Keine versionierten Exports im Code | `src/backup/BackupManager.ts` (AtomicFile, kind save/mod-data/profile/metadata/settings, lastN=5, list/restore/remove, stale cleanup) 3 Tests | VERIFIZIERT |
 | `DiagnosticsBundle` war nur Doku (§49+§51) | Kein zentrales Sammeln | `src/diagnostics/DiagnosticsBundle.ts` (collect game/core/save/render/backup/cache, toJSON, sanitize Privacy) 3 Tests | VERIFIZIERT |
+| `ConfigurationManager` war nur Doku (§28) | Keine versionierten Flags | `src/config/ConfigurationManager.ts` (language, accessibility, featureFlags versioned, graphics quality/voxelLOD) 3 Tests | VERIFIZIERT |
+| `RepositoryProvider` war nur Doku (§43) | Keine Abstraktion für GitHub/local/bookmark | `src/repo/RepositoryProvider.ts` (github/custom/local/bookmark/manual, GithubProvider fetch releases, LocalProvider .zip, BookmarkProvider) 2 Tests | VERIFIZIERT |
 
 **Regel für zukünftige Loops:** Keine Änderung ohne `PROFILE→BENCHMARK`, kein Breaking der `render_pipelines` API, immer `Graceful Degradation` (Voxel → 2D), immer `pro_required:false` prüfen.
 
