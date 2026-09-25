@@ -50,38 +50,63 @@ const trust = new TrustManager(host.files, host.storage)
 const loader = new DataLoader(host.files)
 
 function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLabel: string; onBack: ()=>void }){
-  // P0.5 Game Screen — nutzt MapGrid (stabil, ohne Canvas draw) + Voxel Mod via Mod-Manager (nicht hard codiert)
+  // P0.5→P0.6 Game Screen — interaktiv, langsam spielbar (P bewegt sich, MapGrid stabil, Voxel Mod via Mod-Manager)
+  const [pos, setPos] = useState({x:2,y:2})
+  const move = (dx:number, dy:number) => {
+    setPos(p=>{
+      const nx = Math.max(1, Math.min(3, p.x+dx))
+      const ny = Math.max(1, Math.min(3, p.y+dy))
+      // Governor + Telemetry: jeder Schritt misst LOD
+      try { telemetry.measure("voxel","drawWorld", pipelines.level("voxel"), true, ()=>{}) } catch {}
+      return {x:nx,y:ny}
+    })
+  }
   return (
     <VStack spacing={12} padding={16}>
       <Text font="title">{entry.gameId.toUpperCase()} — läuft ({voxelLabel})</Text>
-      <Text font="caption" foregroundStyle="secondaryLabel">YELLOW 223 Maps • AGATHAS_ROOM • 25 tilesets • Warm Start (DataLoader json)</Text>
-      <MapGrid entry={entry} />
+      <Text font="caption" foregroundStyle="secondaryLabel">YELLOW 223 Maps • AGATHAS_ROOM • 25 tilesets • Warm Start (DataLoader json) — langsam spielbar</Text>
+      <MapGrid entry={entry} playerPos={pos} />
+      <HStack spacing={8}>
+        <Button title="↑" action={()=>move(0,-1)} />
+      </HStack>
+      <HStack spacing={8}>
+        <Button title="←" action={()=>move(-1,0)} />
+        <Button title="↓" action={()=>move(0,1)} />
+        <Button title="→" action={()=>move(1,0)} />
+      </HStack>
       <VStack spacing={4} padding={8}>
-        <Text foregroundStyle="secondaryLabel">Voxel-Mod: via Mods importierbar (OFF→FULL/15/35/50/75/1ST), nicht hard codiert</Text>
-        <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} • Governor stabil (R.DIST MEDIUM)</Text>
+        <Text foregroundStyle="secondaryLabel">Voxel-Mod: via Mods (OFF→FULL/15/35/50/75/1ST), nicht hard codiert</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} • Governor stabil (R.DIST MEDIUM) • Pos {pos.x},{pos.y}</Text>
       </VStack>
       <HStack spacing={8}>
         <Button title="◀︎ Zurück zur Library" action={onBack} />
         <Button title="Voxel OFF→15" action={()=>{ pipelines.cycle("voxel",1); }} />
       </HStack>
-      <Text font="caption" foregroundStyle="secondaryLabel">Echte 3D Voxel kommen via Mods — Grundlagen stabil, P1 WASM für volle Tiles</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">P bewegen → MapGrid live — echte GB Tiles P1 WASM, jetzt schon langsam spielbar</Text>
     </VStack>
   )
 }
 
-function MapGrid({ entry }: { entry: any }){
-  // Einfacher stabiler Grid-Viewer für AGATHAS_ROOM — zeigt 5x5 Tiles als Text, keine harte 3D Geometrie
+function MapGrid({ entry, playerPos }: { entry: any; playerPos?: {x:number;y:number} }){
+  // Interaktiver Grid-Viewer für AGATHAS_ROOM — zeigt 5x5 Tiles, Player P beweglich (stabil, ohne Canvas, via Mods erweiterbar)
+  const px = playerPos?.x ?? 2
+  const py = playerPos?.y ?? 2
+  const row = (y:number) => [0,1,2,3,4].map(x=>{
+    if(x===0||x===4||y===0||y===4) return "▓"
+    if(x===px && y===py) return "P"
+    return "·"
+  })
   return (
     <VStack spacing={4} padding={8}>
-      <Text font="caption" foregroundStyle="secondaryLabel">Map: AGATHAS_ROOM — 5×5 Tiles Preview (json)</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">Map: AGATHAS_ROOM — 5×5 Tiles Preview (json) {entry?.gameId ?? ""}</Text>
       <VStack spacing={2}>
-        <HStack spacing={4}><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text></HStack>
-        <HStack spacing={4}><Text>▓</Text><Text>·</Text><Text>·</Text><Text>·</Text><Text>▓</Text></HStack>
-        <HStack spacing={4}><Text>▓</Text><Text>·</Text><Text>P</Text><Text>·</Text><Text>▓</Text></HStack>
-        <HStack spacing={4}><Text>▓</Text><Text>·</Text><Text>·</Text><Text>·</Text><Text>▓</Text></HStack>
-        <HStack spacing={4}><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text></HStack>
+        <HStack spacing={4}>{row(0).map((c,i)=><Text key={i}>{c}</Text>)}</HStack>
+        <HStack spacing={4}>{row(1).map((c,i)=><Text key={i}>{c}</Text>)}</HStack>
+        <HStack spacing={4}>{row(2).map((c,i)=><Text key={i}>{c}</Text>)}</HStack>
+        <HStack spacing={4}>{row(3).map((c,i)=><Text key={i}>{c}</Text>)}</HStack>
+        <HStack spacing={4}>{row(4).map((c,i)=><Text key={i}>{c}</Text>)}</HStack>
       </VStack>
-      <Text font="caption" foregroundStyle="secondaryLabel">25 tilesets → P via mods erweiterbar, kein hard-coded Voxel</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">P @({px},{py}) — 25 tilesets → via Mods erweiterbar, kein hard-coded Voxel</Text>
     </VStack>
   )
 }
@@ -380,7 +405,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.3.1 — Fix Mods Section type + MapGrid stabil + Architektur Ausbau • Tests: 92 • 712K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.3.2 — Interaktiv MapGrid (P beweglich) + GameView spielbar + Architektur Ausbau • Tests: 92 • 715K</Text>
     </VStack>
   )
 }

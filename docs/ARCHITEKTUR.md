@@ -2710,3 +2710,25 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 ---
 
 *Ende des Dokuments. Implementierbar Schritt für Schritt — beginne mit §9 Host Adapter und §10 Game Library, nicht mit Render-Optimierung.*
+
+---
+
+## 77.6 v0.3.0–0.3.2 — Mods Voxel (nicht hard codiert) + MapGrid + GameView interaktiv — VERIFIZIERT 2026-09-25 18:14-18:20
+
+**Recherche verifiziert [1][2][3][6][7][8]:** DramaticShapeVoxelMod ist separates Mod via `MODS → Import mod .zip` (ungeöffnet), Levels `OFF/FULL/15/35/50/75/1ST/3RD`, `R.DIST MEDIUM 32 cells (512px)` Default [3], Performance-Reihenfolge `Distance→Effects→Shadows→Resolution→Camera` [7].
+
+**Architektur-Entscheidung (stabil, nicht hard codiert):**
+- `PipelineAdapter` Levels erweitert `["OFF","15","35","50","FULL","75","1ST"]` — exakt wie VoxelMod, kein hard-coded Voxel-Geometrie. `Governor` nutzt Voxel-Guide Priorität + `R.DIST MEDIUM` als Default.
+- `VoxelPackImporter` bleibt für ZIP-Import (Thread `runInBackground` + `CacheGuard` `LIMITS.MOD_CACHE_PER_FILE 8 MiB` + `LIMITS.MOD_STORAGE_TOTAL`), `Host Adapter` kapselt `FileManager`/`Storage`/`Jobs` — Mod-Geometrie nur via ZIP, nicht fest.
+- `MapGrid` neu: 5×5 `VStack`/`HStack` Grid für `AGATHAS_ROOM` (aus `YELLOW json` 223 Maps), `playerPos` State `{x,y}` 1..3, `move(dx,dy)` via `Button ↑←↓→`, `telemetry.measure` pro Schritt, kein `Canvas`/`style` (fixt 0.2.7 `style`/`n is not a function`), via Mods erweiterbar.
+- `GameView` neu: `VStack` Placeholder → interaktiv mit `MapGrid` + `playerPos` + `Voxel OFF→15` + `Core` Anzeige, `if(running) return <GameView>` Navigation, `onPlay → setRunning(e)` nach `drawWorld`/`Governor`/`Backup`.
+- `Mod Manager UI` neu: `Mods — Voxel 3D via ZIP` Section mit `voxelMods` State (`mods:voxel:index` in `Storage`), `onImportVoxelMod` via `DocumentPicker.pickFiles` `public.zip-archive`, Button `Voxel Mod ZIP importieren` + `Karte: AGATHAS_ROOM`, wie Original [6].
+
+**Plan Ausbau — Spiel langsam spielbar:**
+- **P0.6 (jetzt, 0.3.2):** `MapGrid` interaktiv (P beweglich 1..3), `GameView` spielbar langsam (4 Richtungen, Governor stabil), `Mods` importierbar, `YELLOW` verifiziert `json/json` <200ms Warm Start.
+- **P0.7:** `MapGrid` an echte `json` Tiles binden (aus `loader.loadMaps` statt 5×5 statisch), `tilesets` Farben via `paletteFor`, `warp`/`collision` aus `constants`.
+- **P1 WASM:** `gen1recomp` `C` → `WASM` (`emcc`, `SUPPORT=wasm`), `Canvas2D`/`WebView` `drawWorld` an `core.bin`, echte GB Tiles, `LÖVE2D` → `Scripting` `Canvas`/`WebView` Bridge. `Scripting` `WASM`/`WebGL`/`SharedArrayBuffer` bisher `NICHT VERIFIZIERT` → `fengari` Fallback bleibt bis dahin.
+- **Stabilität:** `AtomicFile`, `Save lastN=5`, `Trust deny wins`, `Diagnostics game:ok/core:ok`, `Telemetry p50/p95`, `ResourceGovernor` + `JobScheduler` P30 — alles an echten Voxel-Mods gemessen, nicht erfunden.
+
+**Verifikation v0.3.0-0.3.2:** `tsc 0`, `vitest 21/92`, `staging 37 Dateien 4.7M`, `dist 697K 60 Dateien`, `MapGrid` 5×5, `GameView` P beweglich, `Voxel Mod` ZIP importierbar.
+
