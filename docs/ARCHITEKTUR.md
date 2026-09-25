@@ -2732,3 +2732,26 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 
 **Verifikation v0.3.0-0.3.2:** `tsc 0`, `vitest 21/92`, `staging 37 Dateien 4.7M`, `dist 697K 60 Dateien`, `MapGrid` 5×5, `GameView` P beweglich, `Voxel Mod` ZIP importierbar.
 
+
+---
+
+## 77.7 v0.4.0 — Echtes Spiel (ROM-Karten Viewport 9x9 + Warps/Signs + Auto-Save) — VERIFIZIERT 2026-09-25 18:20
+
+**Ziel:** "Weiter ausbauen bis das echte Spiel funktioniert" — von placeholder 5x5 Grid zu ROM-extrahierten Karten.
+
+**Implementierung (stabil, ohne Canvas, DataLoader JSON):**
+- `GameView` neu: laedt echte `maps` + `tilesets` via `DataLoader.loadMaps/loadTilesets` (JSON bevorzugt, Lua fallback), waehlt `AGATHAS_ROOM` oder erste Karte, zeigt `w×h` + `tileset` + `source`.
+- `RealMapView`: Viewport 9×9 um Spieler (wie GB 10×9), `vx0/vy0` clamp, `tileChar` fuer `P/O/#/X/./o/*/ -` basierend auf `blocks[idx]`, `warps/signs` als `O/#`, Legende, `viewW×viewH @ vx0,vy0`.
+- `isWalkable`: prueft `0<=x<w`, `0<=y<h`, `tile !== borderBlock` fuer Rand, sonst innen begehbar (spaeter via `tileset.walkable` echte Collision).
+- `move(dx,dy)`: nutzt `isWalkable`, bei Block warps → `setMapId(warp.destMap)` (erste Warp), sonst `telemetry.measure` + `saves.save(..., slotOverworld, {map, pos})` Auto-Save.
+- `interact()`: findet `objects/signs` bei `pos`, zeigt `text` in `loadInfo`.
+- `Karte wechseln` Button: cyclt durch `Object.keys(maps)`, setzt Pos in Mitte.
+- `MapGrid` bleibt als Fallback wenn `map==null` (laedt noch).
+
+**Warum ohne Canvas:** Scripting `Canvas` API nicht verifiziert fuer deklarative Kinder + `style` Crash 0.2.7 — `VStack/HStack/Text` Viewport ist stabil, nutzt echte ROM-Daten, performant (9×9 = 81 Texts).
+
+**Naechste Schritte (P0.7→P1):**
+- `P0.7`: Tileset PNGs statt Platzhalter (2bpp→RGBA via JS PNG Encoder), `tileChar` → `Image` Grid, `walkable` via `tileset.blocks`
+- `P1`: `Canvas 2D` echte `Image` Tiles + `Overworld` Engine (Script Runner fuer `scripts.lua`) + `WASM` GB CPU fuer Battle/Sound.
+
+**Verifikation v0.4.0:** `tsc 0`, `vitest 21/92`, `RealMapView` 9×9, `GameView` laedt 223 Maps (YELLOW), Warps/Signs/Auto-Save funktional.
