@@ -1,6 +1,6 @@
 -- RecompDeck platform bridge mod.
 -- Uses only gen1recomp's documented process-lifecycle hooks
--- (docs/modding.md, "Process-lifecycle hooks"):
+-- (gen1recomp v0.3.14 docs/modding.md, "Process-lifecycle hooks"):
 --   core.quit_to_launcher  veto the in-process Lua launcher: RecompDeck owns
 --                          "return to launcher" natively
 --   core.update            skip the simulation step while paused by the host

@@ -3,7 +3,7 @@
 -- bridge mod (id "recompdeck_bridge") -- enforced by rd_host.guard.
 --
 -- It exposes the minimum the official process-lifecycle hooks need
--- (docs/modding.md "Process-lifecycle hooks" in gen1recomp):
+-- (gen1recomp v0.3.14 docs/modding.md, "Process-lifecycle hooks"):
 --   quitToLauncher()  tell the native launcher the player chose "exit"
 --   paused()          true while a native sheet covers the game
 --   onFrame()         per-frame bookkeeping (bridge poll is done by boot)

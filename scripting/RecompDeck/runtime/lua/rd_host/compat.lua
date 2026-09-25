@@ -20,7 +20,9 @@
 --   coroutine.isyieldable()                 approximation (inside a coroutine)
 --
 -- Not fixable at runtime (documented): `goto`/labels (used only by the Gen 3
--- ROM importer), LuaJIT FFI (all four users guard it with pcall), JIT control.
+-- ROM importer), LuaJIT FFI (v0.3.14: 27 call sites in 20 files; 24 use
+-- pcall(require, "ffi"), the other 3 run only on other OSes or after such a
+-- guarded probe succeeded -- audit in docs/compatibility.md), JIT control.
 --
 -- Everything is a no-op on LuaJIT or Lua >= 5.2, so the same bootstrap can be
 -- used by native test runs.
