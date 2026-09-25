@@ -2598,6 +2598,7 @@ Beobachten (Dogfood + Benchmarks + Diagnostics)
 | Keine formalen Invarianten/Checkliste für Mod-Autoren | Mod bricht still wenn `nil`/`throw` falsch behandelt | `docs/spec/pipeline-invariants.md` I1–I10 + `docs/diagrams/*.mmd` + `docs/benchmarks/voxel-benchmark.md` | VERIFIZIERT |
 | Voxel Asset Limits nur in Doku, nicht im Code geprüft | Zip-Slip / 64MiB Overflow unbemerkt → Disk Exhaustion | `src/cache/VoxelCacheGuard.ts` (8MiB/file, 64MiB total, 512MiB storage, `safeVoxelPath`) | VERIFIZIERT |
 | 3 Stellen duplizierten `tmp→verify→copy→remove` (CoreStore, VoxelPackImporter, SaveManager) | DRY-Verstoß, Fehler divergieren | `src/host/AtomicFile.ts` (`atomicWriteBytes/String`, parent-dirs, verify, cleanup) — von Voxel-Arbeit entdeckt, gilt generisch | VERIFIZIERT |
+| Pipeline-Budget (6-8ms) war nur Doku, nicht messbar | AdaptivePerformanceManager konnte Voxel nicht stufen | `src/telemetry/PipelineTelemetry.ts` (TimingPort.now, p50/p95/p99, availableFalseRate, shouldDowngrade) + persist für §49 Diagnostics | VERIFIZIERT |
 
 **Regel für zukünftige Loops:** Keine Änderung ohne `PROFILE→BENCHMARK`, kein Breaking der `render_pipelines` API, immer `Graceful Degradation` (Voxel → 2D), immer `pro_required:false` prüfen.
 
