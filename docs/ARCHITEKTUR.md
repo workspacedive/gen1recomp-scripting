@@ -478,6 +478,8 @@ Persistent Storage (FileManager.documentsDirectory + SQLite Index)
 Library Entry + Launch Profile (Default)
 ```
 
+**GameIds (alle verifiziert, §10 + src/library/GameLibrary.ts):** `red`/`blue`/`yellow` (Gen1) + `gold`/`silver`/`crystal` (Gen2) + `firered`/`leafgreen` (Gen3) — `KNOWN_SHA1` 11 Hashes (crystal×2, firered×2, leafgreen×2), `FORMAT_VERSION` je GameId (`v12-gen1`, `v12-yellow2`, `v12`, `v12-crystal4`, `v17-firered`, `v2-leafgreen`) — Tests `GameLibrary.future.test.ts` 4.
+
 **LibraryEntry (SQLite + Storage):**
 
 ```ts
@@ -729,19 +731,21 @@ type SaveSchema = {
 **Ablauf Migration:**
 
 ```
-Load Save → readAsString → JSON.parse (+ SaveSerializer-Limits: maxBytes 2MiB, maxDepth, maxTableEntries)
+Load Save → readAsString → JSON.parse (+ SaveSerializer-Limits: maxBytes 2MiB, maxDepth 40, maxEntries 10k)
   → validate(schemaVersion)
   → if stale → MigrationManager: create Backup (*.bak) + Journal Entry
   → run migrations sequentially (jede mit validate)
   → Integrity Check (Hash)
-  → Atomic Save (write to *.tmp → verify → copyFile over original → remove tmp)
+  → Atomic Save (write to *.tmp → verify → copyFile over original → remove tmp) via AtomicFile
   → Journal Verified → Log
 Bei Fehler: Restore from *.bak + Diagnose
 ```
 
-**Atomic Save:** `writeAsString(tmp) → readAsString(tmp) → JSON.parse verify → copyFile(tmp, final) → remove(tmp)` — kein `rename` angenommen.
+**Implementiert:** `src/save/SaveManager.ts` — `save` (Header+hash, Limits, `atomicWriteString`, Backup lastN=5 via `listBackups`/`enforceBackups`, Journal `Storage`), `load` (Integrity sha256, Migration Registry `registerMigration`, Backup vor Migration, Journal migrating/verified/rollback), `listBackups`, `restoreBackup` — 7 Tests (`SaveManager.test.ts`). Nutzt `AtomicFile` (DRY).
 
-**Backup:** `BackupManager` hält `lastN = 5` pro Slot in `saves/<gameId>/backups/<slot>-<timestamp>.json` + SQLite Journal.
+**Atomic Save:** `writeAsString(tmp) → readAsString(tmp) → JSON.parse verify → copyFile(tmp, final) → remove(tmp)` — kein `rename` angenommen (via `src/host/AtomicFile.ts`).
+
+**Backup:** `BackupManager` hält `lastN = 5` pro Slot in `saves/<gameId>/backups/<slot>-<timestamp>.json` + SQLite Journal (implementiert in SaveManager).
 
 **Recovery:** Bei korruptem Save: `Diagnostics` zeigt `slot + schemaVersion + error`, bietet `Restore` aus letztem Backup oder `Safe Mode` (frischen Save starten ohne alten zu löschen).
 
@@ -904,12 +908,15 @@ type Job = {
 
 - `Preload` (P50–80), cancellable bei Map-Wechsel
 - `Asset Decode` (PNG → `Image`/`Data`) in `Thread.runInBackground`
+- `Voxel Decode` (**P30 neu**, via `src/jobs/JobScheduler.ts` — parallel entdeckt: Voxel 3D braucht eigene Prio zwischen Preload und Remote)
 - `Cache Cleanup` (LRU Sweep, bei `pressureLevel warning`)
 - `Save Backup` (vor Migration)
 - `Core Verification` (Hash-Check alle 24h)
 - `Download` (Core/Mod Update)
 
-**Regel:** `Gameplay hat Vorrang` — Jobs mit `priority<80` pausieren, wenn `Frame Time > 16ms` zwei Frames hintereinander.
+**Implementiert:** `src/jobs/JobScheduler.ts` (PriorityQueue 100/80/40/30/5, AbortSignal, Deadline, Retry+exponential, dependsOn DAG, concurrency 2, `cancelByPriority(threshold)` für Governor, `VOXEL_DECODE_PRIORITY=30`) — 7 Tests. `VoxelPreloadAdapter` nutzt `priority 80/40/5` + `Budget` + `Abort`; `ResourceGovernor.tickVoxelLOD` ruft `cancelByPriority(30)` bei `critical`.
+
+**Regel:** `Gameplay hat Vorrang` — Jobs mit `priority<80` pausieren, wenn `Frame Time > 16ms` zwei Frames hintereinander. `Governor` cancelt `≤30` bei `critical`.
 
 ---
 
@@ -2598,7 +2605,10 @@ Beobachten (Dogfood + Benchmarks + Diagnostics)
 | Keine formalen Invarianten/Checkliste für Mod-Autoren | Mod bricht still wenn `nil`/`throw` falsch behandelt | `docs/spec/pipeline-invariants.md` I1–I10 + `docs/diagrams/*.mmd` + `docs/benchmarks/voxel-benchmark.md` | VERIFIZIERT |
 | Voxel Asset Limits nur in Doku, nicht im Code geprüft | Zip-Slip / 64MiB Overflow unbemerkt → Disk Exhaustion | `src/cache/VoxelCacheGuard.ts` (8MiB/file, 64MiB total, 512MiB storage, `safeVoxelPath`) | VERIFIZIERT |
 | 3 Stellen duplizierten `tmp→verify→copy→remove` (CoreStore, VoxelPackImporter, SaveManager) | DRY-Verstoß, Fehler divergieren | `src/host/AtomicFile.ts` (`atomicWriteBytes/String`, parent-dirs, verify, cleanup) — von Voxel-Arbeit entdeckt, gilt generisch | VERIFIZIERT |
-| Pipeline-Budget (6-8ms) war nur Doku, nicht messbar | AdaptivePerformanceManager konnte Voxel nicht stufen | `src/telemetry/PipelineTelemetry.ts` (TimingPort.now, p50/p95/p99, availableFalseRate, shouldDowngrade) + persist für §49 Diagnostics | VERIFIZIERT |
+| Pipeline-Budget (6-8ms) war nur Doku, nicht messbar | AdaptivePerformanceManager konnte Voxel nicht stufen | `src/telemetry/PipelineTelemetry.ts` (TimingPort.now, p50/p95/p99, availableFalseRate, shouldDowngrade) + persist für §49 Diagnostics + `src/perf/ResourceGovernor.ts` tickVoxelLOD (critical→OFF/warning step/telemetry) | VERIFIZIERT |
+| `SaveManager` war nur Doku (§18) | Kein atomic/Backup/Migration/Journal im Code | `src/save/SaveManager.ts` (AtomicFile, Backup lastN=5, Journal, Integrity sha256, Limits 2MiB/depth40, Migration Registry mit rollback) 7 Tests | VERIFIZIERT |
+| `JobScheduler` war nur Doku (§26) | Keine Priority/Abort/Deadline/Retry DAG | `src/jobs/JobScheduler.ts` (PriorityQueue 100/80/40/**30**/5, AbortSignal, Deadline, Retry, dependsOn, `cancelByPriority` für Governor) 7 Tests | VERIFIZIERT |
+| Library Future (Gold/Silver/Crystal/FireRed/LeafGreen) nur erwähnt | Keine Tests für 11 Hashes + 6 FORMAT_VERSION | `src/library/GameLibrary.future.test.ts` 4 Tests (KNOWN_SHA1, FORMAT_VERSION, reject, isReady für crystal) | VERIFIZIERT |
 
 **Regel für zukünftige Loops:** Keine Änderung ohne `PROFILE→BENCHMARK`, kein Breaking der `render_pipelines` API, immer `Graceful Degradation` (Voxel → 2D), immer `pro_required:false` prüfen.
 

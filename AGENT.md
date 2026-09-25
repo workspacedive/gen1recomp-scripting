@@ -93,6 +93,13 @@
 - **Outputs:** `PipelineTelemetry` (p95/availableFalseRate/shouldDowngrade), `ResourceGovernor` (tick/tryUpgrade), Diagramme & Bench Verifikation
 - **Regel:** Kein Downgrade ohne `p95 > budget` + `count≥10`, kein Upgrade ohne `p95 < budget-2`
 
+### 12. save-job-game-specialist *(neu, P0/P1, parallel)*
+
+- **Verantwortung:** SaveManager (§18), JobScheduler (§26), Future Games (Gold/Silver/Crystal/FireRed/LeafGreen)
+- **Skills:** `save-manager`, `job-scheduler`, `future-games`
+- **Outputs:** `SaveManager` (Atomic/Backup/Journal/Migration/Integrity/Limits), `JobScheduler` (PriorityQueue 30/Abort/Deadline/Retry/DAG), `GameLibrary` Future-Ready Tests
+- **Regel:** Saves nie ohne Backup migrieren, Jobs nie ohne Abort/Deadline, Future Games ohne Pro
+
 ---
 
 ## Orchestrierung

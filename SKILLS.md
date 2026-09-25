@@ -263,6 +263,33 @@ Jeder Skill listet **Voraussetzung**, **Input**, **Output**, **Grenzen**, **Fehl
 - **Output:** `atomicWriteBytes/String` (parent dirs, verify, cleanup), genutzt in `CoreStore` + `VoxelPackImporter`
 - **Tests:** `src/host/AtomicFile.test.ts` 4
 
+### skill: save-manager
+
+- **Zweck:** Save-Arten §18 (normal/engine/mod/checkpoint/config) + Atomic Save + Backup + Migration + Integrity — aus CacheContract/Storage verifiziert
+- **Status:** VERIFIZIERT
+- **pro_required:** false
+- **Input:** `FilesPort` + `StoragePort` (Journal), `LibraryEntry.gameId`, `SaveHeader`, `Migration[]`
+- **Output:** `SaveManager` (save/load, Backup lastN=5, Journal migrating/verified/rollback, Migration Registry, Limits 2MiB/depth40/entries10k, `listBackups`/`restoreBackup`, Integrity sha256 via AtomicFile)
+- **Tests:** `src/save/SaveManager.test.ts` 7 (atomic, backup, migration, rollback, integrity, limits, restore)
+
+### skill: job-scheduler
+
+- **Zweck:** Zentrale Priority-Queue §26 — Priority (100/80/40/30/5 incl. Voxel P30), AbortSignal, Deadline, Retry+DAG, Memory Budget, Governor cancel
+- **Status:** VERIFIZIERT
+- **pro_required:** false
+- **Input:** `JobsPort` (Thread.runInBackground) + `JobOpts` (priority/kind/deadline/retry/deps/signal)
+- **Output:** `JobScheduler` (enqueue, PriorityQueue, Deadline race, `cancelByPriority`, concurrency 2, `VOXEL_DECODE_PRIORITY=30`)
+- **Tests:** `src/jobs/JobScheduler.test.ts` 7 (priority, abort, deadline, retry, cancelByPriority, dependency, VOXEL_P30)
+
+### skill: future-games
+
+- **Zweck:** Gold/Silver/Crystal/FireRed/LeafGreen als Future-Ready — 8 GameIds, 11 KNOWN_SHA1, 6 FORMAT_VERSION
+- **Status:** VERIFIZIERT (aus GameLibrary.ts + KNOWN_SHA1 Tabelle)
+- **pro_required:** false
+- **Input:** `LibraryEntry.gameId`, `KNOWN_SHA1`, `FORMAT_VERSION`, `isReady` (marker+REQUIRED_FILES)
+- **Output:** Coverage für alle 8 Games, `GameLibrary.future.test.ts` 4
+- **Tests:** `src/library/GameLibrary.future.test.ts` 4
+
 ### skill: observability-diagnostics
 
 - **Zweck:** Strukturiertes Logging, Telemetry, Diagnose-Bundle
