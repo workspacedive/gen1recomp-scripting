@@ -2638,11 +2638,13 @@ Die Portierung ist **realistisch ohne Pro** machbar, wenn sie als **Adapter-Schi
 - Input Touch + Virtual Buttons + Haptics
 
 **Phase 4.5 — Rendering Pipelines & Voxel (Woche 16–17) [P1, parallel verbesserbar]:**
-- `PipelineAdapter` (`render_pipelines` Registry, `available`/`gate`, `levels` OFF/15/35/50, `priority`, `broken`, Tilt-Exklusivität) — Canvas2D Default
+- `PipelineAdapter` (`render_pipelines` Registry, `available`/`gate`, `levels` OFF/15/35/50, `priority`, `broken`, Tilt-Exklusivität, **Telemetry-Integration** `attachTelemetry`) — Canvas2D Default
 - `Canvas2DVoxelBackend` (isometrisch/Billboarding, `drawFx` Anchors, `worldPresent` Tilt-Shift)
 - `WebView-WebGL` Probe (Three.js Slim, `postMessage` Bridge, Warm-Cache 1-Frame voraus, BENCHMARK) — EXPERIMENTELL
 - `VoxelAssetPipeline` (`voxels`-Pack/64 MiB `mod.cache`/512 MiB `mod.storage:writeBytes` staged+verified, chunked `Thread.runInBackground`, `PreparedAssetCache`)
-- Telemetry `drawWorldMs`/`triangles`/`availableFalse`, `ResourceGovernor` LOD-Downgrade bei Pressure
+- `VoxelPackImporter` (`DocumentPicker→Files→Jobs→Guard→AtomicFile→prepared_asset`) + `VoxelPreloadAdapter` (Transition Graph Top-N, Budget ramBytes/maxConcurrent, prob/priority)
+- `PipelineTelemetry` (`drawWorldMs` p50/p95/p99, `triangles`, `availableFalseRate`, `shouldDowngrade`) + `ResourceGovernor` (tickVoxelLOD: critical→OFF, warning→step down, telemetry→downgrade; tryUpgrade) + `AtomicFile` DRY
+- Diagramme `pipeline-selection.mmd/.svg` + `voxel-dual-backend.mmd/.svg`, `bench/voxel.bench.ts` (0.0028 ms mean), Invarianten `spec/pipeline-invariants.md`, Benchmark `benchmarks/voxel-benchmark.md`
 
 **Phase 5 — Performance (Woche 17–20) [P1]:**
 - `PerformanceManager` + `ResourceGovernor` + `JobScheduler` + Telemetry

@@ -9,6 +9,7 @@
  */
 
 import type { Host } from "../host/ports"
+import type { PipelineTelemetry } from "../telemetry/PipelineTelemetry"
 
 // ---------------------------------------------------------------------------
 // Typen — 1:1 aus Schemas.lua R.render_pipelines (VERIFIZIERT)
@@ -55,8 +56,13 @@ export class PipelineAdapter {
   private registry = new Map<string, PipelineDef>()
   private owners = new Map<string, string>() // id -> modId
   private listCache: PipelineRecord[] | null = null
+  private telemetry?: PipelineTelemetry
 
-  constructor(private host: Host) {}
+  constructor(private host: Host, opts: { telemetry?: PipelineTelemetry } = {}) {
+    this.telemetry = opts.telemetry
+  }
+
+  attachTelemetry(tel: PipelineTelemetry): void { this.telemetry = tel }
 
   // Registry aus Data.render_pipelines (nach Merge)
   install(data: any): void {
@@ -104,6 +110,7 @@ export class PipelineAdapter {
     if (this.broken.has(id)) return null
     try { return fn() } catch (e) {
       this.broken.add(id)
+      this.telemetry?.markBroken(id)
       const owner = this.ownerOf(id) ?? "?"
       console.error(`[Pipeline ${id}] (${owner}) failed — disabled for session:`, e)
       // Runtime.reportError(owner, ...) in echter Portierung
@@ -251,7 +258,12 @@ export class PipelineAdapter {
     const def = this.get(id)
     if (!def?.drawWorld) return null
     const c = { ...ctx, level: this.level(id) }
-    const out = this.guardRender(id, ()=> def.drawWorld!(c))
+    const level = this.level(id)
+    const available = this.eligible(id) // nutzt guard, aber drawWorld schon eligible; hier für telemetry
+    const fn = ()=> def.drawWorld!(c)
+    const out = this.telemetry
+      ? this.telemetry.measure(id, "drawWorld", level, available, ()=> this.guardRender(id, fn))
+      : this.guardRender(id, fn)
     return this.isCanvas(out) ? out : null // null → vanilla 2D fallback, nie crash
   }
 
@@ -260,7 +272,11 @@ export class PipelineAdapter {
     let cur: unknown = canvas
     for (const {id, def} of this.list()) {
       if (def.worldPresent && this.eligible(id)) {
-        const out: unknown = this.guardRender(id, ()=> def.worldPresent!(cur as any, {...ctx, level:this.level(id)} as FrameCtx))
+        const level = this.level(id)
+        const fn = ()=> def.worldPresent!(cur as any, {...ctx, level} as FrameCtx)
+        const out: unknown = this.telemetry
+          ? this.telemetry.measure(id, "worldPresent", level, true, ()=> this.guardRender(id, fn))
+          : this.guardRender(id, fn)
         if (this.isCanvas(out)) cur = out
       }
     }
@@ -272,7 +288,11 @@ export class PipelineAdapter {
     let cur: unknown = canvas
     for (const {id, def} of this.list()) {
       if (def.present && this.eligible(id)) {
-        const out: unknown = this.guardRender(id, ()=> def.present!(cur as any, {...ctx, level:this.level(id)} as FrameCtx))
+        const level = this.level(id)
+        const fn = ()=> def.present!(cur as any, {...ctx, level} as FrameCtx)
+        const out: unknown = this.telemetry
+          ? this.telemetry.measure(id, "present", level, true, ()=> this.guardRender(id, fn))
+          : this.guardRender(id, fn)
         if (this.isCanvas(out)) cur = out
       }
     }

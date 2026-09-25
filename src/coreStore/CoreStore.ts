@@ -4,6 +4,7 @@
  * pro_required: false
  */
 import type { FilesPort, StoragePort } from "../host/ports"
+import { atomicWriteBytes, atomicWriteString } from "../host/AtomicFile"
 
 export type CoreRetention = "active" | "lastKnownGood" | "fallback" | "protected"
 
@@ -62,17 +63,21 @@ export class CoreStore {
     const dir = this.coresRoot() + `/${record.version}`
     const staged = dir + ".staged"
     try { await this.files.remove(staged) } catch {}
-    await this.files.createDirectory(staged + "/bundle", true)
-    await this.files.writeAsBytes(staged + "/bundle/core.bin", bundleBytes)
-    await this.files.writeAsString(staged + "/core.json", JSON.stringify(record, null, 2))
+    // Staged write via AtomicFile (DRY — parallel entdeckt)
+    const binDest = staged + "/bundle/core.bin"
+    const jsonDest = staged + "/core.json"
+    const r1 = await atomicWriteBytes(this.files, binDest, bundleBytes)
+    if (!r1.ok) return { ok:false, error: r1.error }
+    const r2 = await atomicWriteString(this.files, jsonDest, JSON.stringify(record, null, 2))
+    if (!r2.ok) return { ok:false, error: r2.error }
 
     // Verify staged
-    if (!await this.files.exists(staged + "/bundle/core.bin")) return { ok:false, error:"staged verify failed" }
+    if (!await this.files.exists(binDest)) return { ok:false, error:"staged verify failed" }
 
     // Atomic-ish activation: staged → dir (copy)
     await this.files.createDirectory(dir + "/bundle", true)
-    await this.files.copyFile(staged + "/bundle/core.bin", dir + "/bundle/core.bin")
-    await this.files.copyFile(staged + "/core.json", dir + "/core.json")
+    await this.files.copyFile(binDest, dir + "/bundle/core.bin")
+    await this.files.copyFile(jsonDest, dir + "/core.json")
     await this.files.remove(staged)
 
     // Index upsert

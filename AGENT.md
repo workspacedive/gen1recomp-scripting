@@ -74,10 +74,24 @@
 
 ### 9. voxel-graphics-specialist *(neu, aus iOS-Runtime abgeleitet, parallel)*
 
-- **Verantwortung:** 3D/Grafik-Fokus für Voxel — Canvas-2D Fallback + WebView-WebGL Experiment, Tile/Sprite Atlas, ShaderFX/PaletteFX Äquivalent, Memory/Battery
-- **Skills:** `voxel-pipeline-adapter`, `graphics-audio-input-adapter`
-- **Outputs:** `PipelineAdapter` (Canvas 2D + WebView Three.js), LOD-Strategie (OFF/15/35/50), Frustum/Preload/Budget Integration, Benchmark-Plan für WebGL Probe, `ctx.drawFx` Reprojektion, `invalidate` bei Resize
+- **Verantwortung:** 3D/Grafik-Fokus für Voxel — Canvas-2D Fallback + WebView-WebGL Experiment, Tile/Sprite Atlas, ShaderFX/PaletteFX Äquivalent, Memory/Battery, Preload & Governor
+- **Skills:** `voxel-pipeline-adapter`, `graphics-audio-input-adapter`, `voxel-preload`, `pipeline-telemetry`
+- **Outputs:** `PipelineAdapter` (Canvas 2D + WebView Three.js + Telemetry), LOD-Strategie (OFF/15/35/50), `VoxelPreloadAdapter` (Budget + Top-N), `ResourceGovernor` (tickVoxelLOD), Benchmark-Plan + `voxel.bench.ts`, `ctx.drawFx` Reprojektion, `invalidate` bei Resize, Diagramme `.mmd/.svg`
 - **Regel:** Kein `Metal`/`Native Bridge` ohne Pro — nur `Canvas` + `WebView` WebGL Probe; `BENCHMARK ERFORDERLICH` vor Entscheidung WebGL vs Canvas; kein Overengineering wenn `Canvas` p95 <12 ms
+
+### 10. cache-preload-specialist *(neu, generische DRY-Verbesserung, parallel entdeckt)*
+
+- **Verantwortung:** Cache-Guard + AtomicFile + Preload-Integration (voxel als Treiber)
+- **Skills:** `cache-guard`, `atomic-file`, `voxel-preload`
+- **Outputs:** `VoxelCacheGuard` (8MiB/64MiB/512MiB, SafePath), `AtomicFile` (DRY für CoreStore/Voxel/Save), `VoxelPreloadAdapter`, `VoxelPackImporter`
+- **Regel:** Jeder Write durch Guard, jedes `tmp→copy` durch AtomicFile
+
+### 11. telemetry-governor-specialist *(neu, aus Performance-Engineer abgeleitet)*
+
+- **Verantwortung:** PipelineTelemetry + ResourceGovernor + AdaptivePerformance
+- **Skills:** `pipeline-telemetry`, `performance-preload-design`
+- **Outputs:** `PipelineTelemetry` (p95/availableFalseRate/shouldDowngrade), `ResourceGovernor` (tick/tryUpgrade), Diagramme & Bench Verifikation
+- **Regel:** Kein Downgrade ohne `p95 > budget` + `count≥10`, kein Upgrade ohne `p95 < budget-2`
 
 ---
 

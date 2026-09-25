@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="720" role="img" aria-labelledby="title">
+<title id="title">Voxel Dual-Backend — Canvas 2D + WebView WebGL</title>
+<style>text{font-family: ui-monospace, SFMono-Regular, Menlo, monospace;}</style>
+<rect width="100%" height="100%" fill="#ffffff" stroke="#cccccc"/>
+<text x="20" y="30" font-size="13" fill="#111">Voxel Dual-Backend (Canvas VERIFIZIERT Default + WebView EXPERIMENTELL — mmd in voxel-dual-backend.mmd)</text>
+<text x="20" y="55" font-size="11" fill="#333"><tspan x="20" dy="0">Mod Layer: mods/voxel_world register voxel { label VOXEL, levels OFF/15/35/50, drawWorld drawFx }</tspan>
+<tspan x="20" dy="16">→ PipelineAdapter (priority sel, eligible guard, pushAll/popAll isCanvas)</tspan>
+<tspan x="20" dy="16">→ Selection: Probe isWebGL2AvailableInWebView()? false/no warm → Canvas2D Backend</tspan>
+<tspan x="20" dy="16">→ Canvas2D (VERIFIZIERT): save/translate/rotate, visibleTiles quads, billboard sprites, drawFx project anchors, worldPresent blur filter</tspan>
+<tspan x="20" dy="16">→ Canvas2D Mesh: Heightmap 16×16, Atlas Image reuse, Budget 6ms p95 (bench: 0.0028ms mean)</tspan>
+<tspan x="20" dy="16">→ Selection true &amp; warm hit → WebView-WebGL (EXPERIMENTELL): WKWebView ESM Loader fetch three.module.js → FileManager Cache prepared_asset</tspan>
+<tspan x="20" dy="16">→ Probe: canvas.getContext('webgl2') cached + invalidate on resize → Bridge postMessage {cam,vw,vh,scale,level} ↔ dataURL/Data</tspan>
+<tspan x="20" dy="16">→ Warm Cache 1 Frame voraus: sync drawWorldSync liefert warm → async next Frame im Hintergrund (nie blockierend)</tspan>
+<tspan x="20" dy="16">→ Mesh: mod.cache 64MiB / mod.storage:writeBytes 512MiB staged+verified / Importers voxels pack, LOD 8/16/32, Frustum</tspan>
+<tspan x="20" dy="16">Asset Pipeline: DocumentPicker .vox/.glb → Thread.runInBackground Decode → mod.cache 64MiB cap (8MiB/file via Guard) → PreparedAsset</tspan>
+<tspan x="20" dy="16">→ PreparedAsset: cache/prepared_asset/&lt;hash&gt;/voxels/&lt;map&gt;.bin (key mod+api+core+dep+profile) → Budget check → Render</tspan>
+<tspan x="20" dy="16">→ Governor: ResourceGovernor tickVoxelLOD (critical→OFF, warning→50→35→15→OFF, telemetry p95&gt;budget→downgrade) + tryUpgrade</tspan>
+<tspan x="20" dy="16">Telemetry: PipelineTelemetry drawWorldMs p95, triangles, availableFalseRate → AdaptivePerformance HIGH→BALANCED→LOW</tspan>
+<tspan x="20" dy="22">Farbe: grün=VERIFIZIERT, orange=EXPERIMENTELL/BENCHMARK. GitHub rendert Mermaid direkt; SVG Fallback ohne Chrome.</tspan></text>
+</svg>

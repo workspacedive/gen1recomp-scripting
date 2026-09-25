@@ -235,6 +235,34 @@ Jeder Skill listet **Voraussetzung**, **Input**, **Output**, **Grenzen**, **Fehl
 - **Regel:** Jeder `mod.cache:write` und `writeBytes` muss durch Guard; `..` Pfade → `null` → blockiert
 - **Tests:** `src/cache/VoxelCacheGuard.test.ts` 4 Tests (per-file, total caps, Zip-Slip)
 
+### skill: pipeline-telemetry
+
+- **Zweck:** Messbare Pipeline-Budgets (drawWorld/worldPresent/present) für AdaptivePerformance — aus Voxel-Budget entdeckt
+- **Status:** VERIFIZIERT (eigene Implementierung, getestet)
+- **pro_required:** false
+- **Input:** `TimingPort.now()` + `PipelineAdapter` + `MemoryPort`
+- **Output:** `PipelineTelemetry` (p50/p95/p99, `availableFalseRate`, `recordTriangles`, `shouldDowngrade(budgetMs)`, `persist()`), `ResourceGovernor` (`tickVoxelLOD` critical→OFF/warning→step/telemetry→downgrade, `tryUpgrade`)
+- **Tests:** `src/telemetry/PipelineTelemetry.test.ts` 3 + `src/perf/ResourceGovernor.test.ts` 4
+- **Integration:** `PipelineAdapter.attachTelemetry()` + `measure()` um drawWorld/worldPresent/present
+
+### skill: voxel-preload
+
+- **Zweck:** Voxel Chunk Predictive Preloading mit Budget — Transition Graph → Top-N → Importer
+- **Status:** VERIFIZIERT
+- **pro_required:** false
+- **Input:** `PipelineAdapter` LOD (OFF/15/35/50 → 0/8/16/32) + `TransitionEdge[]` + `VoxelPackImporter`
+- **Output:** `VoxelPreloadAdapter` (`computeTargets` nach prob/dist/priority 80/40/5, `preload` mit `ramBytes` + `maxConcurrent` + `AbortSignal`)
+- **Tests:** `src/preload/VoxelPreloadAdapter.test.ts` 3
+
+### skill: atomic-file
+
+- **Zweck:** DRY für `tmp→verify→copy→final` — aus Voxel dupliziertem CoreStore/SaveManager Code generisch gezogen
+- **Status:** VERIFIZIERT
+- **pro_required:** false
+- **Input:** `FilesPort`, `dest`, `bytes`
+- **Output:** `atomicWriteBytes/String` (parent dirs, verify, cleanup), genutzt in `CoreStore` + `VoxelPackImporter`
+- **Tests:** `src/host/AtomicFile.test.ts` 4
+
 ### skill: observability-diagnostics
 
 - **Zweck:** Strukturiertes Logging, Telemetry, Diagnose-Bundle
