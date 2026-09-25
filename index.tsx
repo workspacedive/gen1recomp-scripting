@@ -351,7 +351,7 @@ function App() {
           <VStack spacing={4}>
             <Text font="caption" foregroundStyle="secondaryLabel">Voxel Mods installiert: {voxelMods.length ? voxelMods.join(", ") : "keine — via Mod ZIP importieren (DramaticShapeVoxelMod, R.DIST MEDIUM 32 cells, Governor nach Voxel-Guide)"}</Text>
             <Text font="caption">Levels: OFF/15/35/50/FULL/75/1ST — OFF=Fallback, 15-50 stabil, FULL=max Distanz (Governor regelt), 1ST experimentell. Import via MODS Tab wie Original.</Text>
-            {selectedId && <MapGrid entry={entries.find(e=>e.id===selectedId)} />}
+            {selectedId ? <MapGrid entry={entries.find(e=>e.id===selectedId) ?? null} /> : null}
           </VStack>
         </Section>
         <Section header={<Text>Library — einmal importieren, danach Warm Start (echter Extractor)</Text>}>
@@ -380,7 +380,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.3.0 — Mods Voxel (DramaticShape, R.DIST MEDIUM, Governor stabil) + MapGrid + 0.2.7 • Tests: 92 • 710K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.3.1 — Fix Mods Section type + MapGrid stabil + Architektur Ausbau • Tests: 92 • 712K</Text>
     </VStack>
   )
 }
