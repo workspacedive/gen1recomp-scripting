@@ -1,8 +1,8 @@
 {
   "name": "gen1recomp-scripting",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
-  "description": "Gen1Recomp → Scripting iOS (Scripting.fun) — Architektur + Host Adapter (Non-Pro, P0 Scaffold)",
+  "description": "Gen1Recomp \u2192 Scripting iOS (Scripting.fun) \u2014 Architektur + Host Adapter (Non-Pro, P0 Scaffold)",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",

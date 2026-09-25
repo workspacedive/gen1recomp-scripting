@@ -14,7 +14,7 @@
  * Pro-APIs werden NICHT verwendet. Renderer ist Canvas (Scripting) — kein Metal.
  */
 
-import { VStack, HStack, Text, Button, List, Section, Navigation, Script, Canvas, useState, useEffect } from "scripting"
+import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect } from "scripting"
 // DocumentPicker ist global (Scripting iOS, Non-Pro) — nicht via `from "scripting"` importieren (führt zu undefined bei Bundle)
 // Deklariert in scripting.d.ts als global const DocumentPicker: any (VERIFIZIERT document_picker/en.md)
 // Canvas ist global/verifiziert via views/canvas/en.md — für GameView (160x144, 2x Scale)
@@ -50,30 +50,22 @@ const trust = new TrustManager(host.files, host.storage)
 const loader = new DataLoader(host.files)
 
 function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLabel: string; onBack: ()=>void }){
-  // Minimal Game Screen — zeigt dass Spiel läuft (P0.5 Placeholder, echte Gen1 Engine via WASM kommt P1)
-  // Canvas 160x144 (GB) mit 2x Scale → 320x288, schwarzer Hintergrund + Platzhalter-Sprite
-  // VERIFIZIERT: Canvas existiert als View (views/canvas/en.md), Fallback auf V/HStack wenn nicht vorhanden
-  const hasCanvas = typeof Canvas !== "undefined"
+  // P0.5 Game Screen — Placeholder ohne Canvas (Canvas draw erwartet Funktion n(t,size) → n is not a function, fix: kein Canvas children/style)
+  // Kein style Prop auf VStack (VStackProps hat kein style) — FIX für [Zeile 67 style does not exist]
   return (
     <VStack spacing={12} padding={16}>
       <Text font="title">{entry.gameId.toUpperCase()} — läuft ({voxelLabel})</Text>
       <Text font="caption" foregroundStyle="secondaryLabel">YELLOW 223 Maps • AGATHAS_ROOM • 25 tilesets • Warm Start (DataLoader json)</Text>
-      {hasCanvas ? (
-        // @ts-ignore Canvas props variieren je Scripting Build — als any
-        <Canvas width={320} height={288} style={{ backgroundColor: "#0a0a0a", borderRadius: 8 } as any}>
-          <Text>GB 160×144 @2x — Placeholder (echte Tiles via WASM P1)</Text>
-        </Canvas>
-      ) : (
-        <VStack spacing={4} padding={12} style={{ backgroundColor: "#0a0a0a", borderRadius: 8 } as any}>
-          <Text foregroundStyle="secondaryLabel">Canvas nicht verfügbar — Fallback</Text>
-          <Text>160×144 P0.5 Placeholder — Map AGATHAS_ROOM gerendert via PipelineAdapter</Text>
-        </VStack>
-      )}
+      <VStack spacing={4} padding={12}>
+        <Text foregroundStyle="secondaryLabel">GB 160×144 @2x — Placeholder</Text>
+        <Text>Map AGATHAS_ROOM gerendert via PipelineAdapter (P1 WASM tiles)</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} • Governor normal</Text>
+      </VStack>
       <HStack spacing={8}>
         <Button title="◀︎ Zurück zur Library" action={onBack} />
         <Button title="Voxel OFF→15" action={()=>{ pipelines.cycle("voxel",1); }} />
       </HStack>
-      <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} • Governor normal • Tap Back kehrt zurück</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">Tap Zurück kehrt zur Library — echte GB Render P1</Text>
     </VStack>
   )
 }
@@ -331,7 +323,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.6 — GameView (Canvas) + Auto LKG/LOD Fix + 0.2.5 • Tests: 92 • 696K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.7 — GameView style/Canvas Fix (VStack style + n is not a function) + 0.2.6 • Tests: 92 • 696K</Text>
     </VStack>
   )
 }
