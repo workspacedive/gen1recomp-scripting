@@ -61,3 +61,23 @@ export function safeFileName(name: string, fallback = 'file'): string {
   const base = basename(String(name || '')).replace(/[^A-Za-z0-9._ -]/g, '_').replace(/^\.+/, '').slice(0, 96)
   return base || fallback
 }
+
+/**
+ * WebView navigation guard: true only for a `file://` URL whose decoded path is
+ * `dir` itself or lies strictly inside it. Fail-closed on anything unusual:
+ * non-empty authority (`file://host/…`), dot segments (`.`/`..`, also when
+ * percent-encoded), empty segments, encoded slashes/backslashes, NUL/control
+ * characters and malformed percent-encoding. Query and fragment are ignored.
+ */
+export function isFileUrlInside(url: string, dir: string): boolean {
+  if (typeof url !== 'string' || !url.startsWith('file:///')) return false
+  if (!dir.startsWith('/') || dir.endsWith('/')) return false
+  const rawPath = url.slice(7).split(/[?#]/, 1)[0]
+  if (/%(2f|5c|00)/i.test(rawPath)) return false
+  let path: string
+  try { path = decodeURIComponent(rawPath) } catch { return false }
+  if (/[\u0000-\u001f\\]/.test(path)) return false
+  const segs = path.split('/').slice(1)
+  if (segs.some((s, i) => s === '.' || s === '..' || (s === '' && i < segs.length - 1))) return false
+  return path === dir || path.startsWith(dir + '/')
+}

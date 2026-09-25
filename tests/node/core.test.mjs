@@ -98,6 +98,19 @@ test('manifest: valid v2 manifest, permissions and reserved id', () => {
   assert.deepEqual(g2.manifest.games, ['gen1', 'gen2']);
 });
 
+test('paths: WebView file:// navigation guard', () => {
+  const dir = '/var/mobile/Documents/RecompDeck/player';
+  for (const u of [`file://${dir}`, `file://${dir}/player.html`, `file://${dir}/player.html?x=1#y`, `file://${dir}/blobs/game.3.js`,
+    `file://${dir}/sp%20ace.js`]) assert.ok(paths.isFileUrlInside(u, dir), u);
+  for (const u of [`file://${dir}/../secret`, `file://${dir}/a/../../x`, `file://${dir}/%2e%2e/x`, `file://${dir}/.%2E/x`,
+    `file://${dir}/./a`, `file://${dir}%2F..%2Fx`, `file://${dir}/a%2Fb`, `file://${dir}/a%5Cb`, `file://${dir}/a%00b`,
+    `file://${dir}//etc`, `file://${dir}x/evil`, `file://${dir}-evil/a`, `file://localhost${dir}/a`, `file:${dir}/a`,
+    `file://${dir}/%E0%A4%A`, 'https://example.com/', 'about:blank', `FILE://${dir}/a`, `file://${dir}/a\\b`])
+    assert.ok(!paths.isFileUrlInside(u, dir), u);
+  assert.ok(!paths.isFileUrlInside(`file://${dir}/a`, dir + '/'), 'dir must not end with /');
+  assert.ok(!paths.isFileUrlInside(`file://${dir}/a`, 'relative/dir'), 'dir must be absolute');
+});
+
 test('paths: validation and classification', () => {
   for (const p of ['saves/red/slot1.lua', 'options.lua', 'prints/a.png']) assert.ok(paths.isSafeRelPath(p), p);
   for (const p of ['', '/etc/passwd', '../x', 'a/../b', 'a//b', 'a\\b', 'a/\u0001b', 'x'.repeat(600)]) assert.ok(!paths.isSafeRelPath(p), p);

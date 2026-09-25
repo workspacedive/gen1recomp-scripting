@@ -1,0 +1,11 @@
+# Upstream files whose escape-transformed source does not compile on PUC
+# Lua 5.1 for reasons UNRELATED to string escapes. None of them is part of the
+# shipped game archive (tools/verify-lua.sh asserts that when the archive is
+# available). Any other COMPILE FAIL makes the verification fail.
+#
+# standalone Gen 3 test script starting with a shebang line (`#!`), which
+# loadstring() never accepts; the upstream runner executes it via the CLI
+tests/game3_oak_first_battle_test.lua
+# desktop save-converter vendor library using the Lua 5.3 `//` operator
+# (not valid LuaJIT 2.1 either, so never loaded by the game)
+tools/save_convert/vendor/gen1lib.lua

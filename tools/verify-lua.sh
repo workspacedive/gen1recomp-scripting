@@ -34,15 +34,37 @@ echo "== 2. escape-transform literal differential"
 python3 tools/audit/lua_escape_scan.py "$UP" "$OUT/escapes.json" > "$OUT/escapes.txt"
 mapfile -t FILES < <(python3 -c "import json,sys; [print(sys.argv[1]+'/'+f) for f in sorted(json.load(open(sys.argv[2])))]" "$UP" "$OUT/escapes.json")
 "$LJ"  tests/lua/lua51src_literals.lua orig  "${FILES[@]}" > "$OUT/lit_orig.txt"
-"$L51" tests/lua/lua51src_literals.lua xform "${FILES[@]}" > "$OUT/lit_xform.txt" 2> "$OUT/lit_xform.err"
+"$L51" tests/lua/lua51src_literals.lua xform "${FILES[@]}" > "$OUT/lit_xform.txt" 2> "$OUT/lit_xform.err"; xrc=$?
 if [ "${#FILES[@]}" -gt 0 ] && cmp -s "$OUT/lit_orig.txt" "$OUT/lit_xform.txt"; then
-  shipped=""
-  if [ -f "$HERE/.cache/game-0.3.14.love" ]; then
-    shipped=$(python3 -c "import json,sys,zipfile; n=set(zipfile.ZipFile(sys.argv[2]).namelist()); print(sum(f in n for f in json.load(open(sys.argv[1]))))" "$OUT/escapes.json" "$HERE/.cache/game-0.3.14.love")
-    shipped=" ($shipped of them in the shipped game archive)"
-  fi
-  ok "${#FILES[@]} files$shipped, $(wc -l < "$OUT/lit_orig.txt") literal lines identical"
+  python3 - "$OUT" "$UP" "$HERE/.cache/game-0.3.14.love" << 'PY'
+import os, re, sys, zipfile
+out, up, love = sys.argv[1:4]
+counts = {}
+for line in open(os.path.join(out, "lit_orig.txt")):
+    m = re.match(r"# (\S+) literals=(\d+)", line)
+    if m: counts[os.path.relpath(m.group(1), up)] = int(m.group(2))
+rew = {}
+for line in open(os.path.join(out, "lit_xform.err")):
+    m = re.match(r"(\S+) +rewrites=(\d+)", line.strip())
+    if m: rew[os.path.relpath(m.group(1), up)] = int(m.group(2))
+msg = f"{len(counts)} files, {sum(counts.values())} literals, {sum(rew.values())} rewrites"
+if os.path.exists(love):
+    names = set(zipfile.ZipFile(love).namelist())
+    sh = [f for f in counts if f in names]
+    msg += f"; shipped game archive: {len(sh)} files, {sum(counts[f] for f in sh)} literals, {sum(rew.get(f, 0) for f in sh)} rewrites"
+print("  PASS literal outputs identical (" + msg + ")")
+PY
 else bad "literal outputs differ (see $OUT/lit_*.txt)"; fi
+if grep -qE '^(NOT IDEMPOTENT|EVAL FAIL)' "$OUT/lit_xform.err"; then bad "transform not idempotent / literal eval failure:"; grep -E '^(NOT IDEMPOTENT|EVAL FAIL)' "$OUT/lit_xform.err"; fi
+grep -E '^COMPILE FAIL ' "$OUT/lit_xform.err" | sed -E "s|^COMPILE FAIL $UP/([^:]+):.*|\1|" | sort -u > "$OUT/lit_compile_failures.txt"
+if diff -u <(grep -vE '^(#|$)' tests/lua/expected_transform_compile_failures.txt | sort) "$OUT/lit_compile_failures.txt" > "$OUT/lit_compile_failures.diff"; then
+  ok "transformed sources compile on Lua 5.1 except the $(wc -l < "$OUT/lit_compile_failures.txt") documented non-game files"
+else bad "unexpected transform compile failures:"; cat "$OUT/lit_compile_failures.diff"; fi
+if [ -f "$HERE/.cache/game-0.3.14.love" ]; then
+  inlove=$(python3 -c "import sys,zipfile; n=set(zipfile.ZipFile(sys.argv[1]).namelist()); print(sum(l.strip() in n for l in open(sys.argv[2]) if l.strip()))" "$HERE/.cache/game-0.3.14.love" "$OUT/lit_compile_failures.txt")
+  if [ "$inlove" = 0 ]; then ok "no compile failure affects the shipped game archive"; else bad "$inlove compile failure(s) in shipped files"; fi
+fi
+if [ $xrc -ne 0 ] && ! grep -qE '^(COMPILE FAIL|NOT IDEMPOTENT|EVAL FAIL)' "$OUT/lit_xform.err"; then bad "xform run crashed (exit $xrc)"; fi
 
 echo "== 3. upstream test tiers (LuaJIT baseline vs Lua 5.1 + compat)"
 tier() { # name runner

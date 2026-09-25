@@ -10,7 +10,7 @@ import { Script } from 'scripting'
 import { BRIDGE_MOD_ID, GAME_IDENTITY, GameId } from '../core/constants'
 import { parseBridgeMessage } from '../core/bridgeSchema'
 import { buildLaunchPlan, LaunchRequest } from '../core/launch'
-import { classifySavePath, isSafeRelPath } from '../core/paths'
+import { classifySavePath, isFileUrlInside, isSafeRelPath } from '../core/paths'
 import type { Settings } from '../core/settings'
 import { appendCachePart, beginCache, cacheMeta, cachePath, endCache } from '../data/cacheStore'
 import { listMods } from '../data/modStore'
@@ -159,11 +159,7 @@ export class PlayerSession {
     this.controller.shouldAllowRequest = async (req) => {
       const url = req.url || ''
       if (url === 'about:blank') return true
-      if (url.startsWith('file://')) {
-        let path = url.slice(7)
-        try { path = decodeURIComponent(path) } catch { return false }
-        return path.startsWith(playerDir + '/') || path === playerDir
-      }
+      if (url.startsWith('file:')) return isFileUrlInside(url, playerDir)
       log('warn', 'blocked WebView request: ' + url.slice(0, 200))
       if (/^https:\/\//i.test(url) && req.navigationType === 'linkActivated') {
         void this.openExternal(url)
