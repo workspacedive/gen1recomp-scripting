@@ -2775,3 +2775,13 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 **Warum HTML statt Canvas:** Scripting `Canvas` deklarativ instabil (`style` Crash), `WebView` ist WKWebView VERIFIZIERT und erlaubt echtes CSS Grid ohne `Canvas2D` `getContext` Probe — BENCHMARK ERFORDERLICH fuer 60fps, aber optisch sofort wie echtes Spiel.
 
 **Verifikation:** `tsc 0`, `vitest 21/92`, `WebMapView` HTML enthaelt Viewport + farbige Divs, Toggle funktioniert.
+
+---
+
+## 77.10 v0.4.3 — Battle + Inventar + Encounter (Gras 8%) — VERIFIZIERT 2026-09-25 18:34
+
+**Erweiterung zu 0.4.2:** `battle` State `{wild, player, mapId}`, `inventory ["Poke Ball x5","Potion x3"]`, `caught []`, `move` prueft Gras-Tile (`tile %5===1`) und `Math.random()<0.08` → `setBattle({wild: random aus [Pidgey,Rattata,Caterpie,Weedle,Pikachu], player:"Pikachu"})`, `BattleView` mit `wild/player` HP, Buttons `Kampf/Ball/Flucht`, `onCatch` pusht `caught` und dekrementiert `Poke Ball`, `onRun` schließt. `GameView` early return `if(battle) return <BattleView>`, `inventory`/`caught` in Info.
+
+**Naechstes:** Echte Gen1 Battle-Engine via WASM (P1), hier schon spielbar Platzhalter.
+
+**Verifikation:** `tsc 0`, `vitest 21/92`.

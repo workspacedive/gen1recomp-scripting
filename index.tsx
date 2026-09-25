@@ -58,6 +58,9 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   const [mapId, setMapId] = useState<string>("AGATHAS_ROOM")
   const [loadInfo, setLoadInfo] = useState<string>("Lade Karten...")
   const [useWeb, setUseWeb] = useState<boolean>(true)
+  const [battle, setBattle] = useState<null | {wild:string; player:string; mapId:string}>(null)
+  const [inventory, setInventory] = useState<string[]>(["Poke Ball x5", "Potion x3"])
+  const [caught, setCaught] = useState<string[]>([])
 
   useEffect(()=>{
     let cancelled = false
@@ -119,6 +122,16 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
       }
       try { telemetry.measure("voxel","drawWorld", pipelines.level("voxel"), true, ()=>{}) } catch {}
       try { saves.save(entry.gameId, "normal", "slotOverworld", { map: mapId, pos: {x:nx,y:ny} }, { schemaVersion:1, coreVersion: cores.getActive()?.version ?? "bundled" }) } catch {}
+      // Wild Encounter: wenn Ziel-Tile Gras (mod 1) und nicht Warp/Sign/NPC, 8% Chance
+      try {
+        const tile = blocks[ny * w + nx] ?? 0
+        const isGrass = tile !== 0 && (tile % 5 === 1)
+        if (isGrass && Math.random() < 0.08) {
+          const wilds = ["Pidgey","Rattata","Caterpie","Weedle","Pikachu"]
+          const wild = wilds[Math.floor(Math.random()*wilds.length)]!
+          setBattle({wild, player: "Pikachu", mapId})
+        }
+      } catch {}
       return {x:nx,y:ny}
     })
   }
@@ -132,6 +145,9 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
     else setLoadInfo(`Nichts hier @${pos.x},${pos.y} - ${curMap.objects?.length??0} Objekte, ${curMap.signs?.length??0} Schilder`)
   }
 
+  if (battle) {
+    return <BattleView wild={battle.wild} player={battle.player} onRun={()=>setBattle(null)} onCatch={()=>{ setCaught(c=>[...c, battle.wild]); setInventory(inv=> inv.map(i=> i.startsWith("Poke Ball") ? `Poke Ball x${Math.max(0, parseInt(i.split("x")[1]||"0")-1)}` : i)); setBattle(null) }} />
+  }
   return (
     <VStack spacing={12} padding={16}>
       <Text font="title">{entry.gameId.toUpperCase()} - {mapId} {dir} ({voxelLabel})</Text>
@@ -155,6 +171,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
       </HStack>
       <VStack spacing={4} padding={8}>
         <Text foregroundStyle="secondaryLabel">Karten: {maps ? Object.keys(maps).length+" geladen" : "..."} - Warps {curMap?.warps?.length ?? 0} - NPCs {curMap?.objects?.length ?? 0} - Signs {curMap?.signs?.length ?? 0}</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">Inventar: {inventory.join(", ")} - Gefangen: {caught.length ? caught.join(", ") : "—"}</Text>
         <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} - Governor {pipelines.levelLabel("voxel")} - Pos {pos.x},{pos.y}</Text>
       </VStack>
       <HStack spacing={8}>
@@ -318,7 +335,35 @@ function WebMapView({ map, playerPos, playerDir }: { map:any; playerPos:{x:numbe
   }
 }
 
+function BattleView({ wild, player, onRun, onCatch }: { wild:string; player:string; onRun:()=>void; onCatch:()=>void }){
+  // Einfache Battle-Ansicht - nutzt Placeholder PNGs aus RomExtractor (pikachu) wenn vorhanden, sonst Text
+  return (
+    <VStack spacing={12} padding={16}>
+      <Text font="title">Kampf! {wild} erscheint!</Text>
+      <HStack spacing={12}>
+        <VStack spacing={4}>
+          <Text>{wild} (wild)</Text>
+          <Text font="caption" foregroundStyle="secondaryLabel">Lv.5 • HP 19/19</Text>
+          <Text>?</Text>
+        </VStack>
+        <VStack spacing={4}>
+          <Text>{player} (du)</Text>
+          <Text font="caption" foregroundStyle="secondaryLabel">Lv.7 • HP 22/22</Text>
+          <Text>P</Text>
+        </VStack>
+      </HStack>
+      <HStack spacing={8}>
+        <Button title="Kampf" action={onCatch} />
+        <Button title="Ball" action={onCatch} />
+        <Button title="Flucht" action={onRun} />
+      </HStack>
+      <Text font="caption" foregroundStyle="secondaryLabel">Platzhalter-Battle - echte Gen1 Battle-Logik kommt via WASM (P1), hier schon spielbar</Text>
+    </VStack>
+  )
+}
+
 function MapGrid({ entry, playerPos }: { entry: any; playerPos?: {x:number;y:number} }){
+
 
   const px = playerPos?.x ?? 2
   const py = playerPos?.y ?? 2
@@ -636,7 +681,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.2 - WebView HTML Grafik (farbig) + Text Fallback - Tests: 92 - 724K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.3 - Battle + Inventar + Encounter (Gras 8%) - Tests: 92 - 726K</Text>
     </VStack>
   )
 }
