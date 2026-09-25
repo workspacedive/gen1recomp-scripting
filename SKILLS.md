@@ -225,6 +225,16 @@ Jeder Skill listet **Voraussetzung**, **Input**, **Output**, **Grenzen**, **Fehl
 - **Grenzen:** Keine erfundenen `Renderer3D` APIs — `Renderer3D.ok()` im Original prüft Depth-Canvas/Shader Verfügbarkeit; in Scripting → `WebGL2` Probe in WebView + `Canvas` Existenz; `love.graphics.newShader`/`newCanvas` → `Canvas`/`WebView` Canvas; kein `Metal`/`Native Bridge` ohne Pro
 - **Fehlerfälle:** Headless (`available()==false`) → 2D Pfad; vergessener Canvas → ignorieren; Throw → `broken` + Fallback; Resize → `invalidate()` leert GPU/Cache
 
+### skill: cache-guard
+
+- **Zweck:** Voxel & generische Asset-Limits gegen Disk Exhaustion / Zip-Slip — 8MiB/file, 64MiB mod.cache, 512MiB storage staged+verified
+- **Status:** VERIFIZIERT (aus `docs/modding.md` mod.cache Limit, Gen1Recomp `MAX_ENTRY_BYTES`, Scripting `FileManager` 8MiB implizit)
+- **pro_required:** false
+- **Input:** `WriteIntent { bytes, totalAfter, target: "mod.cache"|"mod.storage", relPath }`
+- **Output:** `validateVoxelWrite()` + `safeVoxelPath(base, rel)` + `VoxelAssetPipeline.cacheKey` (mod+api+core+dep+profile) — in `src/cache/VoxelCacheGuard.ts`
+- **Regel:** Jeder `mod.cache:write` und `writeBytes` muss durch Guard; `..` Pfade → `null` → blockiert
+- **Tests:** `src/cache/VoxelCacheGuard.test.ts` 4 Tests (per-file, total caps, Zip-Slip)
+
 ### skill: observability-diagnostics
 
 - **Zweck:** Strukturiertes Logging, Telemetry, Diagnose-Bundle

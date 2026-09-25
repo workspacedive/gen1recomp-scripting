@@ -51,9 +51,9 @@ export class ScriptingStorageAdapter implements StoragePort {
     // @ts-ignore
     return Storage.contains(key, { shared: scope === "shared" })
   }
-  keys(): string[] {
-    // @ts-ignore
-    return Storage.keys()
+  keys(scope: "private"|"shared" = "private"): string[] {
+    // @ts-ignore Storage.keys() takes optional scope arg in newer Scripting — TEILWEISE VERIFIZIERT
+    try { return (Storage as any).keys(scope) ?? (Storage as any).keys() } catch { return (Storage as any).keys() }
   }
   clear(scope: "private"|"shared" = "private"): void {
     if (scope === "shared") {
@@ -245,15 +245,15 @@ export class ScriptingNetworkAdapter implements NetworkPort {
     } as any)
 
     if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`)
-    const chunk = new Uint8Array(await res.arrayBuffer())
+    const chunk = new Uint8Array(await res.arrayBuffer()) as Uint8Array<ArrayBuffer>
     // Append: lies bestehendes part + concat
-    let existing = new Uint8Array(0)
+    let existing: Uint8Array<ArrayBuffer> = new Uint8Array(0) as Uint8Array<ArrayBuffer>
     if (offset > 0) {
-      try { existing = await files.readAsBytes(part) } catch {}
+      try { existing = await files.readAsBytes(part) as Uint8Array<ArrayBuffer> } catch {}
     }
-    const combined = new Uint8Array(existing.length + chunk.length)
-    combined.set(existing, 0)
-    combined.set(chunk, existing.length)
+    const combined = new Uint8Array(existing.length + chunk.length) as unknown as Uint8Array
+    combined.set(existing as unknown as Uint8Array, 0)
+    combined.set(chunk as unknown as Uint8Array, existing.length)
     await files.writeAsBytes(part, combined)
 
     // Hash-Verifikation falls erwartet
