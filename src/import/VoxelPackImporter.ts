@@ -10,6 +10,7 @@
 import type { FilesPort, JobsPort } from "../host/ports"
 import { validateVoxelWrite, LIMITS, safeVoxelPath } from "../cache/VoxelCacheGuard"
 import { VoxelAssetPipeline } from "../render/VoxelBackends"
+import { atomicWriteBytes } from "../host/AtomicFile"
 
 export type VoxelSourceKind = "vox" | "glb" | "voxels-pack" | "bin"
 
@@ -108,16 +109,9 @@ export class VoxelPackImporter {
     const guard = validateVoxelWrite({ bytes: decoded.length, totalAfter, target: "mod.storage" })
     if (!guard.ok) return { ok:false, error: guard.reason, reason:"limit" }
 
-    // 6. Atomic write: tmp → verify → copy (wie CoreStore, §12)
-    const tmp = dest + ".tmp"
-    try {
-      await this.files.createDirectory((this.files.documentsDirectory ?? "") + "/" + base, true)
-      await this.files.writeAsBytes(tmp, decoded)
-      const verify = await this.files.readAsBytes(tmp)
-      if (verify.length !== decoded.length) throw new Error("verify length mismatch")
-      await this.files.copyFile(tmp, dest)
-      await this.files.remove(tmp)
-    } catch (e) { try { await this.files.remove(tmp) } catch {}; return { ok:false, error: String(e), reason:"io" } }
+    // 6. Atomic write via shared helper (DRY — parallel entdeckt: CoreStore+Voxel duplizierten tmp→copy)
+    const aw = await atomicWriteBytes(this.files, dest, decoded)
+    if (!aw.ok) return { ok:false, error: aw.error, reason:"io" }
 
     const elapsedMs = Date.now() - t0
     return {

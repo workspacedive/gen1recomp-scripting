@@ -2597,6 +2597,7 @@ Beobachten (Dogfood + Benchmarks + Diagnostics)
 | `HostAdapter` nutzte `NoopGraphicsAdapter` selbst im Scripting Host — WebView nie erreichbar | Scripting Host muss echten `ScriptingGraphicsAdapter` nutzen | `ScriptingGraphicsAdapter` (Canvas 2D + WebView Probe + postMessage) als Default in `createScriptingHost()` | VERIFIZIERT |
 | Keine formalen Invarianten/Checkliste für Mod-Autoren | Mod bricht still wenn `nil`/`throw` falsch behandelt | `docs/spec/pipeline-invariants.md` I1–I10 + `docs/diagrams/*.mmd` + `docs/benchmarks/voxel-benchmark.md` | VERIFIZIERT |
 | Voxel Asset Limits nur in Doku, nicht im Code geprüft | Zip-Slip / 64MiB Overflow unbemerkt → Disk Exhaustion | `src/cache/VoxelCacheGuard.ts` (8MiB/file, 64MiB total, 512MiB storage, `safeVoxelPath`) | VERIFIZIERT |
+| 3 Stellen duplizierten `tmp→verify→copy→remove` (CoreStore, VoxelPackImporter, SaveManager) | DRY-Verstoß, Fehler divergieren | `src/host/AtomicFile.ts` (`atomicWriteBytes/String`, parent-dirs, verify, cleanup) — von Voxel-Arbeit entdeckt, gilt generisch | VERIFIZIERT |
 
 **Regel für zukünftige Loops:** Keine Änderung ohne `PROFILE→BENCHMARK`, kein Breaking der `render_pipelines` API, immer `Graceful Degradation` (Voxel → 2D), immer `pro_required:false` prüfen.
 
