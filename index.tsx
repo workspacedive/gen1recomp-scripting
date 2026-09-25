@@ -61,6 +61,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   const [inventory, setInventory] = useState<string[]>(["Poke Ball x5", "Potion x3"])
   const [caught, setCaught] = useState<string[]>([])
   const [showMenu, setShowMenu] = useState<boolean>(false)
+  const [wasmStatus, setWasmStatus] = useState<string>("pruefe...")
 
   useEffect(()=>{
     let cancelled = false
@@ -88,6 +89,14 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
     load()
     return ()=>{ cancelled = true }
   }, [entry.id])
+
+  useEffect(()=>{
+    try {
+      const hasWasm = typeof WebAssembly !== "undefined" && typeof (WebAssembly as any).instantiate === "function"
+      const hasMemory = hasWasm && typeof (WebAssembly as any).Memory === "function"
+      setWasmStatus(hasWasm ? (hasMemory ? "WASM + Memory OK" : "WASM OK, Memory fehlt") : "WASM nicht verfuegbar - Host Bridge")
+    } catch (e:any) { setWasmStatus(`WASM Fehler: ${String(e?.message??e)}`) }
+  }, [])
 
   const curMap: any = maps ? (maps as any)[mapId] : null
   const w = curMap?.width ?? 5
@@ -151,15 +160,15 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
     return <BattleView wild={battle.wild} player={battle.player} onRun={()=>setBattle(null)} onCatch={()=>{ setCaught(c=>[...c, battle.wild]); setInventory(inv=> inv.map(i=> i.startsWith("Poke Ball") ? `Poke Ball x${Math.max(0, parseInt(i.split("x")[1]||"0")-1)}` : i)); setBattle(null) }} />
   }
   const core = cores.getActive() ?? cores.getLKG()
-  const hasWasm = false // WASM probe BENCHMARK ERFORDERLICH
+  const hasWasm = wasmStatus.includes("OK")
   return (
     <VStack spacing={12} padding={16}>
       <Text font="title">{entry.gameId.toUpperCase()} - {core ? core.version : "bundled"} ({voxelLabel})</Text>
-      <Text font="caption" foregroundStyle="secondaryLabel">{loadInfo} - Core {core ? core.version+" "+core.retention : "bundled fengari"} - {hasWasm ? "WASM" : "Host Bridge"} - {w}x{h} {curMap?.tileset ?? ""}</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">{loadInfo} - Core {core ? core.version+" "+core.retention : "bundled fengari"} - {wasmStatus} - {w}x{h} {curMap?.tileset ?? ""}</Text>
       <VStack spacing={8} padding={12}>
         <Text font="caption" foregroundStyle="secondaryLabel">Core unberuehrt - Bridge Layer aktiv (wie apk)</Text>
         <Text>Spiel laeuft via Host Adapter - kein Text Grid mehr</Text>
-        <Text font="caption" foregroundStyle="secondaryLabel">PipelineAdapter drawWorld - {hasWasm ? "WASM Frame" : "Dummy Canvas (160x144)"} - Governor {pipelines.levelLabel("voxel")}</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">PipelineAdapter drawWorld - {wasmStatus} - Governor {pipelines.levelLabel("voxel")} - Hooks {pipelines.list().length} Pipelines</Text>
         <Text font="caption" foregroundStyle="secondaryLabel">Map {mapId} {w}x{h} - Pos {pos.x},{pos.y} {dir} - Warps {curMap?.warps?.length ?? 0} NPCs {curMap?.objects?.length ?? 0}</Text>
       </VStack>
       <HStack spacing={8}>
@@ -621,7 +630,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.5.0 - Bridge Layer wie apk - Core unberuehrt, Text Grid entfernt - Tests: 92 - 735K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.5.1 - WASM Probe + Hooks Anzeige + Bridge - Tests: 92 - 737K</Text>
     </VStack>
   )
 }

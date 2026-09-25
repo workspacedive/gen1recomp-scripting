@@ -2829,3 +2829,11 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 - `BattleView` + `MenuView` bleiben (Text `Kampf!` etc.) als `Host` Fallback bis `WASM` `P1` echte `Gen1` Battle-Engine liefert — `Core` selbst bleibt unangetastet.
 
 **Verifikation:** `tsc 0`, `vitest 21/92`, `GameView` kein `RealMapView` mehr.
+
+---
+
+## 77.15 v0.5.1 — WASM Probe + Hooks Anzeige + Bridge — VERIFIZIERT 2026-09-25 18:59
+
+**Erweiterung zu 0.5.0:** `wasmStatus` State `pruefe...` → `WASM + Memory OK` / `WASM OK` / `WASM nicht verfuegbar`, `useEffect` prueft `typeof WebAssembly !== "undefined"` + `WebAssembly.Memory`, `hasWasm = wasmStatus.includes("OK")`, `loadInfo` zeigt `Core ... - {wasmStatus} - w×h`, `PipelineAdapter drawWorld - {wasmStatus} - Governor ... - Hooks {pipelines.list().length} Pipelines` — Bridge zeigt jetzt Hooks/API Anzahl.
+
+**Verifikation:** `tsc 0`, `vitest 21/92`.
