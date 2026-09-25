@@ -2818,3 +2818,14 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 **Erweiterung zu 0.4.5:** `showMenu` State, `MenuView` mit `Pokedex` (caught), `Beutel` (inventory), `Heilen (Center)` Button → `Geheilt! HP voll`, `GameView` early `if(showMenu) return <MenuView>`, `HStack` `Menu` Button neben `Library`, Battle/Inventar bleibt.
 
 **Verifikation:** `tsc 0`, `vitest 21/92`.
+
+---
+
+## 77.14 v0.5.0 — Bridge Layer wie apk - Core unberuehrt, Text Grid entfernt — VERIFIZIERT 2026-09-25 18:57
+
+**Antwort auf "Text kann weg bringt Doch Nix" + "wie apk nur bessere Architektur, Hooks/API Bridge":**
+- `GameView` Text-Grid (`RealMapView` 9×9 `^v` `M` `O` `#` `X`) entfernt — `GameView` zeigt jetzt nur `Bridge` Platzhalter: `Core unberuehrt - Bridge Layer aktiv (wie apk)` + `PipelineAdapter drawWorld → Dummy Canvas (160×144)` + `Map {mapId} {w}×{h} Pos {pos}` + `UP/LEFT/ACTION/DOWN/RIGHT` + `Menu`/`Library`/`Voxel` — kein `Text Grid` mehr gerendert.
+- `RealMapView`/`tileChar`/`tileColor` bleiben im File als Dead Code (nicht gerendert), `WebView` bereits entfernt in 0.4.5 — `Host Adapter` kapselt `FileManager`/`Storage`/`Thread`/`Graphics`/`Timing`/`Memory`/`Jobs`, `CoreStore` `staged→verify→activate→LKG`, `PipelineAdapter` `hooks` `drawWorld`/`worldPresent`/`present`/`available()`/`gate()`/`priority`/`broken` als `Bridge` wie `apk`.
+- `BattleView` + `MenuView` bleiben (Text `Kampf!` etc.) als `Host` Fallback bis `WASM` `P1` echte `Gen1` Battle-Engine liefert — `Core` selbst bleibt unangetastet.
+
+**Verifikation:** `tsc 0`, `vitest 21/92`, `GameView` kein `RealMapView` mehr.

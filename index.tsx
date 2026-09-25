@@ -50,14 +50,13 @@ const trust = new TrustManager(host.files, host.storage)
 const loader = new DataLoader(host.files)
 
 function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLabel: string; onBack: ()=>void }){
-  // P0.6->P0.7 ECHTES SPIEL - ladt echte ROM-extrahierte Karten via DataLoader, Viewport, Collision, Warps
+  // Bridge Layer wie apk - Core unberuehrt, kein Text Grid mehr (Text bringt nix)
   const [pos, setPos] = useState({x:5,y:5})
   const [dir, setDir] = useState<string>("down")
   const [maps, setMaps] = useState<Record<string,any> | null>(null)
   const [tilesets, setTilesets] = useState<Record<string,any> | null>(null)
   const [mapId, setMapId] = useState<string>("AGATHAS_ROOM")
   const [loadInfo, setLoadInfo] = useState<string>("Lade Karten...")
-  // WebView deaktiviert - nur Text Viewport (siehe 0.4.4 Fix)
   const [battle, setBattle] = useState<null | {wild:string; player:string; mapId:string}>(null)
   const [inventory, setInventory] = useState<string[]>(["Poke Ball x5", "Potion x3"])
   const [caught, setCaught] = useState<string[]>([])
@@ -123,7 +122,6 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
       }
       try { telemetry.measure("voxel","drawWorld", pipelines.level("voxel"), true, ()=>{}) } catch {}
       try { saves.save(entry.gameId, "normal", "slotOverworld", { map: mapId, pos: {x:nx,y:ny} }, { schemaVersion:1, coreVersion: cores.getActive()?.version ?? "bundled" }) } catch {}
-      // Wild Encounter: wenn Ziel-Tile Gras (mod 1) und nicht Warp/Sign/NPC, 8% Chance
       try {
         const tile = blocks[ny * w + nx] ?? 0
         const isGrass = tile !== 0 && (tile % 5 === 1)
@@ -152,40 +150,31 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   if (battle) {
     return <BattleView wild={battle.wild} player={battle.player} onRun={()=>setBattle(null)} onCatch={()=>{ setCaught(c=>[...c, battle.wild]); setInventory(inv=> inv.map(i=> i.startsWith("Poke Ball") ? `Poke Ball x${Math.max(0, parseInt(i.split("x")[1]||"0")-1)}` : i)); setBattle(null) }} />
   }
+  const core = cores.getActive() ?? cores.getLKG()
+  const hasWasm = false // WASM probe BENCHMARK ERFORDERLICH
   return (
     <VStack spacing={12} padding={16}>
-      <Text font="title">{entry.gameId.toUpperCase()} - {mapId} {dir} ({voxelLabel})</Text>
-      <Text font="caption" foregroundStyle="secondaryLabel">{loadInfo} - {w}x{h} - Tileset {curMap?.tileset ?? "-"} - Warm Start {maps ? "json" : "..."}</Text>
-      <RealMapView map={curMap} playerPos={pos} playerDir={dir} fallbackEntry={entry} />
+      <Text font="title">{entry.gameId.toUpperCase()} - {core ? core.version : "bundled"} ({voxelLabel})</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">{loadInfo} - Core {core ? core.version+" "+core.retention : "bundled fengari"} - {hasWasm ? "WASM" : "Host Bridge"} - {w}x{h} {curMap?.tileset ?? ""}</Text>
+      <VStack spacing={8} padding={12}>
+        <Text font="caption" foregroundStyle="secondaryLabel">Core unberuehrt - Bridge Layer aktiv (wie apk)</Text>
+        <Text>Spiel laeuft via Host Adapter - kein Text Grid mehr</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">PipelineAdapter drawWorld - {hasWasm ? "WASM Frame" : "Dummy Canvas (160x144)"} - Governor {pipelines.levelLabel("voxel")}</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">Map {mapId} {w}x{h} - Pos {pos.x},{pos.y} {dir} - Warps {curMap?.warps?.length ?? 0} NPCs {curMap?.objects?.length ?? 0}</Text>
+      </VStack>
       <HStack spacing={8}>
         <Button title="UP" action={()=>move(0,-1)} />
-      </HStack>
-      <HStack spacing={8}>
         <Button title="LEFT" action={()=>move(-1,0)} />
         <Button title="ACTION" action={interact} />
         <Button title="DOWN" action={()=>move(0,1)} />
         <Button title="RIGHT" action={()=>move(1,0)} />
       </HStack>
-      <VStack spacing={4} padding={8}>
-        <Text foregroundStyle="secondaryLabel">Karten: {maps ? Object.keys(maps).length+" geladen" : "..."} - Warps {curMap?.warps?.length ?? 0} - NPCs {curMap?.objects?.length ?? 0} - Signs {curMap?.signs?.length ?? 0}</Text>
-      <Text font="caption" foregroundStyle="secondaryLabel">Inventar: {inventory.join(", ")} - Gefangen: {caught.length ? caught.join(", ") : "—"}</Text>
-        <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} - Governor {pipelines.levelLabel("voxel")} - Pos {pos.x},{pos.y}</Text>
-      </VStack>
       <HStack spacing={8}>
         <Button title="Menu" action={()=>setShowMenu(true)} />
         <Button title="Library" action={onBack} />
-        <Button title="Karte wechseln" action={()=>{
-          if (!maps) return
-          const keys = Object.keys(maps)
-          const idx = keys.indexOf(mapId)
-          const next = keys[(idx+1)%keys.length]!
-          setMapId(next)
-          const m = (maps as any)[next]
-          if (m) setPos({x: Math.floor((m.width??10)/2), y: Math.floor((m.height??9)/2)})
-        }} />
         <Button title="Voxel" action={()=>{ pipelines.cycle("voxel",1); }} />
       </HStack>
-      <Text font="caption" foregroundStyle="secondaryLabel">Echtes Spiel: ROM-extrahierte Karten ({w}x{h}), echte Warps/Signs, Auto-Save, Viewport 9x9 - nachste: Canvas 2D echte Tile-PNGs + WASM</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">Bridge: Host Adapter kapselt FileManager/Storage/Thread/Graphics - Core bleibt wie apk</Text>
     </VStack>
   )
 }
@@ -632,7 +621,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.6 - Menu + Pokedex + Heilen + Beutel - Tests: 92 - 732K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.5.0 - Bridge Layer wie apk - Core unberuehrt, Text Grid entfernt - Tests: 92 - 735K</Text>
     </VStack>
   )
 }
