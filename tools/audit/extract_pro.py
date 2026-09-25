@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Extract every doc.json entry flagged "pro": true (authoritative PRO gating source)
 plus every doc page whose text states that it requires Scripting PRO."""
 import json, os, re, sys

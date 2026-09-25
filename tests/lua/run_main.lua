@@ -1,4 +1,5 @@
 -- tests/lua/run_main.lua
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- Interpreter shim: `lua5.1 run_main.lua script.lua args...` runs script.lua
 -- through the compat loadfile (so the MAIN chunk gets the escape transform
 -- too) and rebuilds `arg` exactly like the standalone interpreter would.

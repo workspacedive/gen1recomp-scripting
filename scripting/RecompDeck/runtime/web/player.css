@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* RecompDeck player shell. The canvas fills the safe area; the game itself
    letterboxes its 160x144 view and draws its own touch controls. */
 :root {

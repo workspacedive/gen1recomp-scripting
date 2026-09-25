@@ -1,4 +1,5 @@
 -- tests/lua/lua51src_literals.lua
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- Differential test for rd_host/lua51src.lua.
 --
 --   luajit tests/lua/lua51src_literals.lua orig  <files...>  > a.txt

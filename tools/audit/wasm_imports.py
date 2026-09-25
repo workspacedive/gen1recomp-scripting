@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """List the import section of a wasm module (names only) to see which Emscripten
 runtime features (C++ exception landing pads, setjmp/longjmp, GL) it was built with."""
 import sys

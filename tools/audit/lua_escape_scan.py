@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Proper Lua lexer scan: find string literals (short strings only; long brackets do not
 process escapes) that use escapes unsupported by PUC Lua 5.1 but supported by LuaJIT 2.1:
 \\xXX, \\z, \\u{XXX}. Comments and long strings are skipped correctly."""

@@ -86,9 +86,12 @@ Authoritative design documents: `docs/architecture.md`, `docs/compatibility.md`,
 | `scripting/RecompDeck/runtime/lua/` | Lua bootstrap copied into the love.js FS |
 | `scripting/RecompDeck/runtime/web/` | WebView player (HTML/CSS/JS) |
 | `scripting/RecompDeck/runtime/mods/` | Host-managed platform bridge mod |
-| `tests/` | Lua differential tests, Node unit tests |
-| `tools/` | Harness (headless Chromium), packers, type-check helpers |
+| `tests/lua/` | Lua differential tests, compat prelude, expected-failure list |
+| `tests/node/` | Node unit tests of the pure host modules (`src/core`) |
+| `tools/` | Harness (headless Chromium), verification, packer, APK analyzer, audits |
+| `tools/ci/workflows/` | CI workflow templates (enable per `tools/ci/README.md`) |
 | `docs/` | Architecture, analyses, verification reports |
+| `.cache/` | Local, untracked toolchain + downloads (never commit) |
 
 ## 4. Workflow for every change
 
@@ -102,15 +105,24 @@ Authoritative design documents: `docs/architecture.md`, `docs/compatibility.md`,
 
 ## 5. Verification commands and evidence levels
 
+Environment (once per machine; everything lands in the untracked `.cache/`):
+`tools/setup-lua.sh` (PUC Lua 5.1 + LuaJIT 2.1 from source), `npm install`,
+`npm run fetch-types` (pinned, SHA-256-verified Scripting typings),
+`npm run harness:setup` (Chromium + pinned love.js + locally built game
+archive), and a gen1recomp checkout of the supported tag in
+`.cache/gen1recomp`. Behind a TLS-intercepting proxy export
+`NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt` for Node.
+
 | Check | Command | Proves |
 |---|---|---|
-| Lua syntax (5.1) | `find scripting -name '*.lua' -exec luac5.1 -p {} +` | our Lua parses on love.js |
-| bit library | `luajit tests/lua/bit_differential.lua native > a; lua5.1 tests/lua/bit_differential.lua rd_host > b; cmp a b` | bit-exact vs LuaJIT |
-| escape transform | `tests/lua/lua51src_literals.lua` (see file header) | literals identical |
-| upstream tiers | `tools/lua51compat tests/run_engine.lua` (in a gen1recomp checkout) | game logic on Lua 5.1 + compat |
+| All fast checks | `npm run check` | typecheck + unit tests + Lua 5.1 lint |
+| Lua syntax (5.1) | `npm run lint:lua` | our Lua parses on love.js |
+| Lua differentials + upstream tiers | `tools/verify-lua.sh [gen1recomp checkout]` | `bit` bit-exact vs LuaJIT; escape transform literal-exact; upstream tiers on Lua 5.1 + compat with the extra failures machine-checked against `tests/lua/expected_compat_failures.txt` |
 | TS/TSX types | `npm run typecheck` | host code matches Scripting `.d.ts` |
 | unit tests | `npm test` | pure host logic |
-| E2E (browser) | `node tools/harness/run-player.mjs …` | real game on love.js in Chromium |
+| E2E (browser) | `npm run harness -- --game .cache/game-0.3.14.love --lovejs .cache/lovejs/compat …` | real game on love.js in Chromium |
+| Package | `npm run package` | reproducible `dist/RecompDeck.scripting` (+ `.sha256`) |
+| APK binary | `python3 tools/apk-analysis/analyze.py <apk> <out> --love <official .love>` | manifest, signature, native libs, embedded archive diff |
 | Device | manual, see `docs/verification.md` | WKWebView/iOS behaviour |
 
 Chromium is not WKWebView: browser results never prove iOS behaviour. State the
@@ -120,13 +132,17 @@ remaining on-device steps explicitly.
 
 - TypeScript strict; no `any` in exported APIs; 2-space indent, no semicolons
   in TS/TSX (Scripting community convention), single quotes.
-- Import UI components/hooks only from `"scripting"`; globals (`FileManager`,
-  `Data`, `Crypto`, `Script`, `Navigation`, …) are ambient — never import them.
+- Import views, hooks and the module-level APIs that `scripting.d.ts` exports
+  (`Script`, `Navigation`, `Path`, `fetch`, `Device`, …) from `"scripting"`.
+  Ambient globals from `global.d.ts` (`FileManager`, `Data`, `Crypto`,
+  `Storage`, `DocumentPicker`, `Dialog`, `Safari`, `HapticFeedback`,
+  `WebViewController`, …) are never imported. When in doubt, check the export
+  list at the end of `types/scripting/scripting.d.ts`.
 - JSX factory is `createElement`/`Fragment` (see `tsconfig.json`).
 - Lua: `local` everything, no globals except documented shims, SPDX header,
   5.1 syntax only.
 - Every file carries `SPDX-License-Identifier: GPL-3.0-or-later`.
-- User-facing strings: German and English (`src/i18n.ts`).
+- User-facing strings: German and English (`src/core/i18n.ts`).
 
 ## 7. When unsure
 

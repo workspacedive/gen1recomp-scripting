@@ -24,6 +24,8 @@ and safety rules apply to every Scripting change.
 2. **PRO check:** the entry and all its parents must not carry `"pro": true`
    in `doc.json`, and the page text must not say "requires Scripting PRO".
    If it does, choose a free alternative (see `docs/scripting-pro-vs-free.md`).
+   To regenerate the full list: unzip both `Scripting Documentation.zip`
+   files and run `python3 tools/audit/extract_pro.py <appstore dir> <testflight dir>`.
 3. Confirm the exact TypeScript shape in the synced declarations
    (`types/scripting/global.d.ts`, `types/scripting/scripting.d.ts`, fetched by
    `npm run fetch-types`): import vs. global, parameters, return type, async.
@@ -59,14 +61,20 @@ failures beyond the documented ones.
 **Trigger:** changes to `runtime/lua/rd_host/compat.lua`, `bit.lua`,
 `lua51src.lua`, or S2.
 
-1. In a gen1recomp checkout of the target tag run the baseline:
-   `for t in run_engine run_gen2 run_modkit modkit_tests; do luajit tests/$t.lua; done`.
-2. Run the same with `RD_LUA51=<lua5.1> <repo>/tools/lua51compat tests/$t.lua`.
-3. Diff the failing suite lists. Every new failure must be explained
-   (Gen 3 `goto`, harness artefact) or fixed.
-4. Run the two differential tests (`tests/lua/bit_differential.lua`,
-   `tests/lua/lua51src_literals.lua`).
-5. Update `docs/verification.md` with the numbers.
+1. Run `tools/verify-lua.sh <gen1recomp checkout of the target tag>`. It
+   runs, in order: the `bit` differential (LuaJIT native vs `rd_host/bit.lua`
+   on Lua 5.1), the escape-transform literal differential over every upstream
+   file with 5.2+/LuaJIT escapes, and the tiers `run_engine`, `run_gen2`,
+   `run_modkit`, `modkit_tests` on LuaJIT (baseline) and on
+   `tools/lua51compat` (Lua 5.1 + compat). Logs go to `.cache/verify/`.
+2. The script fails unless gen2/modkit/modkit tooling fully pass on both VMs
+   and the engine tier's extra failures equal
+   `tests/lua/expected_compat_failures.txt` exactly.
+3. A new failure must be explained (Gen 3 `goto`, harness artefact) or
+   fixed. Only a proven Gen 3/goto case may be added to the expected list,
+   with the reason in `docs/compatibility.md`; a test that starts passing
+   must be removed from the list.
+4. Update `docs/verification.md` with the numbers the script printed.
 
 **Done when:** gen2, modkit and modkit tooling match the baseline exactly and
 engine differences are fully explained.
@@ -96,7 +104,9 @@ engine differences are fully explained.
    `.cache/browser`, downloads the pinned love.js build into `.cache/lovejs`).
 2. `node tools/harness/run-player.mjs --game <game.love> --lovejs .cache/lovejs/compat --out .cache/run --duration 40 --shots 10,40`
    (options: `--selftest`, `--arg=--game=red`, `--env K=V`, `--save-pack`,
-   `--file dest:path:local`, `--viewport 390x844@3`).
+   `--file dest:path:local`, `--viewport 390x844@3`, `--transport chunks`
+   to load the page from `file://` with chunked `<script>` blobs exactly like
+   the iOS host, `--tap x,y@sec`, `--key Enter@sec`, `--fps-cap`).
 3. Inspect `report.json` (topics, errors, `engineFault`, `perf`, `stats`) and
    the screenshots.
 4. For persistence changes run the two-boot round trip (see
@@ -122,10 +132,12 @@ the expected screen, and results are written to `docs/verification.md`.
 
 **Trigger:** changing the mod importer or reviewing a mod.
 
-1. The ZIP central directory is parsed by `src/mods/zipScan.ts` before any
-   extraction: reject absolute paths, `..`, backslashes, symlinks, encrypted
-   entries, > 4096 entries, > 256 MiB uncompressed, compression ratio > 200.
-2. `manifest.json` is validated by `src/mods/manifest.ts` (id pattern, semver,
+1. The ZIP central directory is parsed by `src/core/zipScan.ts`
+   (`DEFAULT_ZIP_POLICY`) before any extraction: reject absolute paths, `..`,
+   backslashes, drive letters, control characters, duplicate names, symlinks,
+   encrypted entries, methods other than store/deflate, ZIP64, > 4096 entries,
+   > 256 MiB total or > 128 MiB per entry uncompressed, compression ratio > 200.
+2. `manifest.json` is validated by `src/core/manifest.ts` (id pattern, semver,
    api 1|2, known categories, `games`, permissions).
 3. Permissions (`network`, `filesystem`, `engine_internals`, `steps`,
    `background`, `compute`) are shown to the user before enabling.
@@ -139,7 +151,8 @@ permission.
 **Trigger:** preparing a release of RecompDeck.
 
 1. `npm run check` (typecheck + unit tests + Lua syntax).
-2. `npm run package` → `dist/RecompDeck.scripting` (zip of the project dir).
+2. `npm run package` → `dist/RecompDeck.scripting` (reproducible zip of the
+   project dir) and `dist/RecompDeck.scripting.sha256`.
 3. Update `CHANGELOG.md`, bump `script.json` `version`.
 4. Verify the import link in README points at the release tag.
 
@@ -158,8 +171,10 @@ the same commit. Numbers in docs must come from a command you actually ran.
    gradle properties, `scripts/build_android.sh` branding/permissions, native
    `love.system` extensions (`wrap_System.cpp`, `GameActivity.java`), embedded
    `game.love` contents (`scripts/pack_love.sh`).
-2. If GitHub Actions is available, run `.github/workflows/apk-analysis.yml`
-   (workflow_dispatch, input `version`) to verify the real binary
-   (hash, `aapt2 dump badging`, `apksigner verify --print-certs`, file list,
-   embedded `game.love` diff against the source tree).
+2. Verify the real binary: either enable `tools/ci/workflows/apk-analysis.yml`
+   (see `tools/ci/README.md`; workflow_dispatch, input `version`) or run
+   `python3 tools/apk-analysis/analyze.py <apk> <out> --love <official .love>`
+   locally with Android build-tools on `PATH` (hash, `aapt2 dump badging`,
+   decoded manifest, `apksigner verify --print-certs`, native libraries,
+   embedded `game.love` file-by-file diff against the official `.love`).
 3. Update `docs/apk-analysis.md`.

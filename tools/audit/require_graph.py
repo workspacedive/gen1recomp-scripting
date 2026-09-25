@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Static require graph of the game archive: which modules (transitively) depend on
 modules that PUC Lua 5.1 cannot compile (goto)? Prints dependents grouped by area."""
 import os, re, json, sys

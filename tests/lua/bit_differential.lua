@@ -1,4 +1,5 @@
 -- tests/lua/bit_differential.lua
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- Differential test: prints the result of every LuaBitOp function for a fixed,
 -- deterministic vector set. Run once with LuaJIT's native `bit` and once with
 -- rd_host/bit.lua under PUC Lua 5.1; the outputs must be byte-identical.

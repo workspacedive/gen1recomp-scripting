@@ -1,4 +1,5 @@
 -- tests/lua/prelude_lua51.lua
+-- SPDX-License-Identifier: GPL-3.0-or-later
 -- LUA_INIT prelude: runs the upstream gen1recomp test tiers on PUC Lua 5.1
 -- with the RecompDeck compatibility layer, i.e. the same VM + shims the game
 -- gets inside love.js. Usage (from a gen1recomp checkout):

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Compile every .lua file inside a game tree with PUC Lua 5.1 (the VM used by love.js)
 and with LuaJIT 2.1 (the VM used by native LOVE builds). Reports files that LuaJIT accepts
 but Lua 5.1 rejects -> these would fail to load under the WebAssembly runtime."""
