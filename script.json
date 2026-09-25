@@ -2,7 +2,7 @@
   "icon": "gamecontroller.fill",
   "color": "red",
   "name": "gen1recomp",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Gen1Recomp → Scripting iOS (Red/Blue/Yellow/Gold/Silver/Crystal, RomExtractor + DataLoader + Voxel LOD, Non-Pro, Offline-First)",
   "localizedNames": {
     "de": "gen1recomp",
