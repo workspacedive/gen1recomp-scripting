@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "storageRootName": "Gen1Recomp",
+  "locale": "de",
+  "coreRetention": {
+    "keepActive": true,
+    "keepLastKnownGood": true,
+    "keepPrevious": 1
+  },
+  "security": {
+    "networkForUnverifiedMods": false,
+    "maxArchiveFiles": 4096,
+    "maxArchiveExpandedBytes": 536870912,
+    "maxSingleFileBytes": 134217728
+  },
+  "performance": {
+    "profile": "balanced",
+    "preloadEnabled": false,
+    "adaptiveEnabled": false
+  },
+  "featureFlags": {
+    "runtimeWebView": false,
+    "wasmSimd": false,
+    "wasmThreads": false,
+    "predictivePreload": false,
+    "developerTools": false
+  }
+}
