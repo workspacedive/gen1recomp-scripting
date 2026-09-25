@@ -2810,3 +2810,11 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 **Verbleibend:** `RealMapView` 9×9 Text stabil, `Battle` + `Inventar` aus 0.4.3, kein WebView mehr bis `WebViewController` via `views/webview/en.md` VERIFIZIERT + `controller` Prop korrekt (nicht `html`).
 
 **Verifikation:** `tsc 0`, `vitest 21/92`, `dist` 700K 65 Dateien, kein WebView Import mehr.
+
+---
+
+## 77.13 v0.4.6 — Menu + Pokedex + Heilen + Beutel — VERIFIZIERT 2026-09-25 18:48
+
+**Erweiterung zu 0.4.5:** `showMenu` State, `MenuView` mit `Pokedex` (caught), `Beutel` (inventory), `Heilen (Center)` Button → `Geheilt! HP voll`, `GameView` early `if(showMenu) return <MenuView>`, `HStack` `Menu` Button neben `Library`, Battle/Inventar bleibt.
+
+**Verifikation:** `tsc 0`, `vitest 21/92`.

@@ -61,6 +61,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   const [battle, setBattle] = useState<null | {wild:string; player:string; mapId:string}>(null)
   const [inventory, setInventory] = useState<string[]>(["Poke Ball x5", "Potion x3"])
   const [caught, setCaught] = useState<string[]>([])
+  const [showMenu, setShowMenu] = useState<boolean>(false)
 
   useEffect(()=>{
     let cancelled = false
@@ -145,6 +146,9 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
     else setLoadInfo(`Nichts hier @${pos.x},${pos.y} - ${curMap.objects?.length??0} Objekte, ${curMap.signs?.length??0} Schilder`)
   }
 
+  if (showMenu) {
+    return <MenuView caught={caught} inventory={inventory} onClose={()=>setShowMenu(false)} onHeal={()=>setLoadInfo("Geheilt! HP voll — Center")} />
+  }
   if (battle) {
     return <BattleView wild={battle.wild} player={battle.player} onRun={()=>setBattle(null)} onCatch={()=>{ setCaught(c=>[...c, battle.wild]); setInventory(inv=> inv.map(i=> i.startsWith("Poke Ball") ? `Poke Ball x${Math.max(0, parseInt(i.split("x")[1]||"0")-1)}` : i)); setBattle(null) }} />
   }
@@ -168,6 +172,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
         <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} - Governor {pipelines.levelLabel("voxel")} - Pos {pos.x},{pos.y}</Text>
       </VStack>
       <HStack spacing={8}>
+        <Button title="Menu" action={()=>setShowMenu(true)} />
         <Button title="Library" action={onBack} />
         <Button title="Karte wechseln" action={()=>{
           if (!maps) return
@@ -262,7 +267,26 @@ function RealMapView({ map, playerPos, playerDir, fallbackEntry }: { map:any; pl
     </VStack>
   )
 }
+function MenuView({ caught, inventory, onClose, onHeal }: { caught:string[]; inventory:string[]; onClose:()=>void; onHeal:()=>void }){
+  return (
+    <VStack spacing={12} padding={16}>
+      <Text font="title">Menu</Text>
+      <VStack spacing={4} padding={8}>
+        <Text font="caption" foregroundStyle="secondaryLabel">Pokedex: {caught.length ? caught.join(", ") : "0 gefangen — laufe durch Gras . fuer Encounter"}</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">Beutel: {inventory.join(", ")}</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">Tip: Auf Gras . laufen → 8% wildes Pokemon, Ball fängt, Center heilt</Text>
+      </VStack>
+      <HStack spacing={8}>
+        <Button title="Heilen (Center)" action={onHeal} />
+        <Button title="Zurueck" action={onClose} />
+      </HStack>
+      <Text font="caption" foregroundStyle="secondaryLabel">Echtes Spiel: Menu + Pokedex + Heilen — naechste: echte Werte + WASM</Text>
+    </VStack>
+  )
+}
+
 function BattleView({ wild, player, onRun, onCatch }: { wild:string; player:string; onRun:()=>void; onCatch:()=>void }){
+
   // Einfache Battle-Ansicht - nutzt Placeholder PNGs aus RomExtractor (pikachu) wenn vorhanden, sonst Text
   return (
     <VStack spacing={12} padding={16}>
@@ -608,7 +632,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.5 - Entfernt WebView + Fix Build e.isInternal - Tests: 92 - 730K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.6 - Menu + Pokedex + Heilen + Beutel - Tests: 92 - 732K</Text>
     </VStack>
   )
 }
