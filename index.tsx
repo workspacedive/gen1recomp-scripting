@@ -14,7 +14,7 @@
  * Pro-APIs werden NICHT verwendet. Renderer ist Canvas (Scripting) — kein Metal.
  */
 
-import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect } from "scripting"
+import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect, DocumentPicker } from "scripting"
 import { createScriptingHost } from "./src/host/ScriptingAdapter"
 import { GameLibrary, type LibraryEntry } from "./src/library/GameLibrary"
 import { CoreStore } from "./src/coreStore/CoreStore"
@@ -75,10 +75,12 @@ function App() {
   const onImport = async () => {
     setStatus("Wähle ROM… (Nur US Red/Blue/Yellow/Gold/Silver/Crystal/FireRed/LeafGreen, SHA-1 geprüft, echter RomExtractor läuft)")
     try {
-      // @ts-ignore DocumentPicker global
-      const urls: string[] = await DocumentPicker.open(["public.data", "public.item"])
+      const urls: string[] | null = await (DocumentPicker as any).pickFiles({ types: ["public.data", "public.item"], allowsMultipleSelection: false } as any).catch(async () => {
+        // Fallback für ältere Scripting Builds wo pickFiles ohne options erwartet wird
+        try { return await (DocumentPicker as any).pickFiles() } catch { return null }
+      })
       if (!urls?.length) { setStatus("Abgebrochen"); return }
-      const path = urls[0]
+      const path = urls[0] as string
       setStatus(`Lese ${path.split("/").pop()}… (8 MiB Limit, AtomicFile, SHA-1)`)
       const bytes = await host.files.readAsBytes(path)
       setStatus(`SHA-1 prüfen… (${bytes.length} Bytes, 1/2/16 MiB) → RomExtractor (17 Stages, tolerant)`)
@@ -228,7 +230,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.2 — Text/Section Fix (foregroundStyle, header Text) + Extractor/Runtime • Tests: 92 • 693K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.3 — DocumentPicker.pickFiles Fix + Text/Section Fix • Tests: 92 • 693K</Text>
     </VStack>
   )
 }
