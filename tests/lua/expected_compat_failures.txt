@@ -1,0 +1,19 @@
+# Upstream engine-tier tests that pass on LuaJIT but are EXPECTED to fail on
+# PUC Lua 5.1 + RecompDeck compat (love.js VM). Every entry is Gen 3
+# (FireRed/LeafGreen) code that needs `goto`, or a test that itself uses goto /
+# checks that the goto-based GBA importer compiles. Gen 3 is marked unsupported
+# in RecompDeck (docs/compatibility.md). tools/verify-lua.sh fails on ANY
+# deviation from this list (new failure or unexpected pass).
+tests/engine/game3_bills_pc_label_bug2404_test.lua
+tests/engine/game3_japanese_font_test.lua
+tests/engine/game3_naming_update_contract_test.lua
+tests/engine/game3_ow_meta_bounds_test.lua
+tests/engine/game3_ow_pic_table_len_test.lua
+tests/engine/game3_speed_hotkey_test.lua
+tests/engine/game3_trainer_sight_test.lua
+tests/engine/luajit_source_limits_test.lua
+tests/engine/nickname_mon_icon_scale_bug2319.lua
+tests/engine/nickname_title_fits_box_bug2319.lua
+tests/engine/oaks_lab_last_ball_bug601.lua
+tests/engine/save_menu_badges_bug2405.lua
+tests/engine/wild_encounter_cooldown.lua

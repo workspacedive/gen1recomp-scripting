@@ -1,0 +1,40 @@
+# Continuous verification (AGENT.md "Definition of done"): TypeScript typecheck
+# against the pinned Scripting typings, unit tests, Lua 5.1 syntax lint and the
+# Lua differential/unit suites, plus the reproducible .scripting package.
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Lua 5.1 + LuaJIT
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1 luajit
+      - run: npm ci
+      - name: Fetch pinned Scripting typings (sha256-verified)
+        run: npm run fetch-types
+      - run: npm run check
+      - name: Upstream gen1recomp checkout (pinned tag)
+        run: git clone -q --depth 1 --branch v0.3.14 https://github.com/bryanthaboi/gen1recomp.git .cache/gen1recomp
+      - name: Lua differential + upstream tiers (tools/verify-lua.sh)
+        run: tools/verify-lua.sh .cache/gen1recomp
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-lua-logs
+          path: .cache/verify/
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RecompDeck.scripting
+          path: dist/RecompDeck.scripting*

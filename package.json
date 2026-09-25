@@ -13,7 +13,8 @@
     "lint:lua": "node tools/check-lua.mjs",
     "check": "npm run typecheck && npm test && npm run lint:lua",
     "package": "node tools/package-scripting.mjs",
-    "harness:setup": "node tools/harness/setup.mjs"
+    "harness:setup": "node tools/harness/setup.mjs",
+    "harness": "node tools/harness/run-player.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

@@ -5,7 +5,12 @@ import os, re, json, sys
 root = sys.argv[1]
 bad = {"src.import.gba.battle_anim_extract","src.import.gba.cli_extract","src.import.gba.door_anim_extract",
        "src.import.gba.extract_map_events","src.import.gba.extract_scripts","src.import.gba.map_tree"}
-req_re = re.compile(r'require\s*\(?\s*["\']([\w\.\-/]+)["\']')
+top_level = "--top-level" in sys.argv
+if top_level: sys.argv.remove("--top-level")
+# --top-level: only requires at column 0 (executed when the module loads);
+# lazy requires inside functions are ignored.
+req_re = (re.compile(r'^(?:local\s+[\w,\s]+=\s*)?require\s*\(?\s*["\']([\w\.\-]+)["\']', re.M)
+          if top_level else re.compile(r'require\s*\(?\s*["\']([\w\.\-/]+)["\']'))
 mods = {}
 for dp, _, fns in os.walk(root):
     for fn in fns:
@@ -15,7 +20,7 @@ for dp, _, fns in os.walk(root):
             if name.endswith(".init"): name = name[:-5]
             src = open(p, encoding="utf-8", errors="replace").read()
             # strip line comments crudely
-            src = re.sub(r"--[^\n]*", "", src)
+            if not top_level: src = re.sub(r"--[^\n]*", "", src)
             mods[name] = set(req_re.findall(src))
 rev = {}
 for m, deps in mods.items():

@@ -1,0 +1,56 @@
+# Binary analysis of the official gen1recomp Android APK (SKILLS.md S10).
+# Downloads the release APK + official .love + sha256sums.txt, verifies the
+# checksums, analyses the APK with the runner's Android SDK tools and commits
+# docs/apk-analysis/generated/<version>/report.{md,json} to the current branch.
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: APK analysis
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: gen1recomp release version (without v)
+        default: 0.3.14
+        required: true
+  push:
+    paths:
+      - .github/workflows/apk-analysis.yml
+      - tools/apk-analysis/**
+permissions:
+  contents: write
+concurrency:
+  group: apk-analysis-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ github.event.inputs.version || '0.3.14' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official release assets
+        run: |
+          mkdir -p dl && cd dl
+          gh release download "v${VERSION}" -R bryanthaboi/gen1recomp \
+            -p "gen1recomp-${VERSION}-android.apk" -p "gen1recomp-${VERSION}.love" -p "sha256sums.txt"
+          grep -E "gen1recomp-${VERSION}(-android\.apk|\.love)$" sha256sums.txt | sha256sum -c -
+      - name: Locate Android build tools
+        run: |
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          echo "AAPT2=$BT/aapt2" >> "$GITHUB_ENV"
+          echo "APKSIGNER=$BT/apksigner" >> "$GITHUB_ENV"
+      - name: Analyse
+        run: |
+          out="docs/apk-analysis/generated/${VERSION}"
+          python3 tools/apk-analysis/analyze.py "dl/gen1recomp-${VERSION}-android.apk" "$out" \
+            --love "dl/gen1recomp-${VERSION}.love" --aapt2 "$AAPT2" --apksigner "$APKSIGNER"
+          cat "$out/report.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit report
+        run: |
+          git config user.name "apk-analysis[bot]"
+          git config user.email "apk-analysis@users.noreply.github.com"
+          git add docs/apk-analysis/generated
+          git diff --cached --quiet && exit 0
+          git commit -m "APK analysis report for gen1recomp v${VERSION}"
+          git push

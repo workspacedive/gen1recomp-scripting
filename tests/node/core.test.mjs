@@ -212,7 +212,10 @@ test('pins: formats, allowlist, sha256sums parser', () => {
 
 test('luaTable: reads REAL SaveSerializer.encode output (fixture generated with gen1recomp v0.3.14 under LuaJIT)', async () => {
   const fs = await import('node:fs');
-  const src = fs.readFileSync(new URL('./fixtures/save_serializer_sample.lua', import.meta.url), 'latin1');
+  // stored as base64: the fixture contains raw non-UTF-8 bytes (\200\255) that
+  // text-oriented tooling would otherwise replace with U+FFFD
+  const b64 = fs.readFileSync(new URL('./fixtures/save_serializer_sample.lua.b64', import.meta.url), 'ascii');
+  const src = Buffer.from(b64.replace(/\s+/g, ''), 'base64').toString('latin1');
   const v = lua.parseLuaReturn(src);
   assert.equal(v.player.name, 'RED\u00e2\u0099\u0082');
   assert.equal(v.player.money, 3000);

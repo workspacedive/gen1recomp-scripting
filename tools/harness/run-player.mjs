@@ -50,12 +50,14 @@ function parseArgs(argv) {
     else if (a === '--chrome') o.chrome = next();
     else if (a === '--no-auto-start') o.autoStart = false;
     else if (a === '--fps-cap') o.fpsCap = Number(next());
+    else if (a === '--transport') o.transport = next(); // fetch (http) | chunks (file://, like WKWebView)
     else if (a === '--memory') o.memoryMB = Number(next());
     else if (a === '--selftest') o.selftest = true;
     else if (a === '--trace-exceptions') o.traceExceptions = true;
     else throw new Error(`unknown argument ${a}`);
   }
-  if (!o.game || !o.lovejs) throw new Error('--game and --lovejs are required');
+  o.lovejs = o.lovejs || path.join(REPO, '.cache', 'lovejs', 'compat');
+  if (!o.game) throw new Error('--game is required (see npm run harness:setup)');
   return o;
 }
 
@@ -69,10 +71,25 @@ function prepareSite(o) {
     fs.copyFileSync(path.join(RUNTIME, 'web', f), path.join(site, f));
   }
   fs.copyFileSync(path.join(o.lovejs, 'love.js'), path.join(site, 'love.js'));
-  const blob = (id, bytes) => {
-    const file = `blobs/${id}.bin`;
+  const CHUNK = 3 * 1024 * 1024; // == CHUNK_SIZE in src/player/blobs.ts
+  const blob = (role, bytes) => {
+    const sha = sha256(bytes);
+    if (o.transport === 'chunks') {
+      const id = 'b' + sha.slice(0, 20);
+      const dir = path.join(site, 'blobs', sha);
+      fs.mkdirSync(dir, { recursive: true });
+      const count = Math.max(1, Math.ceil(bytes.length / CHUNK));
+      const chunks = [];
+      for (let i = 0; i < count; i++) {
+        const part = Buffer.from(bytes.subarray(i * CHUNK, Math.min(bytes.length, (i + 1) * CHUNK)));
+        fs.writeFileSync(path.join(dir, `${i}.js`), `RD.chunk("${id}",${i},"${part.toString('base64')}");\n`);
+        chunks.push(`blobs/${sha}/${i}.js`);
+      }
+      return { id, chunks, chunkSize: CHUNK, size: bytes.length, sha256: sha };
+    }
+    const file = `blobs/${role}.bin`;
     fs.writeFileSync(path.join(site, file), bytes);
-    return { id, url: file, size: bytes.length, sha256: sha256(bytes) };
+    return { id: role, url: file, size: bytes.length, sha256: sha };
   };
   const wasm = fs.readFileSync(path.join(o.lovejs, 'love.wasm'));
   const game = fs.readFileSync(o.game);
@@ -87,7 +104,7 @@ function prepareSite(o) {
   const [h, dpr] = rest.split('@');
   const config = {
     version: 1,
-    transport: 'fetch',
+    transport: o.transport === 'chunks' ? 'chunks' : 'fetch',
     memoryMB: o.memoryMB || 192,
     fpsCap: o.fpsCap,
     highdpi: true,
@@ -123,7 +140,7 @@ function serve(root) {
 }
 
 async function launchBrowser(o) {
-  const modDir = process.env.RD_BROWSER_MODULES;
+  const modDir = process.env.RD_BROWSER_MODULES || path.join(REPO, '.cache', 'browser', 'node_modules');
   const req = createRequire(modDir ? path.join(modDir, 'noop.js') : import.meta.url);
   const puppeteer = await import(pathToFileURL(req.resolve('puppeteer-core')).href);
   let executablePath = o.chrome || process.env.CHROME_PATH;
@@ -135,6 +152,11 @@ async function launchBrowser(o) {
     // model under test (single-process, disabled web security) are dropped.
     const drop = new Set(['--single-process', '--no-zygote', '--in-process-gpu', '--disable-web-security', '--allow-running-insecure-content', "--headless='shell'"]);
     args = [...chromium.args.filter((a) => !drop.has(a)), ...args];
+    // non-Lambda Linux hosts lack NSS: unpack the bundled libraries once
+    const mod = await import(pathToFileURL(req.resolve('@sparticuz/chromium')).href);
+    const binDir = path.join(path.dirname(req.resolve('@sparticuz/chromium')), '..', 'bin');
+    const libDir = await mod.inflate(path.join(binDir, 'al2023.tar.br'));
+    process.env.LD_LIBRARY_PATH = [path.join(libDir, 'lib'), process.env.LD_LIBRARY_PATH].filter(Boolean).join(':');
   }
   return (puppeteer.default || puppeteer).launch({ executablePath, args, headless: true, protocolTimeout: 600000 });
 }
@@ -186,7 +208,9 @@ async function main() {
   });
 
   const t0 = Date.now();
-  await page.goto(`http://127.0.0.1:${port}/player.html`, { waitUntil: 'load', timeout: 120000 });
+  const entry = o.transport === 'chunks' ? pathToFileURL(path.join(site, 'player.html')).href : `http://127.0.0.1:${port}/player.html`;
+  report.entry = entry;
+  await page.goto(entry, { waitUntil: 'load', timeout: 120000 });
 
   const events = [];
   for (const s of o.shots) events.push({ at: s, kind: 'shot' });
