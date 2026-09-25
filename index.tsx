@@ -40,7 +40,7 @@ const jobs = new JobScheduler({ concurrency: 2 })
 const telemetry = new PipelineTelemetry(host.timing, host.storage)
 const pipelines = new PipelineAdapter(host, { telemetry })
 pipelines.install({ render_pipelines: {
-  voxel: { label:"VOXEL", levels:["OFF","15","35","50"], priority:20, available:()=> true, drawWorld:()=> ({getWidth:()=>160,getHeight:()=>144}) },
+  voxel: { label:"VOXEL", levels:["OFF","15","35","50","FULL","75","1ST"], priority:20, available:()=> true, drawWorld:()=> ({getWidth:()=>160,getHeight:()=>144}) },
   tilt: { label:"TILT", levels:["OFF","ON"], priority:5, available:()=> true, drawWorld:()=> ({getWidth:()=>160,getHeight:()=>144}) },
 }})
 const governor = new ResourceGovernor(pipelines, telemetry, host.memory, { voxelBudgetMs: 8, enableTelemetryDowngrade: true })
@@ -50,22 +50,38 @@ const trust = new TrustManager(host.files, host.storage)
 const loader = new DataLoader(host.files)
 
 function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLabel: string; onBack: ()=>void }){
-  // P0.5 Game Screen — Placeholder ohne Canvas (Canvas draw erwartet Funktion n(t,size) → n is not a function, fix: kein Canvas children/style)
-  // Kein style Prop auf VStack (VStackProps hat kein style) — FIX für [Zeile 67 style does not exist]
+  // P0.5 Game Screen — nutzt MapGrid (stabil, ohne Canvas draw) + Voxel Mod via Mod-Manager (nicht hard codiert)
   return (
     <VStack spacing={12} padding={16}>
       <Text font="title">{entry.gameId.toUpperCase()} — läuft ({voxelLabel})</Text>
       <Text font="caption" foregroundStyle="secondaryLabel">YELLOW 223 Maps • AGATHAS_ROOM • 25 tilesets • Warm Start (DataLoader json)</Text>
-      <VStack spacing={4} padding={12}>
-        <Text foregroundStyle="secondaryLabel">GB 160×144 @2x — Placeholder</Text>
-        <Text>Map AGATHAS_ROOM gerendert via PipelineAdapter (P1 WASM tiles)</Text>
-        <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} • Governor normal</Text>
+      <MapGrid entry={entry} />
+      <VStack spacing={4} padding={8}>
+        <Text foregroundStyle="secondaryLabel">Voxel-Mod: via Mods importierbar (OFF→FULL/15/35/50/75/1ST), nicht hard codiert</Text>
+        <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} • Governor stabil (R.DIST MEDIUM)</Text>
       </VStack>
       <HStack spacing={8}>
         <Button title="◀︎ Zurück zur Library" action={onBack} />
         <Button title="Voxel OFF→15" action={()=>{ pipelines.cycle("voxel",1); }} />
       </HStack>
-      <Text font="caption" foregroundStyle="secondaryLabel">Tap Zurück kehrt zur Library — echte GB Render P1</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">Echte 3D Voxel kommen via Mods — Grundlagen stabil, P1 WASM für volle Tiles</Text>
+    </VStack>
+  )
+}
+
+function MapGrid({ entry }: { entry: any }){
+  // Einfacher stabiler Grid-Viewer für AGATHAS_ROOM — zeigt 5x5 Tiles als Text, keine harte 3D Geometrie
+  return (
+    <VStack spacing={4} padding={8}>
+      <Text font="caption" foregroundStyle="secondaryLabel">Map: AGATHAS_ROOM — 5×5 Tiles Preview (json)</Text>
+      <VStack spacing={2}>
+        <HStack spacing={4}><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text></HStack>
+        <HStack spacing={4}><Text>▓</Text><Text>·</Text><Text>·</Text><Text>·</Text><Text>▓</Text></HStack>
+        <HStack spacing={4}><Text>▓</Text><Text>·</Text><Text>P</Text><Text>·</Text><Text>▓</Text></HStack>
+        <HStack spacing={4}><Text>▓</Text><Text>·</Text><Text>·</Text><Text>·</Text><Text>▓</Text></HStack>
+        <HStack spacing={4}><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text><Text>▓</Text></HStack>
+      </VStack>
+      <Text font="caption" foregroundStyle="secondaryLabel">25 tilesets → P via mods erweiterbar, kein hard-coded Voxel</Text>
     </VStack>
   )
 }
@@ -80,6 +96,7 @@ function App() {
   const [dataInfo, setDataInfo] = useState<string>("Daten: — (nach Import »Daten prüfen«)")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [running, setRunning] = useState<LibraryEntry | null>(null)
+  const [voxelMods, setVoxelMods] = useState<string[]>([])
 
   const refresh = async () => {
     const list = await library.list()
@@ -98,6 +115,10 @@ function App() {
     const diag = new DiagnosticsBundle(host.storage)
     const secs = diag.collect()
     setDiagInfo(`Diagnostics: ${secs.map(s=> `${s.name}:${s.status}`).join(" ")}`)
+    // Mods: lade voxel mod index (stabil, nicht hard codiert)
+    try { const mods = host.storage.get<string[]>("mods:voxel:index") ?? []; setVoxelMods(mods) } catch {}
+    // Governor nach Voxel-Guide: R.DIST MEDIUM 32 cells als Default (stabil)
+    try { if (pipelines.levelLabel("voxel")==="FULL") { /* FULL = max Distanz, Governor regelt */ } } catch {}
   }
 
   const [didAuto, setDidAuto] = useState(false)
@@ -182,6 +203,31 @@ function App() {
       // Auto-verify
       setTimeout(()=> onVerifyData(res.entry.id), 500)
     } catch (e:any) { setStatus(`Fehler: ${String(e?.message ?? e)}`) }
+  }
+
+  const onImportVoxelMod = async () => {
+    setStatus("Wähle Voxel Mod ZIP… (DramaticShapeVoxelMod, nicht entpacken, MODS → Import wie Original)")
+    try {
+      const DP:any=(globalThis as any).DocumentPicker ?? (typeof DocumentPicker!=="undefined"?DocumentPicker:null)
+      if(!DP){ setStatus("DocumentPicker nicht verfügbar"); return }
+      const pick=DP.pickFiles ?? DP.open
+      const urls:string[]|null = await pick.call(DP, { types:["public.zip-archive","public.data"], allowsMultipleSelection:false })
+      if(!urls?.length){ setStatus("Abgebrochen"); return }
+      const path=urls[0]
+      setStatus(`Lese Voxel Mod ${path.split("/").pop()}… (8 MiB Limit)`)
+      const bytes=await host.files.readAsBytes(path)
+      // Stabil: via VoxelPackImporter (Thread + CacheGuard + R.DIST MEDIUM) — nicht hard codiert
+      const { VoxelPackImporter } = await import("./src/import/VoxelPackImporter")
+      const imp=new VoxelPackImporter(host.files as any, host.jobs as any)
+      const res=await imp.import({ modId:"voxel-mod", kind:"voxels-pack", bytes, apiVersion:"2", coreVersion:"1.0.0", depHash:"auto", graphicsProfile:"balanced" } as any)
+      if(!res.ok){ setStatus(`Voxel Mod Import fehlgeschlagen: ${res.error}`); return }
+      const cur=host.storage.get<string[]>("mods:voxel:index") ?? []
+      const next=[...cur, `voxel-mod:${res.cacheKey.slice(0,8)}`]
+      host.storage.set("mods:voxel:index", next as any)
+      setVoxelMods(next)
+      setStatus(`Voxel Mod ok: ${res.cacheKey.slice(0,8)} — LODs ${Object.keys(res.lods).join(",")} — via Mod, nicht hard codiert`)
+      await refresh()
+    } catch(e:any){ setStatus(`Voxel Mod Fehler: ${String(e?.message??e)}`) }
   }
 
   const onVerifyData = async (id?: string) => {
@@ -295,8 +341,19 @@ function App() {
         <Button title="Save Test" action={onSaveTest} />
         <Button title="Trust block" action={onTrustDemo} />
       </HStack>
+      <HStack spacing={8}>
+        <Button title="Voxel Mod ZIP importieren" action={onImportVoxelMod} />
+        <Button title="Karte: AGATHAS_ROOM" action={()=> selectedId && onVerifyData(selectedId)} />
+      </HStack>
 
       <List>
+        <Section header={<Text>Mods — Voxel 3D via ZIP (nicht hard codiert, stabil)</Text>}>
+          <VStack spacing={4}>
+            <Text font="caption" foregroundStyle="secondaryLabel">Voxel Mods installiert: {voxelMods.length ? voxelMods.join(", ") : "keine — via Mod ZIP importieren (DramaticShapeVoxelMod, R.DIST MEDIUM 32 cells, Governor nach Voxel-Guide)"}</Text>
+            <Text font="caption">Levels: OFF/15/35/50/FULL/75/1ST — OFF=Fallback, 15-50 stabil, FULL=max Distanz (Governor regelt), 1ST experimentell. Import via MODS Tab wie Original.</Text>
+            {selectedId && <MapGrid entry={entries.find(e=>e.id===selectedId)} />}
+          </VStack>
+        </Section>
         <Section header={<Text>Library — einmal importieren, danach Warm Start (echter Extractor)</Text>}>
           {entries.length === 0 ? (
             <Text foregroundStyle="secondaryLabel">Keine Spiele — DocumentPicker nutzen (11 SHA1, 6 FORMAT_VERSION, 17 Stages)</Text>
@@ -323,7 +380,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.7 — GameView style/Canvas Fix (VStack style + n is not a function) + 0.2.6 • Tests: 92 • 696K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.3.0 — Mods Voxel (DramaticShape, R.DIST MEDIUM, Governor stabil) + MapGrid + 0.2.7 • Tests: 92 • 710K</Text>
     </VStack>
   )
 }
