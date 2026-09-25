@@ -11,6 +11,9 @@ declare module "scripting" {
   export const Section: any
   export const Navigation: any
   export const Script: any
+  export const Canvas: any
+  export const Image: any
+  export const WebView: any
   export const DocumentPicker: {
     pickFiles(options?: { types?: string[]; allowsMultipleSelection?: boolean; initialDirectory?: string; shouldShowFileExtensions?: boolean }): Promise<string[] | null>
     pickDirectory(initialDirectory?: string): Promise<string | null>

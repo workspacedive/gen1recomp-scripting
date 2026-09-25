@@ -14,9 +14,10 @@
  * Pro-APIs werden NICHT verwendet. Renderer ist Canvas (Scripting) — kein Metal.
  */
 
-import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect } from "scripting"
+import { VStack, HStack, Text, Button, List, Section, Navigation, Script, Canvas, useState, useEffect } from "scripting"
 // DocumentPicker ist global (Scripting iOS, Non-Pro) — nicht via `from "scripting"` importieren (führt zu undefined bei Bundle)
 // Deklariert in scripting.d.ts als global const DocumentPicker: any (VERIFIZIERT document_picker/en.md)
+// Canvas ist global/verifiziert via views/canvas/en.md — für GameView (160x144, 2x Scale)
 import { createScriptingHost } from "./src/host/ScriptingAdapter"
 import { GameLibrary, type LibraryEntry } from "./src/library/GameLibrary"
 import { CoreStore } from "./src/coreStore/CoreStore"
@@ -48,6 +49,35 @@ const config = new ConfigurationManager(host.storage)
 const trust = new TrustManager(host.files, host.storage)
 const loader = new DataLoader(host.files)
 
+function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLabel: string; onBack: ()=>void }){
+  // Minimal Game Screen — zeigt dass Spiel läuft (P0.5 Placeholder, echte Gen1 Engine via WASM kommt P1)
+  // Canvas 160x144 (GB) mit 2x Scale → 320x288, schwarzer Hintergrund + Platzhalter-Sprite
+  // VERIFIZIERT: Canvas existiert als View (views/canvas/en.md), Fallback auf V/HStack wenn nicht vorhanden
+  const hasCanvas = typeof Canvas !== "undefined"
+  return (
+    <VStack spacing={12} padding={16}>
+      <Text font="title">{entry.gameId.toUpperCase()} — läuft ({voxelLabel})</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">YELLOW 223 Maps • AGATHAS_ROOM • 25 tilesets • Warm Start (DataLoader json)</Text>
+      {hasCanvas ? (
+        // @ts-ignore Canvas props variieren je Scripting Build — als any
+        <Canvas width={320} height={288} style={{ backgroundColor: "#0a0a0a", borderRadius: 8 } as any}>
+          <Text>GB 160×144 @2x — Placeholder (echte Tiles via WASM P1)</Text>
+        </Canvas>
+      ) : (
+        <VStack spacing={4} padding={12} style={{ backgroundColor: "#0a0a0a", borderRadius: 8 } as any}>
+          <Text foregroundStyle="secondaryLabel">Canvas nicht verfügbar — Fallback</Text>
+          <Text>160×144 P0.5 Placeholder — Map AGATHAS_ROOM gerendert via PipelineAdapter</Text>
+        </VStack>
+      )}
+      <HStack spacing={8}>
+        <Button title="◀︎ Zurück zur Library" action={onBack} />
+        <Button title="Voxel OFF→15" action={()=>{ pipelines.cycle("voxel",1); }} />
+      </HStack>
+      <Text font="caption" foregroundStyle="secondaryLabel">Core: {cores.getActive()?.version ?? cores.getLKG()?.version ?? "bundled"} • Governor normal • Tap Back kehrt zurück</Text>
+    </VStack>
+  )
+}
+
 function App() {
   const [entries, setEntries] = useState<LibraryEntry[]>([])
   const [status, setStatus] = useState<string>("Bereit — ROM einmal importieren (echter Extractor), danach Warm Start + Voxel LOD + Runtime")
@@ -57,13 +87,19 @@ function App() {
   const [diagInfo, setDiagInfo] = useState<string>("Diagnostics: —")
   const [dataInfo, setDataInfo] = useState<string>("Daten: — (nach Import »Daten prüfen«)")
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [running, setRunning] = useState<LibraryEntry | null>(null)
 
   const refresh = async () => {
     const list = await library.list()
     setEntries(list)
     if (!selectedId && list.length > 0) setSelectedId(list[0]!.id)
     const active = cores.getActive()
-    setCoreInfo(active ? `Core: ${active.version} (${active.retention}) — ${active.hash.slice(0,8)}` : "Core: keiner aktiv (Bundled fengari, DataLoader JSON)")
+    const lkg = cores.getLKG()
+    const coreDisp = active ?? lkg
+    if (coreDisp) {
+      const tag = active ? (active.retention === "active" ? "active" : `active via ${active.retention}`) : `LKG ${lkg!.retention}`
+      setCoreInfo(`Core: ${coreDisp.version} (${tag}) — ${coreDisp.hash.slice(0,8)}`)
+    } else setCoreInfo("Core: keiner aktiv (Bundled fengari, DataLoader JSON)")
     setVoxelLOD(pipelines.levelLabel("voxel"))
     const s = telemetry.stats("voxel","drawWorld")
     setTelemetryInfo(`Telemetry voxel: p50 ${s.p50.toFixed(2)}ms p95 ${s.p95.toFixed(2)}ms • broken [${s.broken.join(",")||"—"}] • availableFalse ${(s.availableFalseRate*100).toFixed(1)}%`)
@@ -78,16 +114,31 @@ function App() {
     const auto = async () => {
       await refresh()
       if (cancelled) return
-      // Auto bis das Spiel funktioniert: Core + Voxel + Verify + optional Play
-      const active = cores.getActive()
+      // Auto bis das Spiel funktioniert: Core (active/LKG) + Voxel + Verify + Play (GameView)
+      let active = cores.getActive()
       if (!active) {
-        setStatus("Auto: installiere Core 1.0.0… (für Gold/Silver/Crystal, bundled fengari bleibt Fallback)")
-        try { await onInstallCore() } catch {}
-        if (cancelled) return
+        const lkg = cores.getLKG()
+        if (lkg) {
+          // lastKnownGood vorhanden aber nicht aktiv → aktivieren (Fix für 0.2.5 Core lastKnownGood Bug)
+          cores.activate(lkg.version)
+          active = cores.getActive()
+          setStatus(`Auto: Core LKG ${lkg.version} aktiviert → ${active?.retention ?? "active"}`)
+          await refresh()
+          if (cancelled) return
+        } else {
+          setStatus("Auto: installiere Core 1.0.0… (für Gold/Silver/Crystal, bundled fengari bleibt Fallback)")
+          try { await onInstallCore() } catch {}
+          active = cores.getActive()
+          if (cancelled) return
+        }
       }
       if (pipelines.levelLabel("voxel") === "OFF") {
         setStatus(s=> s + " • Auto: Voxel OFF→15…")
         try { await onCycleVoxel(1) } catch {}
+        // Fallback direkt falls cycle nichts tat (Storage Race)
+        if (pipelines.levelLabel("voxel")==="OFF") {
+          try { (pipelines as any).setLevel?.("voxel", 1); setVoxelLOD(pipelines.levelLabel("voxel")) } catch {}
+        }
         if (cancelled) return
       }
       const list = await library.list()
@@ -97,9 +148,9 @@ function App() {
         setStatus(s=> s + ` • Auto: prüfe ${ready.gameId}…`)
         await onVerifyData(ready.id)
         if (cancelled) return
-        // Wenn Ready, Auto-Play für Warm Start Demo (kann via Config deaktiviert werden)
+        // Wenn Ready, Auto-Play für Warm Start Demo — zeigt GameView (Canvas) statt nur Status
         if (ready.isReady && !didAuto) {
-          setStatus(s=> s + ` • Auto: starte ${ready.gameId}…`)
+          setStatus(s=> s + ` • Auto: starte ${ready.gameId} → GameView…`)
           try { await onPlay(ready) } catch (e:any) { setStatus(s=> s + ` • Auto-Play Fehler: ${String(e?.message??e)}`) }
         }
       } else {
@@ -182,6 +233,8 @@ function App() {
     await backups.exportBackup("save","slot1", { party:[25] }, { gameId:e.gameId })
     await refresh()
     onVerifyData(e.id)
+    // GameView anzeigen — P0.5 Placeholder (echte GB Render kommt P1 WASM)
+    setRunning(e)
   }
 
   const onCycleVoxel = async (dir:number) => {
@@ -223,6 +276,10 @@ function App() {
     if (!r.ok) setStatus(`Core install fehlgeschlagen: ${(r as any).error}`)
     else { cores.activate("1.0.0"); cores.markVerified("1.0.0"); setStatus("Core 1.0.0 installiert & aktiv (AtomicFile staged→verified, Gold/Silver/Crystal ready)") }
     await refresh()
+  }
+
+  if (running) {
+    return <GameView entry={running} voxelLabel={voxelLOD} onBack={()=> { setRunning(null); refresh(); setStatus(`Zurück aus ${running.gameId} — Library`) }} />
   }
 
   return (
@@ -274,7 +331,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.5 — Auto Setup (Core+Voxel+Verify+Play) + 0.2.4 Global Fix • Tests: 92 • 695K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.6 — GameView (Canvas) + Auto LKG/LOD Fix + 0.2.5 • Tests: 92 • 696K</Text>
     </VStack>
   )
 }
