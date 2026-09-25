@@ -2609,6 +2609,8 @@ Beobachten (Dogfood + Benchmarks + Diagnostics)
 | `SaveManager` war nur Doku (§18) | Kein atomic/Backup/Migration/Journal im Code | `src/save/SaveManager.ts` (AtomicFile, Backup lastN=5, Journal, Integrity sha256, Limits 2MiB/depth40, Migration Registry mit rollback) 7 Tests | VERIFIZIERT |
 | `JobScheduler` war nur Doku (§26) | Keine Priority/Abort/Deadline/Retry DAG | `src/jobs/JobScheduler.ts` (PriorityQueue 100/80/40/**30**/5, AbortSignal, Deadline, Retry, dependsOn, `cancelByPriority` für Governor) 7 Tests | VERIFIZIERT |
 | Library Future (Gold/Silver/Crystal/FireRed/LeafGreen) nur erwähnt | Keine Tests für 11 Hashes + 6 FORMAT_VERSION | `src/library/GameLibrary.future.test.ts` 4 Tests (KNOWN_SHA1, FORMAT_VERSION, reject, isReady für crystal) | VERIFIZIERT |
+| `BackupManager` war nur Doku (§60) | Keine versionierten Exports im Code | `src/backup/BackupManager.ts` (AtomicFile, kind save/mod-data/profile/metadata/settings, lastN=5, list/restore/remove, stale cleanup) 3 Tests | VERIFIZIERT |
+| `DiagnosticsBundle` war nur Doku (§49+§51) | Kein zentrales Sammeln | `src/diagnostics/DiagnosticsBundle.ts` (collect game/core/save/render/backup/cache, toJSON, sanitize Privacy) 3 Tests | VERIFIZIERT |
 
 **Regel für zukünftige Loops:** Keine Änderung ohne `PROFILE→BENCHMARK`, kein Breaking der `render_pipelines` API, immer `Graceful Degradation` (Voxel → 2D), immer `pro_required:false` prüfen.
 
