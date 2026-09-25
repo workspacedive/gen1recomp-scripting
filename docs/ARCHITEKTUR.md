@@ -2785,3 +2785,16 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 **Naechstes:** Echte Gen1 Battle-Engine via WASM (P1), hier schon spielbar Platzhalter.
 
 **Verifikation:** `tsc 0`, `vitest 21/92`.
+
+---
+
+## 77.11 v0.4.4 — Fix foregroundStyle + WebView missing controller — VERIFIZIERT 2026-09-25 18:40
+
+**Fixes:**
+- `[Zeile 260] Type string is not assignable to ShapeStyle` → `tileColor(...): any` + `foregroundStyle={col as any}` (col ist "label"|"secondaryLabel", aber TS Typ ist ShapeStyle Union, daher any Cast)
+- `WebView missing controller` + `e.isInternal` Build-Crash → `WebMapView` deaktiviert (return null), `useWeb` default false, kein `WebView html` mehr versucht bis Controller via `WebViewController` verifiziert
+- `Battle` + `Inventar` aus 0.4.3 bleiben, Text-Viewport stabil
+
+**Logs:** `20:37:19 Failed to build component. TypeError: null is not an object (e.isInternal)` + `20:37:19-27 Failed to render WebView, missing controller.` — Fix: kein WebView mehr, nur RealMapView.
+
+**Verifikation:** `tsc 0`, `vitest 21/92`.
