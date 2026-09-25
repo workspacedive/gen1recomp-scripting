@@ -41,7 +41,13 @@ code that could be hostile.
   against pinned sizes and SHA-256 (`love.js` 335 905 B `86a993ad…`,
   `love.wasm` 4 720 510 B `8e955d3c…`).
 - **Game archive**: downloaded only from the official GitHub release and
-  verified against that release's own `sha256sums.txt`; stored unchanged.
+  verified against that release's own `sha256sums.txt`, which must agree with
+  GitHub's server-computed asset digest (API field `digest`, when present)
+  and — for tested versions — with the pinned digest in `pins.ts`
+  (`0.3.14`: `b425a286…c619`); any disagreement aborts
+  (`expectedArchiveSha256`, unit-tested). Offline imports of a tested
+  version's official file are verified against the pinned digest; other
+  offline files need explicit user confirmation. Stored unchanged.
 - Nothing is uploaded; no analytics, no telemetry, no accounts.
 
 ### WebView (`src/player/session.ts`, `runtime/web/player.html`)

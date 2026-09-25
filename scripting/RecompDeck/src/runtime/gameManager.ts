@@ -1,8 +1,9 @@
 // Official game releases: discovery (GitHub API), download and verification
-// against the release's own sha256sums.txt. The archive is stored unchanged.
+// against the release's own sha256sums.txt, cross-checked with GitHub's asset
+// digest and (for tested versions) a pinned digest. Stored unchanged.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { GAME_SOURCE, parseSha256Sums } from '../core/pins'
+import { expectedArchiveSha256, GAME_SOURCE, parseAssetDigest, parseSha256Sums } from '../core/pins'
 import { compareSemver, parseSemver } from '../core/semver'
 import { DIRS, ensureDir, exists, readJson, removeIfExists, writeDataAtomic, writeJson } from '../platform/fs'
 import { sha256Hex } from '../platform/hash'
@@ -25,13 +26,13 @@ export interface InstalledGame {
   path: string
   sha256: string
   size: number
-  verified: 'release-checksum' | 'user-confirmed'
+  verified: 'release-checksum' | 'pinned-digest' | 'user-confirmed'
   installedAt: string
 }
 
 const ACTIVE_FILE = () => DIRS.games + '/active.json'
 
-interface GhAsset { name: string; size: number }
+interface GhAsset { name: string; size: number; digest?: string | null }
 interface GhRelease { tag_name: string; name: string; published_at: string; prerelease: boolean; draft: boolean; assets: GhAsset[] }
 
 export async function listReleases(): Promise<ReleaseInfo[]> {
@@ -85,8 +86,14 @@ export async function installRelease(version: string, onStatus: (s: string) => v
   onStatus('Fetching official checksums…')
   const sums = parseSha256Sums(await fetchText(GAME_SOURCE.checksumsUrl(version), 256 * 1024))
   const name = GAME_SOURCE.assetName(version)
-  const expected = sums[name]
-  if (!expected) throw new Error(`${name} is not listed in the release's sha256sums.txt`)
+  let assetDigest: string | null = null
+  try {
+    const rel = await fetchJson<GhRelease>(GAME_SOURCE.releaseByTagApi(version))
+    assetDigest = parseAssetDigest((rel.assets ?? []).find((a) => a.name === name)?.digest)
+  } catch (e) {
+    log('warn', 'release metadata unavailable, relying on sha256sums.txt: ' + String(e))
+  }
+  const expected = expectedArchiveSha256({ sums: sums[name], assetDigest, pinned: GAME_SOURCE.testedDigests[version] })
   onStatus(`Downloading ${name}…`)
   const data = await download(GAME_SOURCE.assetUrl(version), { maxBytes: GAME_SOURCE.maxArchiveBytes, sha256: expected, timeout: 600 })
   const dir = `${DIRS.games}/${version}`
@@ -115,7 +122,11 @@ export async function importLoveFile(srcPath: string, confirmUnverified: (sha: s
   const sha = sha256Hex(data)
   let verified: InstalledGame['verified'] = 'user-confirmed'
   const version = m ? m[1] : 'local-' + sha.slice(0, 8)
-  if (m) {
+  const pinned = m ? GAME_SOURCE.testedDigests[m[1]] : undefined
+  if (pinned && pinned !== sha) throw new Error('This file does not match the official release checksum.')
+  if (pinned) {
+    verified = 'pinned-digest' // official archive of a tested version, verified offline
+  } else if (m) {
     try {
       const sums = parseSha256Sums(await fetchText(GAME_SOURCE.checksumsUrl(m[1]), 256 * 1024))
       if (sums[base] === sha) verified = 'release-checksum'
@@ -125,7 +136,7 @@ export async function importLoveFile(srcPath: string, confirmUnverified: (sha: s
       log('warn', 'could not reach release checksums: ' + String(e))
     }
   }
-  if (verified !== 'release-checksum' && !(await confirmUnverified(sha))) throw new Error('import cancelled')
+  if (verified === 'user-confirmed' && !(await confirmUnverified(sha))) throw new Error('import cancelled')
   const dir = `${DIRS.games}/${version}`
   const path = `${dir}/gen1recomp-${version}.love`
   await ensureDir(dir)

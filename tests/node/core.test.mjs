@@ -217,6 +217,21 @@ test('launch: plans use only documented options', () => {
   assert.equal(settings.sanitizeSettings({ idleFps: 15 }).idleFps, 15);
 });
 
+test('pins: archive checksum sources must agree', () => {
+  const pins = require(B + 'pins.js');
+  const A = 'b425a2862419ab81731b5aa52dfb95766e78e7ebace0c7a4580cc4f8cb7ac619';
+  const X = 'f'.repeat(64);
+  assert.equal(pins.parseAssetDigest('sha256:' + A.toUpperCase()), A);
+  for (const d of [null, 42, 'sha1:' + A, 'sha256:xyz', 'sha256:' + A + '0']) assert.equal(pins.parseAssetDigest(d), null);
+  assert.equal(pins.expectedArchiveSha256({ sums: A }), A);
+  assert.equal(pins.expectedArchiveSha256({ sums: A, assetDigest: A, pinned: A }), A);
+  assert.throws(() => pins.expectedArchiveSha256({ sums: undefined, assetDigest: A }), /not listed/);
+  assert.throws(() => pins.expectedArchiveSha256({ sums: A, assetDigest: X }), /GitHub asset digest/);
+  assert.throws(() => pins.expectedArchiveSha256({ sums: A, pinned: X }), /pinned digest/);
+  assert.equal(pins.GAME_SOURCE.testedDigests['0.3.14'], A);
+  for (const v of pins.GAME_SOURCE.testedVersions) assert.match(pins.GAME_SOURCE.testedDigests[v], /^[0-9a-f]{64}$/, v);
+});
+
 test('ui: no JSX text that is an unevaluated expression (e.g. <Text>t.key</Text>)', () => {
   const dir = path.join(ROOT, 'scripting/RecompDeck');
   const files = [path.join(dir, 'index.tsx'), ...fs.readdirSync(path.join(dir, 'src/ui')).map((f) => path.join(dir, 'src/ui', f))];
