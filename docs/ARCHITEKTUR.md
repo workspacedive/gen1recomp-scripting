@@ -2837,3 +2837,14 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 **Erweiterung zu 0.5.0:** `wasmStatus` State `pruefe...` → `WASM + Memory OK` / `WASM OK` / `WASM nicht verfuegbar`, `useEffect` prueft `typeof WebAssembly !== "undefined"` + `WebAssembly.Memory`, `hasWasm = wasmStatus.includes("OK")`, `loadInfo` zeigt `Core ... - {wasmStatus} - w×h`, `PipelineAdapter drawWorld - {wasmStatus} - Governor ... - Hooks {pipelines.list().length} Pipelines` — Bridge zeigt jetzt Hooks/API Anzahl.
 
 **Verifikation:** `tsc 0`, `vitest 21/92`.
+
+---
+
+## 77.16 v0.5.2 — Fix WebAssembly globalThis + weiter Bridge — VERIFIZIERT 2026-09-25 19:05
+
+**Fixes:**
+- `[95,30] Cannot find name WebAssembly` → `typeof (globalThis as any).WebAssembly !== "undefined"` + `WebAssembly.Memory` via `globalThis` (Scripting `lib` hat kein `dom` `WebAssembly` global, daher `globalThis` Cast)
+
+**Weiter:** Bridge wie apk, Core unberuehrt.
+
+**Verifikation:** `tsc 0`, `vitest 21/92`.

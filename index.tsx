@@ -92,8 +92,8 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
 
   useEffect(()=>{
     try {
-      const hasWasm = typeof WebAssembly !== "undefined" && typeof (WebAssembly as any).instantiate === "function"
-      const hasMemory = hasWasm && typeof (WebAssembly as any).Memory === "function"
+      const hasWasm = typeof (globalThis as any).WebAssembly !== "undefined" && typeof (globalThis as any).WebAssembly.instantiate === "function"
+      const hasMemory = hasWasm && typeof (globalThis as any).WebAssembly.Memory === "function"
       setWasmStatus(hasWasm ? (hasMemory ? "WASM + Memory OK" : "WASM OK, Memory fehlt") : "WASM nicht verfuegbar - Host Bridge")
     } catch (e:any) { setWasmStatus(`WASM Fehler: ${String(e?.message??e)}`) }
   }, [])
@@ -630,7 +630,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.5.1 - WASM Probe + Hooks Anzeige + Bridge - Tests: 92 - 737K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.5.2 - Fix WebAssembly globalThis + weiter Bridge - Tests: 92 - 738K</Text>
     </VStack>
   )
 }
