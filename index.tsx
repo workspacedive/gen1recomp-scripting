@@ -182,11 +182,11 @@ function App() {
   return (
     <VStack spacing={12} padding={16}>
       <Text font="title">gen1recomp — Scripting (P0.5 + RomExtractor)</Text>
-      <Text font="caption" color="secondary">{status}</Text>
-      <Text font="caption" color="secondary">{coreInfo}</Text>
-      <Text font="caption" color="secondary">Voxel LOD: {voxelLOD} — {config.get().graphics.quality} — {telemetryInfo}</Text>
-      <Text font="caption2" color="secondary">{diagInfo}</Text>
-      <Text font="caption" color="secondary">{dataInfo}</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">{status}</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">{coreInfo}</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">Voxel LOD: {voxelLOD} — {config.get().graphics.quality} — {telemetryInfo}</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">{diagInfo}</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">{dataInfo}</Text>
 
       <HStack spacing={8}>
         <Button title="ROM importieren (echt)" action={onImport} />
@@ -202,21 +202,21 @@ function App() {
       </HStack>
 
       <List>
-        <Section header="Library — einmal importieren, danach Warm Start (echter Extractor)">
+        <Section header={<Text>Library — einmal importieren, danach Warm Start (echter Extractor)</Text>}>
           {entries.length === 0 ? (
-            <Text color="secondary">Keine Spiele — DocumentPicker nutzen (11 SHA1, 6 FORMAT_VERSION, 17 Stages)</Text>
+            <Text foregroundStyle="secondaryLabel">Keine Spiele — DocumentPicker nutzen (11 SHA1, 6 FORMAT_VERSION, 17 Stages)</Text>
           ) : entries.map((e: LibraryEntry) => (
             <HStack key={e.id}>
-              <VStack>
+              <VStack alignment="leading">
                 <Text>{e.gameId.toUpperCase()} ({e.format}) — {e.region}</Text>
-                <Text font="caption" color="secondary">{e.contentHash.slice(0,12)}… • {e.isReady ? "Ready" : "Nicht ready"} • LOD {voxelLOD} {selectedId===e.id ? "• ausgewählt" : ""}</Text>
+                <Text font="caption" foregroundStyle="secondaryLabel">{e.contentHash.slice(0,12)}… • {e.isReady ? "Ready" : "Nicht ready"} • LOD {voxelLOD} {selectedId===e.id ? "• ausgewählt" : ""}</Text>
               </VStack>
               <Button title={e.isReady ? "Spielen" : "Re-Import"} action={()=>onPlay(e)} />
               <Button title="Prüfen" action={()=>{ setSelectedId(e.id); onVerifyData(e.id)}} />
             </HStack>
           ))}
         </Section>
-        <Section header="Hinweise (Non-Pro, Offline-First, Extractor, Runtime)">
+        <Section header={<Text>Hinweise (Non-Pro, Offline-First, Extractor, Runtime)</Text>}>
           <Text font="caption">• ROM nach Import nicht erneut verlangt (isReady via rom-cache.complete + 14 REQUIRED_FILES, tolerant, atomic)</Text>
           <Text font="caption">• Extractor: Rom (Bank 0x4000), Manifest (3288 Symbole), 17 Stages (constants→tilesets→maps→…→audio), 1×1 PNG placeholders, Lua+JSON sidecars, LuaRunner fengari lazy (Node) / JSON preferred (Scripting)</Text>
           <Text font="caption">• DataLoader: verify → constants/maps/tilesets/text/field — Warm Start &lt;200ms (JSON.parse), Lua fallback via fengari</Text>
@@ -228,7 +228,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption2" color="secondary">v0.2.0 — Extractor (Rom/Manifest) + Runtime (LuaRunner/DataLoader) • Tests: 92 • Docs: ARCHITEKTUR.md §44.1 §76.1 • PR #1</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.2 — Text/Section Fix (foregroundStyle, header Text) + Extractor/Runtime • Tests: 92 • 693K</Text>
     </VStack>
   )
 }
