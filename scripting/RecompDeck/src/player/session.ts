@@ -52,6 +52,17 @@ export class PlayerSession {
   private cacheTarget: string | null = null
   stats: Record<string, unknown> = {}
   lastError: string | null = null
+  private listener: ((e: SessionEvent) => void) | null = null
+
+  /** Attach the view that currently shows this session. */
+  setListener(fn: ((e: SessionEvent) => void) | null) {
+    this.listener = fn
+  }
+
+  private emit(e: SessionEvent) {
+    try { this.input.onEvent(e) } catch (err) { log('warn', 'session onEvent: ' + String(err)) }
+    try { this.listener?.(e) } catch (err) { log('warn', 'session listener: ' + String(err)) }
+  }
 
   private constructor(input: SessionInput) {
     this.input = input
@@ -65,7 +76,7 @@ export class PlayerSession {
   }
 
   private status(text: string) {
-    this.input.onEvent({ kind: 'status', text })
+    this.emit({ kind: 'status', text })
   }
 
   private async build() {
@@ -175,7 +186,7 @@ export class PlayerSession {
     if (this.closed) return
     const msg = parseBridgeMessage(raw)
     if (!msg) { log('warn', 'rejected bridge message'); return }
-    const emit = this.input.onEvent
+    const emit = (e: SessionEvent) => this.emit(e)
     switch (msg.topic) {
       case 'log':
         log(msg.data.level, 'player: ' + msg.data.text)

@@ -32,7 +32,8 @@ export interface GameInfo {
   supported: boolean
   /** gen1recomp support level upstream. */
   upstream: 'stable' | 'phase1' | 'beta'
-  color: string
+  /** Hex colour (matches Scripting's ColorStringHex). */
+  color: `#${string}`
 }
 
 export const GAMES: GameInfo[] = [

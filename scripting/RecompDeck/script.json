@@ -1,0 +1,22 @@
+{
+  "name": "RecompDeck",
+  "icon": "gamecontroller.fill",
+  "color": "#E3350D",
+  "version": "1.0.0",
+  "description": "Unofficial iOS frontend for the gen1recomp LÖVE game: runs the official release on LÖVE 11.5 (WebAssembly) with native ROM/mod/save management. Contains no game content.",
+  "localizedNames": {
+    "de": "RecompDeck",
+    "en": "RecompDeck"
+  },
+  "localizedDescriptions": {
+    "de": "Inoffizielles iOS-Frontend für gen1recomp: führt das offizielle Release auf LÖVE 11.5 (WebAssembly) aus, mit nativer ROM-, Mod- und Spielstandverwaltung. Enthält keine Spielinhalte.",
+    "en": "Unofficial iOS frontend for the gen1recomp LÖVE game: runs the official release on LÖVE 11.5 (WebAssembly) with native ROM/mod/save management. Contains no game content."
+  },
+  "author": {
+    "name": "RecompDeck contributors",
+    "email": "noreply@users.noreply.github.com",
+    "homepage": "https://github.com/workspacedive/gen1recomp-scripting"
+  },
+  "contributors": [],
+  "remoteResource": null
+}
