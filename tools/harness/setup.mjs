@@ -76,15 +76,32 @@ function setupBrowser() {
   console.log('browser: installed ->', dir);
 }
 
-// Same include/exclude set as gen1recomp scripts/pack_love.sh (v0.3.14).
+// Same include/exclude set as gen1recomp scripts/pack_love.sh (v0.3.14) and the
+// same release version stamp as scripts/build.sh. `--rebuild-game` forces a rebuild.
 function buildGame(checkout) {
   const version = execFileSync('git', ['-C', checkout, 'describe', '--tags', '--always'], { encoding: 'utf8' }).trim().replace(/^v/, '');
   const out = path.join(CACHE, `game-${version}.love`);
-  if (fs.existsSync(out)) { console.log('game: cached', out); return; }
+  if (fs.existsSync(out) && !args.includes('--rebuild-game')) { console.log('game: cached', out); return; }
+  fs.rmSync(out, { force: true });
   const include = ['main.lua', 'conf.lua', 'src', 'data', 'assets', 'tools/save-editor',
     ...['', '_blue', '_yellow', '_gold', '_silver', '_crystal', '_firered', '_leafgreen'].map((s) => `tools/rom_manifest${s}.json`),
     'PATCH_NOTES.md', 'mobile/ios/app-repo.json'].filter((p) => fs.existsSync(path.join(checkout, p)));
   execFileSync('zip', ['-q', '-9', '-r', out, ...include, '-x', '*.DS_Store', 'data/generated/*', 'assets/generated/*'], { cwd: checkout, stdio: 'inherit' });
+  // Stamp the release version exactly like upstream scripts/build.sh: patch a
+  // staged copy of src/core/Version.lua (engine = "X.Y.Z"), replace the entry
+  // in the archive in place, read it back. The checkout is never modified.
+  if (/^\d+\.\d+\.\d+$/.test(version)) {
+    const stage = path.join(CACHE, 'stamp');
+    fs.rmSync(stage, { recursive: true, force: true });
+    fs.mkdirSync(path.join(stage, 'src/core'), { recursive: true });
+    const src = fs.readFileSync(path.join(checkout, 'src/core/Version.lua'), 'utf8');
+    const stamped = src.split('\n').map((l) => l.replace(/(engine[ \t]*=[ \t]*")[^"]*(")/, `$1${version}$2`)).join('\n');
+    fs.writeFileSync(path.join(stage, 'src/core/Version.lua'), stamped);
+    execFileSync('zip', ['-q', out, 'src/core/Version.lua'], { cwd: stage, stdio: 'inherit' });
+    const back = execFileSync('unzip', ['-p', out, 'src/core/Version.lua'], { encoding: 'utf8' });
+    if (!new RegExp(`engine[ \\t]*=[ \\t]*"${version.replace(/\./g, '\\.')}"`).test(back)) throw new Error('version stamp failed');
+    console.log('game: stamped engine version', version);
+  }
   console.log('game: built', out, fs.statSync(out).size, 'bytes, sha256', hash('sha256', fs.readFileSync(out)));
 }
 

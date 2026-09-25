@@ -48,6 +48,22 @@ wasm heap: 192 MiB (initial memory setting), no growth; 0 errors, no
 frame. The skip counter (90 per 2 s = 45/s = 60 − 15) proves that the idle
 cap is realised by skipping frames, not by spinning.
 
+**Fill-rate caveat (sandbox).** Later runs on the same 2-core sandbox
+reached only ~30 fps at DPR 2 while the frame callback still took just
+1.1–1.4 ms and no rAF was skipped. Controlled experiments isolated the cause:
+
+| Experiment (20 s runs, file:// transport) | fps (active phase) | work per frame |
+|---|---|---|
+| archive with engine `0.0.0-dev` vs. stamped `0.3.14` | ~30 vs. ~30 | 1.1–1.4 ms |
+| viewport 390×844 **@1** | 60 (all samples) | 1.1–1.2 ms |
+| viewport 390×844 **@2** (same minute) | 52–60 | 1.0–1.4 ms |
+
+The limit is Chromium's software WebGL rasteriser (SwiftShader) filling a
+780×1688 canvas on a loaded 2-core machine — work outside RecompDeck's frame
+callback that a device GPU does in hardware. If a device ever shows the same
+pattern (low fps, low work per frame, no skipped frames), switch off
+*Retina rendering* (renders at 1× and upscales with nearest-neighbour).
+
 These numbers characterise relative cost (no busy-waits, no per-frame
 overhead from the bridge); absolute numbers on an iPhone GPU/CPU must be
 measured on the device (Diagnostics screen, [verification.md](verification.md)).
