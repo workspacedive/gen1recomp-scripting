@@ -72,7 +72,44 @@ function App() {
     setDiagInfo(`Diagnostics: ${secs.map(s=> `${s.name}:${s.status}`).join(" ")}`)
   }
 
-  useEffect(() => { refresh() }, [])
+  const [didAuto, setDidAuto] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    const auto = async () => {
+      await refresh()
+      if (cancelled) return
+      // Auto bis das Spiel funktioniert: Core + Voxel + Verify + optional Play
+      const active = cores.getActive()
+      if (!active) {
+        setStatus("Auto: installiere Core 1.0.0… (für Gold/Silver/Crystal, bundled fengari bleibt Fallback)")
+        try { await onInstallCore() } catch {}
+        if (cancelled) return
+      }
+      if (pipelines.levelLabel("voxel") === "OFF") {
+        setStatus(s=> s + " • Auto: Voxel OFF→15…")
+        try { await onCycleVoxel(1) } catch {}
+        if (cancelled) return
+      }
+      const list = await library.list()
+      const ready = list.find(e=> e.isReady) ?? list[0]
+      if (ready) {
+        setSelectedId(ready.id)
+        setStatus(s=> s + ` • Auto: prüfe ${ready.gameId}…`)
+        await onVerifyData(ready.id)
+        if (cancelled) return
+        // Wenn Ready, Auto-Play für Warm Start Demo (kann via Config deaktiviert werden)
+        if (ready.isReady && !didAuto) {
+          setStatus(s=> s + ` • Auto: starte ${ready.gameId}…`)
+          try { await onPlay(ready) } catch (e:any) { setStatus(s=> s + ` • Auto-Play Fehler: ${String(e?.message??e)}`) }
+        }
+      } else {
+        setStatus(s=> s + " • Auto: Kein ROM — bitte ROM importieren (einmalig)")
+      }
+      setDidAuto(true)
+    }
+    auto()
+    return () => { cancelled = true }
+  }, [])
 
   const onImport = async () => {
     setStatus("Wähle ROM… (Nur US Red/Blue/Yellow/Gold/Silver/Crystal/FireRed/LeafGreen, SHA-1 geprüft, echter RomExtractor läuft)")
@@ -237,7 +274,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.4 — DocumentPicker global Fix (Picker.pickFiles undefined) + 0.2.3 • Tests: 92 • 694K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.2.5 — Auto Setup (Core+Voxel+Verify+Play) + 0.2.4 Global Fix • Tests: 92 • 695K</Text>
     </VStack>
   )
 }
