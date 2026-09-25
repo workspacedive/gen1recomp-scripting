@@ -11,6 +11,7 @@ import type { FilesPort, JobsPort } from "../host/ports"
 import { validateVoxelWrite, LIMITS, safeVoxelPath } from "../cache/VoxelCacheGuard"
 import { VoxelAssetPipeline } from "../render/VoxelBackends"
 import { atomicWriteBytes } from "../host/AtomicFile"
+import type { TrustManager } from "../security/TrustManager"
 
 export type VoxelSourceKind = "vox" | "glb" | "voxels-pack" | "bin"
 
@@ -33,7 +34,7 @@ export type VoxelImportResult =
   | { ok: false; error: string; reason: "limit"|"path"|"decode"|"io" }
 
 export class VoxelPackImporter {
-  constructor(private files: FilesPort, private jobs: JobsPort) {}
+  constructor(private files: FilesPort, private jobs: JobsPort, private trust?: TrustManager) {}
 
   private async decodeInBackground(req: VoxelImportRequest, bytes: Uint8Array): Promise<Uint8Array> {
     // Thread.runInBackground für schwere Dekodierung (MagicaVoxel → Mesh) — VERIFIZIERT via thread/en.md
@@ -70,9 +71,14 @@ export class VoxelPackImporter {
       } catch (e) { return { ok:false, error: String(e), reason:"io" } }
     } else return { ok:false, error:"no bytes or filePath", reason:"io" }
 
-    // 2. Per-file Limit (8 MiB) — sofort Guard
+    // 2. Per-file Limit (8 MiB) — sofort Guard + TrustManager (Revocation) falls vorhanden
     if (bytes.length > LIMITS.MOD_CACHE_PER_FILE) {
       return { ok:false, error: `file ${bytes.length} > ${LIMITS.MOD_CACHE_PER_FILE}`, reason:"limit" }
+    }
+    if (this.trust) {
+      // TrustManager kannImport prüft revoked/block + size Limits (generisch, Voxel als Treiber)
+      const tcheck=this.trust.canImport(req.modId, bytes.length, { perFile: LIMITS.MOD_CACHE_PER_FILE, total: LIMITS.MOD_STORAGE_TOTAL, totalAfter: bytes.length })
+      if (!tcheck.ok) return { ok:false, error: tcheck.reason, reason:"limit" }
     }
 
     // 3. Decode (Thread)
