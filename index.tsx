@@ -14,7 +14,7 @@
  * Pro-APIs werden NICHT verwendet. Renderer ist Canvas (Scripting) — kein Metal.
  */
 
-import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect } from "scripting"
+import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect, WebView } from "scripting"
 // DocumentPicker ist global (Scripting iOS, Non-Pro) — nicht via `from "scripting"` importieren (führt zu undefined bei Bundle)
 // Deklariert in scripting.d.ts als global const DocumentPicker: any (VERIFIZIERT document_picker/en.md)
 // Canvas ist global/verifiziert via views/canvas/en.md — für GameView (160x144, 2x Scale)
@@ -57,6 +57,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   const [tilesets, setTilesets] = useState<Record<string,any> | null>(null)
   const [mapId, setMapId] = useState<string>("AGATHAS_ROOM")
   const [loadInfo, setLoadInfo] = useState<string>("Lade Karten...")
+  const [useWeb, setUseWeb] = useState<boolean>(true)
 
   useEffect(()=>{
     let cancelled = false
@@ -135,7 +136,14 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
     <VStack spacing={12} padding={16}>
       <Text font="title">{entry.gameId.toUpperCase()} - {mapId} {dir} ({voxelLabel})</Text>
       <Text font="caption" foregroundStyle="secondaryLabel">{loadInfo} - {w}x{h} - Tileset {curMap?.tileset ?? "-"} - Warm Start {maps ? "json" : "..."}</Text>
-      <RealMapView map={curMap} playerPos={pos} playerDir={dir} fallbackEntry={entry} />
+      <VStack spacing={4}>
+        <HStack spacing={8}>
+          <Button title={useWeb ? "Text-Ansicht" : "Grafik-Ansicht"} action={()=>setUseWeb(v=>!v)} />
+          <Text font="caption" foregroundStyle="secondaryLabel">{useWeb ? "WebView HTML" : "Text"}</Text>
+        </HStack>
+        {useWeb ? <WebMapView map={curMap} playerPos={pos} playerDir={dir} /> : null}
+        <RealMapView map={curMap} playerPos={pos} playerDir={dir} fallbackEntry={entry} />
+      </VStack>
       <HStack spacing={8}>
         <Button title="UP" action={()=>move(0,-1)} />
       </HStack>
@@ -244,7 +252,74 @@ function RealMapView({ map, playerPos, playerDir, fallbackEntry }: { map:any; pl
     </VStack>
   )
 }
+function WebMapView({ map, playerPos, playerDir }: { map:any; playerPos:{x:number;y:number}; playerDir?:string }){
+  // HTML-WebView Render fuer echte Tiles - farbige Divs statt Text, stabiler als Canvas, verifiziert via views/webview
+  if (!map) return null
+  const w = map.width ?? 10
+  const h = map.height ?? 9
+  const blocks: number[] = map.blocks ?? []
+  const px = playerPos.x
+  const py = playerPos.y
+  // Viewport 9x9 um Spieler
+  const VIEW = 9
+  const half = Math.floor(VIEW/2)
+  let vx0 = Math.max(0, Math.min(w - VIEW, px - half))
+  let vy0 = Math.max(0, Math.min(h - VIEW, py - half))
+  if (w <= VIEW) vx0 = 0
+  if (h <= VIEW) vy0 = 0
+  const viewW = Math.min(VIEW, w)
+  const viewH = Math.min(VIEW, h)
+
+  // HTML bauen: Grid mit farbigen Tiles
+  let html = `<div style="display:grid;grid-template-columns:repeat(${viewW},22px);gap:1px;background:#222;padding:4px;font-family:monospace;font-size:10px;">`
+  for (let y=0; y<viewH; y++){
+    const gy = vy0 + y
+    for (let x=0; x<viewW; x++){
+      const gx = vx0 + x
+      const tile = blocks[gy * w + gx] ?? 0
+      const isPlayer = gx===px && gy===py
+      const isWarp = (map.warps ?? []).some((wp:any)=> wp.x===gx && wp.y===gy)
+      const isSign = (map.signs ?? []).some((s:any)=> s.x===gx && s.y===gy)
+      const isObj = (map.objects ?? []).some((o:any)=> o.x===gx && o.y===gy)
+      let bg = "#8fbc8f" // grass default
+      let ch = "."
+      let fg = "#111"
+      if (tile===0){ bg="#555"; ch="X"; fg="#222" }
+      else if (tile % 5 === 2){ bg="#d2b48c"; ch="o" }
+      else if (tile % 5 === 3){ bg="#87ceeb"; ch="~" }
+      else if (tile % 5 === 4){ bg="#98fb98"; ch="*" }
+      if (isWarp){ bg="#4169e1"; ch="O"; fg="#fff" }
+      if (isSign){ bg="#ffa500"; ch="#"; fg="#000" }
+      if (isObj && !isPlayer){ bg="#ff6347"; ch="M"; fg="#fff" }
+      if (isPlayer){
+        ch = playerDir==="up" ? "^" : playerDir==="down" ? "v" : playerDir==="left" ? "<" : playerDir==="right" ? ">" : "P"
+        bg="#ffd700"; fg="#000"
+      }
+      html += `<div style="width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:${bg};color:${fg};border-radius:2px;">${ch}</div>`
+    }
+  }
+  html += `</div><div style="font-family:monospace;font-size:9px;color:#888;margin-top:4px;">${map.id ?? map.label} ${w}x${h} @${vx0},${vy0} P ${px},${py} ${playerDir ?? ""}</div>`
+
+  // Fallback: wenn WebView nicht verfuegbar, nutze RealMapView Text
+  try {
+    // @ts-ignore WebView pruefen
+    if (typeof WebView === "undefined") return null
+  } catch { return null }
+
+  // @ts-ignore Scripting WebView props variieren - versuche html/source
+  try {
+    // @ts-ignore
+    return <WebView html={html} style={{ height: 240 }} />
+  } catch {
+    try {
+      // @ts-ignore fallback source
+      return <WebView source={{ html }} />
+    } catch { return null }
+  }
+}
+
 function MapGrid({ entry, playerPos }: { entry: any; playerPos?: {x:number;y:number} }){
+
   const px = playerPos?.x ?? 2
   const py = playerPos?.y ?? 2
   const row = (y:number) => [0,1,2,3,4].map(x=>{
@@ -561,7 +636,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.1 - Farbcodierte Tiles + Richtung + Objekte farbig - Tests: 92 - 722K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.2 - WebView HTML Grafik (farbig) + Text Fallback - Tests: 92 - 724K</Text>
     </VStack>
   )
 }

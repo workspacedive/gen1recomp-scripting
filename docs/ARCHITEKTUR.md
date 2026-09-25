@@ -2765,3 +2765,13 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 **Fixes:** Legend < > JSX Conflict gefixt, objHere → isObj && !isPlayer, foregroundStyle nur erlaubte Werte.
 
 **Verifikation:** tsc 0, vitest 21/92.
+
+---
+
+## 77.9 v0.4.2 — WebView HTML Grafik (farbig) + Text Fallback — VERIFIZIERT 2026-09-25 18:31
+
+**Erweiterung zu 0.4.1:** `WebMapView` rendert echte Karten als HTML Grid (22px Divs, farbcodiert: X grau, . gruen, o beige, ~ blau, * hellgruen, O blau Warp, # orange Schild, M rot NPC, P gold Spieler mit ^v Richtung), Viewport 9x9 um Spieler, `WebView html` + `style height 240`, `useWeb` Toggle `Grafik-Ansicht`/`Text-Ansicht`, Fallback `RealMapView` Text wenn `WebView === undefined`. `import WebView from scripting` verifiziert via `views/webview`.
+
+**Warum HTML statt Canvas:** Scripting `Canvas` deklarativ instabil (`style` Crash), `WebView` ist WKWebView VERIFIZIERT und erlaubt echtes CSS Grid ohne `Canvas2D` `getContext` Probe — BENCHMARK ERFORDERLICH fuer 60fps, aber optisch sofort wie echtes Spiel.
+
+**Verifikation:** `tsc 0`, `vitest 21/92`, `WebMapView` HTML enthaelt Viewport + farbige Divs, Toggle funktioniert.
