@@ -50,8 +50,16 @@ and safety rules apply to every Scripting change.
 4. Run `python3 tools/audit/require_graph.py <dir>` and confirm only Gen 3
    modules depend on non-5.1 files.
 5. Run skill S3.
-6. Update `docs/compatibility.md` (tables + numbers) and the supported-version
-   pin in `src/core/pins.ts`.
+6. Run the E2E harness on the new archive (skill S5; rebuild it with
+   `node tools/harness/setup.mjs --skip-browser --rebuild-game` after checking
+   out the new tag in `.cache/gen1recomp`).
+7. Update `docs/compatibility.md` (tables + numbers) and, in
+   `src/core/pins.ts`, add the version to `GAME_SOURCE.testedVersions` and its
+   official archive SHA-256 to `GAME_SOURCE.testedDigests` — taken from the
+   GitHub API (`gh api repos/bryanthaboi/gen1recomp/releases/tags/v<X.Y.Z>
+   --jq '.assets[] | select(.name=="gen1recomp-<X.Y.Z>.love") | .digest'`)
+   and cross-checked with the release's `sha256sums.txt`. A unit test requires
+   a digest for every tested version.
 
 **Done when:** all non-Gen-3 files compile on 5.1 and S3 shows no new
 failures beyond the documented ones.
