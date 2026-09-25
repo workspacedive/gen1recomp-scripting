@@ -70,10 +70,11 @@ describe("Integration: Library → Save → Pipeline → Preload → Governor �
     store.set("library:index", [entry])
     await files.createDirectory("/docs/library/crystal-1/generated/data/generated", true)
     await files.writeAsString("/docs/library/crystal-1/generated/rom-cache.complete", entry.cacheMarker)
-    for (const rel of ["data/generated/constants.lua","data/generated/maps.lua","data/generated/text.lua","assets/generated/title/pokemon_logo.png"]) {
+    for (const rel of ["data/generated/constants.lua","data/generated/maps.lua","data/generated/text.lua","data/generated/field.lua","data/generated/battle_anims.lua","assets/generated/title/pokemon_logo.png","assets/generated/fonts/font.png","assets/generated/battle/front/pikachu.png","assets/generated/battle/anims/move_anim_0.png","assets/generated/battle/anims/move_anim_1.png","assets/generated/audio/programs.bin","assets/generated/trade/game_boy.png","assets/generated/townmap/nest.png","assets/generated/townmap/up_arrow.png"]) {
       const p="/docs/library/crystal-1/generated/"+rel
       await files.createDirectory(p.slice(0,p.lastIndexOf("/")), true)
       if (rel.endsWith(".png")) await files.writeAsBytes(p, new Uint8Array([1]))
+      else if (rel.endsWith(".bin")) await files.writeAsBytes(p, new Uint8Array([1]))
       else await files.writeAsString(p, "return {}")
     }
     expect(await lib.isReady(entry)).toBe(true)

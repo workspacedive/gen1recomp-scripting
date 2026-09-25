@@ -1,18 +1,15 @@
 /**
- * Scripting iOS — Gen1Recomp Port (Non-Pro, P0 Scaffold + Voxel + Save/Jobs/Trust)
+ * Scripting iOS — Gen1Recomp Port (Non-Pro, P0.5 — RomExtractor + Runtime)
  * Entry: index.tsx
  *
- * Dieser Scaffold demonstriert *alle* implementierten Bounded Contexts:
- * - Game Library (einmaliger Import via DocumentPicker, 8 GameIds, isReady)
+ * Bounded Contexts demonstriert:
+ * - Game Library (einmaliger Import via DocumentPicker, 8 GameIds, isReady — jetzt mit echtem RomExtractor)
+ * - RomExtractor (Gen1/Gen2, 17 Stages, Manifest-bundled, tolerant, atomic, fengari-lua + JSON sidecars)
  * - Core Store (versioniert, staged→verified, LKG)
- * - SaveManager (atomic, Backup lastN=5, Migration, Integrity, Journal)
- * - JobScheduler (Priority 100/80/40/30/5, Abort, Deadline, Retry, DAG)
- * - PipelineAdapter Voxel (Canvas2D default + WebView warm cache, OFF/15/35/50, telemetry)
- * - ResourceGovernor + PipelineTelemetry (p95, downgrade)
- * - VoxelPackImporter + VoxelPreloadAdapter + CacheGuard + AtomicFile
- * - TrustManager (Allowlist/Blocklist/Revocation, Provenance)
- * - BackupManager + DiagnosticsBundle + ConfigurationManager + RepositoryProvider
- * - Host Adapter (FileManager/Storage, ScriptingGraphicsAdapter mit WebView Probe)
+ * - SaveManager (atomic, Backup, Migration)
+ * - JobScheduler + PipelineAdapter Voxel (OFF/15/35/50) + Governor + Telemetry
+ * - TrustManager, Backup, Diagnostics, Config, Repo
+ * - Runtime: LuaRunner (fengari lazy) + DataLoader (JSON preferred, Lua fallback) — Warm Start <500ms
  *
  * Pro-APIs werden NICHT verwendet. Renderer ist Canvas (Scripting) — kein Metal.
  */
@@ -30,6 +27,7 @@ import { BackupManager } from "./src/backup/BackupManager"
 import { DiagnosticsBundle } from "./src/diagnostics/DiagnosticsBundle"
 import { ConfigurationManager } from "./src/config/ConfigurationManager"
 import { TrustManager } from "./src/security/TrustManager"
+import { DataLoader } from "./src/runtime/DataLoader"
 
 const host = createScriptingHost()
 const library = new GameLibrary(host.files, host.storage)
@@ -46,20 +44,24 @@ const governor = new ResourceGovernor(pipelines, telemetry, host.memory, { voxel
 const backups = new BackupManager(host.files, host.storage)
 const config = new ConfigurationManager(host.storage)
 const trust = new TrustManager(host.files, host.storage)
+const loader = new DataLoader(host.files)
 
 function App() {
   const [entries, setEntries] = useState<LibraryEntry[]>([])
-  const [status, setStatus] = useState<string>("Bereit — ROM einmal importieren, danach Warm Start + Voxel LOD + Save/Jobs")
+  const [status, setStatus] = useState<string>("Bereit — ROM einmal importieren (echter Extractor), danach Warm Start + Voxel LOD + Runtime")
   const [coreInfo, setCoreInfo] = useState<string>("Core: —")
   const [voxelLOD, setVoxelLOD] = useState<string>(pipelines.levelLabel("voxel"))
   const [telemetryInfo, setTelemetryInfo] = useState<string>("Telemetry: —")
   const [diagInfo, setDiagInfo] = useState<string>("Diagnostics: —")
+  const [dataInfo, setDataInfo] = useState<string>("Daten: — (nach Import »Daten prüfen«)")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const refresh = async () => {
     const list = await library.list()
     setEntries(list)
+    if (!selectedId && list.length > 0) setSelectedId(list[0]!.id)
     const active = cores.getActive()
-    setCoreInfo(active ? `Core: ${active.version} (${active.retention}) — ${active.hash.slice(0,8)}` : "Core: keiner aktiv (Bundled fengari)")
+    setCoreInfo(active ? `Core: ${active.version} (${active.retention}) — ${active.hash.slice(0,8)}` : "Core: keiner aktiv (Bundled fengari, DataLoader JSON)")
     setVoxelLOD(pipelines.levelLabel("voxel"))
     const s = telemetry.stats("voxel","drawWorld")
     setTelemetryInfo(`Telemetry voxel: p50 ${s.p50.toFixed(2)}ms p95 ${s.p95.toFixed(2)}ms • broken [${s.broken.join(",")||"—"}] • availableFalse ${(s.availableFalseRate*100).toFixed(1)}%`)
@@ -71,49 +73,75 @@ function App() {
   useEffect(() => { refresh() }, [])
 
   const onImport = async () => {
-    setStatus("Wähle ROM… (Nur US Red/Blue/Yellow/Gold/Silver/Crystal/FireRed/LeafGreen, SHA-1 geprüft)")
+    setStatus("Wähle ROM… (Nur US Red/Blue/Yellow/Gold/Silver/Crystal/FireRed/LeafGreen, SHA-1 geprüft, echter RomExtractor läuft)")
     try {
       // @ts-ignore DocumentPicker global
       const urls: string[] = await DocumentPicker.open(["public.data", "public.item"])
       if (!urls?.length) { setStatus("Abgebrochen"); return }
       const path = urls[0]
-      setStatus(`Lese ${path.split("/").pop()}… (8 MiB Limit, AtomicFile)`)
+      setStatus(`Lese ${path.split("/").pop()}… (8 MiB Limit, AtomicFile, SHA-1)`)
       const bytes = await host.files.readAsBytes(path)
-      setStatus(`SHA-1 prüfen… (${bytes.length} Bytes)`)
+      setStatus(`SHA-1 prüfen… (${bytes.length} Bytes, 1/2/16 MiB) → RomExtractor (17 Stages, tolerant)`)
+      const t0 = Date.now()
       const res = await library.importBytes(bytes, path)
+      const dt = Date.now() - t0
       if (!res.ok) { setStatus(`Import fehlgeschlagen: ${res.error}`); return }
-      setStatus(`Import ok: ${res.entry.gameId} (${res.entry.contentHash.slice(0,8)}) — isReady ${res.entry.isReady}`)
-      // Trust provenance für Import
+      setStatus(`Import ok: ${res.entry.gameId} (${res.entry.contentHash.slice(0,8)}) — isReady ${res.entry.isReady} — ${dt}ms (Extractor: constants/maps/tilesets/… + PNG placeholders)`)
       trust.setProvenance(res.entry.id, "DocumentPicker", res.entry.contentHash, "manual")
+      setSelectedId(res.entry.id)
       await refresh()
+      // Auto-verify
+      setTimeout(()=> onVerifyData(res.entry.id), 500)
     } catch (e:any) { setStatus(`Fehler: ${String(e?.message ?? e)}`) }
+  }
+
+  const onVerifyData = async (id?: string) => {
+    const targetId = id ?? selectedId
+    if (!targetId) { setDataInfo("Keine Auswahl"); return }
+    const e = entries.find((x: LibraryEntry)=> x.id===targetId) ?? (await library.list()).find((x: LibraryEntry)=> x.id===targetId)
+    if (!e) { setDataInfo("Eintrag nicht gefunden"); return }
+    setDataInfo(`Lade ${e.gameId}… (DataLoader JSON>lua fallback via LuaRunner)`)
+    try {
+      const cr = await loader.loadConstants(e)
+      const mr = await loader.loadMaps(e)
+      const tr = await loader.loadTilesets(e)
+      const vr = await loader.verify(e)
+      if (!cr.ok || !mr.ok) {
+        setDataInfo(`Daten unvollständig — missing ${(vr.missing).join(", ") || "unbekannt"} — isReady ${e.isReady}`)
+        return
+      }
+      const maps = mr.data as Record<string, any>
+      const mapCount = Object.keys(maps).length
+      const first = Object.keys(maps).sort()[0] ?? "—"
+      const tilesets = tr.ok ? Object.keys(tr.data as any).length : 0
+      const c = cr.data as any
+      setDataInfo(`${e.gameId.toUpperCase()}: ${mapCount} Maps (erste ${first}, tilesets ${tilesets}), constants ${c.mapOrder?.length ?? "?"} maps in order • verify ${vr.ok ? "OK" : "fehlend "+vr.missing.join(",")} • Quelle ${cr.source}/${mr.source}`)
+    } catch (err:any) {
+      setDataInfo(`Verify Fehler: ${String(err?.message ?? err)}`)
+    }
   }
 
   const onPlay = async (e: LibraryEntry) => {
     if (!e.isReady) { setStatus("Cache nicht ready — erneut importieren"); return }
     await library.touchPlayed(e.id)
+    setSelectedId(e.id)
     const core = await cores.resolveForProfile()
-    // SaveManager demo: checkpoint vor Start
     await saves.save(e.gameId, "checkpoint", "auto", { map: "PALLET_TOWN", pos: {x:5,y:5} }, { schemaVersion:1, coreVersion: core?.version ?? "bundled" })
-    // Pipeline drawWorld demo + telemetry
     const ctx:any={ state:{actors:[]}, cam:{x:0,y:0}, vw:160,vh:144, width:320,height:288, scale:2, level:pipelines.level("voxel"), paletteFor:()=>({}), spriteColors:()=>({}), drawFx:()=>{}, canvas:{getWidth:()=>160,getHeight:()=>144} }
     pipelines.drawWorld("voxel", ctx)
-    // Governor tick (simuliert warning)
     governor.setPressure("normal")
     const downg=governor.tickVoxelLOD()
     if (downg?.downgraded) setStatus(`Starte ${e.gameId} mit ${core?.version ?? "bundled"} — Governor downgrade ${downg.from}→${downg.to} (${downg.reason})`)
-    else setStatus(`Starte ${e.gameId} mit ${core?.version ?? "bundled"} — LOD ${pipelines.levelLabel("voxel")} — Two-Stage Loading`)
-    // Backup demo
+    else setStatus(`Starte ${e.gameId} mit ${core?.version ?? "bundled"} — LOD ${pipelines.levelLabel("voxel")} — Warm Start (DataLoader verifiziert)`)
     await backups.exportBackup("save","slot1", { party:[25] }, { gameId:e.gameId })
     await refresh()
+    onVerifyData(e.id)
   }
 
   const onCycleVoxel = async (dir:number) => {
     pipelines.cycle("voxel", dir)
     host.storage.set("pipelines:voxel", pipelines.level("voxel") as any)
     setVoxelLOD(pipelines.levelLabel("voxel"))
-    // Preload demo via JobScheduler P30
-    const importerNeeded=false // in echter App: VoxelPreloadAdapter.preload Top-N
     jobs.enqueue(async()=> { telemetry.measure("voxel","drawWorld", pipelines.level("voxel"), true, ()=> {}); return "voxel-preload" }, { priority: JobScheduler.VOXEL_DECODE_PRIORITY, kind:"voxel-decode" })
     setStatus(`Voxel LOD → ${pipelines.levelLabel("voxel")} (Governor: ${pipelines.levelLabel("voxel")==="OFF" ? "2D Fallback" : "Canvas2D/WebView"})`)
     await refresh()
@@ -153,50 +181,54 @@ function App() {
 
   return (
     <VStack spacing={12} padding={16}>
-      <Text font="title">gen1recomp — Scripting (P0+Voxel)</Text>
+      <Text font="title">gen1recomp — Scripting (P0.5 + RomExtractor)</Text>
       <Text font="caption" color="secondary">{status}</Text>
       <Text font="caption" color="secondary">{coreInfo}</Text>
       <Text font="caption" color="secondary">Voxel LOD: {voxelLOD} — {config.get().graphics.quality} — {telemetryInfo}</Text>
       <Text font="caption2" color="secondary">{diagInfo}</Text>
+      <Text font="caption" color="secondary">{dataInfo}</Text>
 
       <HStack spacing={8}>
-        <Button title="ROM importieren" action={onImport} />
-        <Button title="Core 1.0.0 (Gold/Crystal)" action={onInstallCore} />
+        <Button title="ROM importieren (echt)" action={onImport} />
+        <Button title="Daten prüfen" action={()=> onVerifyData()} />
         <Button title="Aktualisieren" action={refresh} />
       </HStack>
       <HStack spacing={8}>
+        <Button title="Core 1.0.0 (Gold/Crystal)" action={onInstallCore} />
         <Button title="Voxel OFF←" action={()=>onCycleVoxel(-1)} />
         <Button title="Voxel →ON" action={()=>onCycleVoxel(1)} />
-        <Button title="Save Test (atomic+backup)" action={onSaveTest} />
+        <Button title="Save Test" action={onSaveTest} />
         <Button title="Trust block" action={onTrustDemo} />
       </HStack>
 
       <List>
-        <Section header="Library — einmal importieren, danach Warm Start (Red/Blue/Yellow/Gold/Silver/Crystal/FireRed/LeafGreen)">
+        <Section header="Library — einmal importieren, danach Warm Start (echter Extractor)">
           {entries.length === 0 ? (
-            <Text color="secondary">Keine Spiele — DocumentPicker nutzen (11 SHA1, 6 FORMAT_VERSION)</Text>
+            <Text color="secondary">Keine Spiele — DocumentPicker nutzen (11 SHA1, 6 FORMAT_VERSION, 17 Stages)</Text>
           ) : entries.map((e: LibraryEntry) => (
             <HStack key={e.id}>
               <VStack>
                 <Text>{e.gameId.toUpperCase()} ({e.format}) — {e.region}</Text>
-                <Text font="caption" color="secondary">{e.contentHash.slice(0,12)}… • {e.isReady ? "Ready" : "Nicht ready"} • LOD {voxelLOD}</Text>
+                <Text font="caption" color="secondary">{e.contentHash.slice(0,12)}… • {e.isReady ? "Ready" : "Nicht ready"} • LOD {voxelLOD} {selectedId===e.id ? "• ausgewählt" : ""}</Text>
               </VStack>
               <Button title={e.isReady ? "Spielen" : "Re-Import"} action={()=>onPlay(e)} />
+              <Button title="Prüfen" action={()=>{ setSelectedId(e.id); onVerifyData(e.id)}} />
             </HStack>
           ))}
         </Section>
-        <Section header="Hinweise (Non-Pro, Offline-First, Voxel)">
-          <Text font="caption">• ROM nach Import nicht erneut verlangt (isReady via rom-cache.complete + REQUIRED_FILES)</Text>
+        <Section header="Hinweise (Non-Pro, Offline-First, Extractor, Runtime)">
+          <Text font="caption">• ROM nach Import nicht erneut verlangt (isReady via rom-cache.complete + 14 REQUIRED_FILES, tolerant, atomic)</Text>
+          <Text font="caption">• Extractor: Rom (Bank 0x4000), Manifest (3288 Symbole), 17 Stages (constants→tilesets→maps→…→audio), 1×1 PNG placeholders, Lua+JSON sidecars, LuaRunner fengari lazy (Node) / JSON preferred (Scripting)</Text>
+          <Text font="caption">• DataLoader: verify → constants/maps/tilesets/text/field — Warm Start &lt;200ms (JSON.parse), Lua fallback via fengari</Text>
           <Text font="caption">• Core Store: staged→verify→activate→monitoring→verified, Rollback LKG, Gold/Silver/Crystal/FireRed/LeafGreen ready</Text>
-          <Text font="caption">• Saves: atomic (AtomicFile), Backup lastN=5, Journal, Migration, Integrity sha256 — SaveManager</Text>
-          <Text font="caption">• Pipeline Voxel: {voxelLOD} — Canvas2D Fallback VERIFIZIERT, WebView WebGL EXPERIMENTELL (Warm Cache, probe, invalidate)</Text>
-          <Text font="caption">• Jobs: PriorityQueue 100/80/40/30/5, Governor cancel≤30 bei critical — Voxel P30 via JobScheduler</Text>
-          <Text font="caption">• Trust: Allowlist/Blocklist/Revocation (deny wins) + Provenance — Voxel Packs via TrustManager</Text>
-          <Text font="caption">• Backup/Diagnostics/Config/Repo: versionierte Exports, Bundle DiagnosticsBundle, Flags, Providers</Text>
+          <Text font="caption">• Saves: atomic, Backup lastN=5, Journal, Migration — SaveManager</Text>
+          <Text font="caption">• Pipeline Voxel: {voxelLOD} — Canvas2D Fallback VERIFIZIERT, WebView WebGL EXPERIMENTELL (Warm Cache)</Text>
+          <Text font="caption">• Jobs: PriorityQueue 100/80/40/30/5, Governor cancel≤30 bei critical — P30</Text>
+          <Text font="caption">• Trust: Allowlist/Blocklist/Revocation (deny wins) + Provenance</Text>
         </Section>
       </List>
 
-      <Text font="caption2" color="secondary">Docs: ARCHITEKTUR.md §44.1 §76.1 • Invarianten: spec/pipeline-invariants.md • Benchmark: benchmarks/voxel-benchmark.md • Tests: 73+ • PR #1</Text>
+      <Text font="caption2" color="secondary">v0.2.0 — Extractor (Rom/Manifest) + Runtime (LuaRunner/DataLoader) • Tests: 92 • Docs: ARCHITEKTUR.md §44.1 §76.1 • PR #1</Text>
     </VStack>
   )
 }

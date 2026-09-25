@@ -75,10 +75,11 @@ describe("GameLibrary â€” Future Games (Gold/Silver/Crystal/FireRed/LeafGreen) Â
     // Erzeuge marker + required files
     await f.createDirectory("/docs/library/test-crystal/generated/data/generated", true)
     await f.writeAsString("/docs/library/test-crystal/generated/rom-cache.complete", entry.cacheMarker)
-    for (const rel of ["data/generated/constants.lua","data/generated/maps.lua","data/generated/text.lua","assets/generated/title/pokemon_logo.png"]) {
+    for (const rel of ["data/generated/constants.lua","data/generated/maps.lua","data/generated/text.lua","data/generated/field.lua","data/generated/battle_anims.lua","assets/generated/title/pokemon_logo.png","assets/generated/fonts/font.png","assets/generated/battle/front/pikachu.png","assets/generated/battle/anims/move_anim_0.png","assets/generated/battle/anims/move_anim_1.png","assets/generated/audio/programs.bin","assets/generated/trade/game_boy.png","assets/generated/townmap/nest.png","assets/generated/townmap/up_arrow.png"]) {
       const p="/docs/library/test-crystal/generated/"+rel
       await f.createDirectory(p.slice(0,p.lastIndexOf("/")), true)
       if (rel.endsWith(".png")) await f.writeAsBytes(p, new Uint8Array([1]))
+      else if (rel.endsWith(".bin")) await f.writeAsBytes(p, new Uint8Array([1]))
       else await f.writeAsString(p, "return {}")
     }
     expect(await lib.isReady(entry)).toBe(true)
