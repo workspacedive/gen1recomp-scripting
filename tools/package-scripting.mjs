@@ -2,6 +2,11 @@
 // Packages scripting/RecompDeck into dist/RecompDeck.scripting (a ZIP of the
 // project directory, the format the Scripting app imports/exports).
 // Reproducible: sorted entries, fixed DOS timestamp, no external deps.
+//
+//   node tools/package-scripting.mjs                 -> dist/RecompDeck.scripting
+//   node tools/package-scripting.mjs --out release   -> release/RecompDeck.scripting
+//   node tools/package-scripting.mjs --check release/RecompDeck.scripting
+//        build in memory and fail (exit 1) if the committed file is stale
 // SPDX-License-Identifier: GPL-3.0-or-later
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,7 +15,10 @@ import crypto from 'node:crypto';
 
 const root = path.resolve(import.meta.dirname, '..');
 const projectDir = path.join(root, 'scripting', 'RecompDeck');
-const outDir = path.join(root, 'dist');
+const argv = process.argv.slice(2);
+const argOf = (flag) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : undefined; };
+const outDir = path.resolve(root, argOf('--out') ?? 'dist');
+const checkFile = argOf('--check');
 const outFile = path.join(outDir, 'RecompDeck.scripting');
 const PREFIX = 'RecompDeck/';
 const SKIP = /(^|\/)(\.DS_Store|Thumbs\.db|\.git.*|node_modules)(\/|$)/;
@@ -49,11 +57,20 @@ if (!files.includes('script.json') || !files.includes('index.tsx')) {
   console.error('project must contain script.json and index.tsx');
   process.exit(1);
 }
+// Directory entries first-class (like `zip -r` and the official packages):
+// "RecompDeck/", "RecompDeck/src/", ... sorted so parents precede children.
+const dirs = new Set(['']);
 for (const rel of files) {
-  const data = fs.readFileSync(path.join(projectDir, rel));
+  const parts = rel.split('/');
+  for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join('/') + '/');
+}
+const entries = [...[...dirs].map((d) => ({ rel: d, dir: true })), ...files.map((f) => ({ rel: f, dir: false }))]
+  .sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+for (const { rel, dir } of entries) {
+  const data = dir ? Buffer.alloc(0) : fs.readFileSync(path.join(projectDir, rel));
   const name = Buffer.from(PREFIX + rel, 'utf8');
-  const deflated = zlib.deflateRawSync(data, { level: 9 });
-  const useDeflate = deflated.length < data.length;
+  const deflated = dir ? data : zlib.deflateRawSync(data, { level: 9 });
+  const useDeflate = !dir && deflated.length < data.length;
   const body = useDeflate ? deflated : data;
   const crc = crc32(data);
   const local = Buffer.alloc(30);
@@ -81,7 +98,8 @@ for (const rel of files) {
   central.writeUInt32LE(body.length, 20);
   central.writeUInt32LE(data.length, 24);
   central.writeUInt16LE(name.length, 28);
-  central.writeUInt32LE((0o100644 << 16) >>> 0, 38); // -rw-r--r--
+  // external attributes: drwxr-xr-x + MS-DOS directory bit, or -rw-r--r--
+  central.writeUInt32LE(dir ? (((0o40755 << 16) >>> 0) | 0x10) >>> 0 : (0o100644 << 16) >>> 0, 38);
   central.writeUInt32LE(offset, 42);
   centrals.push(central, name);
   offset += local.length + name.length + body.length;
@@ -89,14 +107,24 @@ for (const rel of files) {
 const cdSize = centrals.reduce((n, b) => n + b.length, 0);
 const eocd = Buffer.alloc(22);
 eocd.writeUInt32LE(0x06054b50, 0);
-eocd.writeUInt16LE(files.length, 8);
-eocd.writeUInt16LE(files.length, 10);
+eocd.writeUInt16LE(entries.length, 8);
+eocd.writeUInt16LE(entries.length, 10);
 eocd.writeUInt32LE(cdSize, 12);
 eocd.writeUInt32LE(offset, 16);
 
 const zip = Buffer.concat([...locals, ...centrals, eocd]);
+const sha = crypto.createHash('sha256').update(zip).digest('hex');
+if (checkFile) {
+  const target = path.resolve(root, checkFile);
+  const current = fs.existsSync(target) ? fs.readFileSync(target) : null;
+  if (!current || !current.equals(zip)) {
+    console.error(`${path.relative(root, target)} is stale or missing (fresh build: sha256 ${sha}); run: npm run release`);
+    process.exit(1);
+  }
+  console.log(`${path.relative(root, target)} is up to date (${files.length} files, sha256 ${sha})`);
+  process.exit(0);
+}
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(outFile, zip);
-const sha = crypto.createHash('sha256').update(zip).digest('hex');
 fs.writeFileSync(`${outFile}.sha256`, `${sha}  RecompDeck.scripting\n`);
 console.log(`wrote ${path.relative(root, outFile)}: ${files.length} files, ${zip.length} bytes, sha256 ${sha}`);

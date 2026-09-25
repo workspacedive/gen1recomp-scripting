@@ -11,10 +11,12 @@
     "build:test": "node tools/build-test.mjs",
     "test": "npm run build:test && node --test \"tests/node/*.test.mjs\"",
     "lint:lua": "node tools/check-lua.mjs",
-    "check": "npm run typecheck && npm test && npm run lint:lua",
+    "check": "npm run typecheck && npm test && npm run lint:lua && npm run check:release",
     "package": "node tools/package-scripting.mjs",
     "harness:setup": "node tools/harness/setup.mjs",
-    "harness": "node tools/harness/run-player.mjs"
+    "harness": "node tools/harness/run-player.mjs",
+    "release": "node tools/package-scripting.mjs --out release",
+    "check:release": "node tools/package-scripting.mjs --check release/RecompDeck.scripting"
   },
   "devDependencies": {
     "typescript": "5.9.3"
