@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" role="img" aria-labelledby="title">
+<title id="title">Pipeline Selection — render_pipelines</title>
+<style>text{font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre;}</style>
+<rect width="100%" height="100%" fill="#ffffff" stroke="#cccccc"/>
+<text x="20" y="30" font-size="13" fill="#111">Pipeline Selection (VERIFIZIERT gegen Pipelines.lua — mmd source in pipeline-selection.mmd)</text>
+<text x="20" y="55" font-size="11" fill="#333"><tspan x="20" dy="0">Mod register render_pipeline (id, label, levels OFF/15/35/50, priority, available, gate) → Data.merge + _owners</tspan>
+<tspan x="20" dy="16">→ PipelineAdapter.install (priority sort) → save.options.pipelines persistent → pro Frame update(dt)</tspan>
+<tspan x="20" dy="16">→ worldPipeline = highest priority where eligible = level&gt;0 &amp;&amp; !broken &amp;&amp; available()==true (gate NICHT geprüft)</tspan>
+<tspan x="20" dy="16">→ keine eligible → Fallback vanilla 2D (TileRenderer+SpriteRenderer) / gefunden → guardRender: pushAll → drawWorld ctx → popAll → isCanvas</tspan>
+<tspan x="20" dy="16">→ canvas|null → Fallback 2D / throw → broken=true attribuiert an ownerOf(id) → Fallback 2D (nie Crash)</tspan>
+<tspan x="20" dy="16">→ canvas → worldPresent fold (alle eligible with worldPresent, isCanvas each) → present fold</tspan>
+<tspan x="20" dy="16">→ present → Screen (Canvas/TimelineCanvas)</tspan>
+<tspan x="20" dy="16">Input: Hotkey 6 → canToggle? gate(top,overworld)==true → cycle OFF→15→35→50→OFF + excludeTilt (andere drawWorld→0)</tspan>
+<tspan x="20" dy="16">Resize / Memory critical → invalidate() leert GPU/Data/Image → Fallback 2D</tspan>
+<tspan x="20" dy="16">available probe: Canvas exists? true / WebGL2 in WebView? async cached (invalidate löscht) / Headless false</tspan>
+<tspan x="20" dy="22">Render in GitHub via Mermaid block in docs/ARCHITEKTUR.md §73.7b — SVG ist Fallback; echt via `npx mmdc -i .mmd -o .svg`</tspan></text>
+</svg>

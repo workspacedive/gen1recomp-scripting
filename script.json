@@ -1,0 +1,20 @@
+{
+  "icon": "gamecontroller.fill",
+  "color": "red",
+  "name": "gen1recomp",
+  "version": "0.3.0",
+  "description": "Gen1Recomp \u2192 Scripting iOS (Red/Blue/Yellow/Gold/Silver/Crystal, RomExtractor + DataLoader + Voxel LOD, Non-Pro, Offline-First)",
+  "localizedNames": {
+    "de": "gen1recomp",
+    "zh": "gen1recomp"
+  },
+  "localizedDescriptions": {
+    "de": "Pok\u00e9mon Red/Blue/Yellow\u2026 in Scripting (echter ROM-Extractor, isReady, Save, Trust, Voxel)",
+    "zh": "\u5728 Scripting \u4e2d\u8fd0\u884c Gen1Recomp"
+  },
+  "author": {
+    "name": "workspacedive",
+    "email": "gen1recomp@workspacedive.local",
+    "homepage": "https://github.com/workspacedive/gen1recomp-scripting"
+  }
+}

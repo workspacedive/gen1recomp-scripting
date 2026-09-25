@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "scripting",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "scripting": ["./shims/scripting"],
+      "scripting/jsx-runtime": ["./shims/jsx-runtime"]
+    }
+  },
+  "include": ["index.tsx", "scripting.d.ts", "shims/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

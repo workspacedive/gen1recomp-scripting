@@ -1,0 +1,27 @@
+%% Pipeline Selection — Gen1Recomp render_pipelines → Scripting PipelineAdapter
+%% Quelle: src/render/Pipelines.lua + docs/modding.md §Rendering pipelines
+flowchart TD
+  A[Mod register render_pipeline\nid, label, levels, priority,\navailable, gate, update, drawWorld,\nworldPresent, present, invalidate] --> B[Data.render_pipelines merge\n+ _owners Provenance]
+  B --> C[PipelineAdapter.install\nregistry + priority sort]
+  C --> D[save.options.pipelines\nlevels persistent\nOFF=0 … maxLevel]
+  D --> E{pro Frame\nupdate dt}
+
+  E --> F{drawWorld Phase\nworldPipeline = highest priority\nwhere eligible = level>0\n&& !broken\n&& available()==true\n**gate NICHT geprüft**}
+  F -->|keine eligible| Z[Fallback: vanilla 2D\nTileRenderer+SpriteRenderer]
+  F -->|id gefunden| G[guardRender: pushAll\n→ def.drawWorld ctx\n→ popAll\n→ isCanvas check]
+  G -->|canvas|null| Z
+  G -->|canvas| H{worldPresent Phase\nfold über alle eligible with worldPresent\nisCanvas each}
+  G -->|throw| BR1[broken[id]=true\nattribuiert an ownerOf(id)\nlog once → Z]
+
+  H --> I{present Phase\nfold über alle eligible with present\nisCanvas each}
+  I --> J[present canvas → Screen\nCanvas/TimelineCanvas]
+  H -->|throw| BR2[broken[id]=true → skip]
+  I -->|throw| BR3[broken[id]=true → skip]
+
+  K[User Input Hotkey 6] --> L{canToggle?\ngate(top,overworld)==true}
+  L -->|false| M[ignore toggle\nkein draw betroffen]
+  L -->|true| N[cycle level OFF→15→35→50→OFF\nexcludeTilt: andere drawWorld auf 0\ninvalidate on resize]
+
+  O[Resize / Memory Pressure] --> P[invalidate\nleert GPU/Data/Image\nFallback 2D bis ready]
+
+  Q[available probe\nCanvas exists? → true\nWebGL2 in WebView? → async probe\nHeadless → false] --> F
