@@ -138,7 +138,7 @@ function SetupSection() {
   const t = strings(state.lang)
   const rt = state.runtime
   return (
-    <Section header={<Text>t.setup</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">{t.firstRunHint}</Text>}>
+    <Section header={<Text>{t.setup}</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">{t.firstRunHint}</Text>}>
       <HStack>
         <Image systemName={rt?.installed ? 'checkmark.circle.fill' : 'circle'} foregroundStyle={rt?.installed ? 'systemGreen' : 'secondaryLabel'} />
         <Text>{t.runtime}</Text>

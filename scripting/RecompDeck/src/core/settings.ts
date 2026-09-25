@@ -2,11 +2,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 export type FpsCap = 30 | 60 | 120 | 0
+/** Game's idle render governor (POKEPORT_IDLE_FPS); 0 = off. */
+export type IdleFps = 0 | 15 | 20 | 30
 export type Language = 'auto' | 'de' | 'en'
 
 export interface Settings {
   /** Player frame cap (0 = display rate). 60 is the game's native rate. */
   fpsCap: FpsCap
+  /**
+   * Lower the presentation rate on in-game screens after IDLE_AFTER_SEC
+   * seconds without input (game logic and audio keep running at full speed).
+   */
+  idleFps: IdleFps
   /** Render at device pixel ratio (sharper, more GPU work). */
   highdpi: boolean
   /** CSS nearest-neighbour upscaling of the canvas. */
@@ -32,6 +39,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   fpsCap: 60,
+  idleFps: 0,
   highdpi: true,
   pixelated: true,
   fillEdges: false,
@@ -46,6 +54,9 @@ export const DEFAULT_SETTINGS: Settings = {
 }
 
 const FPS: FpsCap[] = [30, 60, 120, 0]
+const IDLE: IdleFps[] = [0, 15, 20, 30]
+/** Seconds without input before the idle governor lowers the rate. */
+export const IDLE_AFTER_SEC = 20
 const MEM: Settings['memoryMB'][] = [128, 192, 256, 384]
 
 export function sanitizeSettings(raw: unknown): Settings {
@@ -54,6 +65,7 @@ export function sanitizeSettings(raw: unknown): Settings {
   const bool = (v: unknown, def: boolean) => (typeof v === 'boolean' ? v : def)
   return {
     fpsCap: FPS.includes(s.fpsCap as FpsCap) ? (s.fpsCap as FpsCap) : d.fpsCap,
+    idleFps: IDLE.includes(s.idleFps as IdleFps) ? (s.idleFps as IdleFps) : d.idleFps,
     highdpi: bool(s.highdpi, d.highdpi),
     pixelated: bool(s.pixelated, d.pixelated),
     fillEdges: bool(s.fillEdges, d.fillEdges),

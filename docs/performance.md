@@ -112,3 +112,4 @@ used only while its recorded game version matches the installed archive
 | Pixelated upscaling | nearest-neighbour CSS scaling (no cost) |
 | Fill edges | draw under notch/home indicator |
 | Initial memory | fewer heap growths vs. RAM footprint |
+| Idle power saving off/30/20/15 fps | sets the game's official idle render governor (`POKEPORT_IDLE_AFTER=20`, `POKEPORT_IDLE_FPS`): after 20 s without input, in-game presentation drops to the chosen rate while logic and audio keep full speed; any input restores the full rate. Off by default because idleness is input-based (watching an animation counts as idle) |

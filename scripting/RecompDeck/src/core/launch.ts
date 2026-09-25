@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { BRIDGE_ENV, GAME_IDENTITY, GameId, isGameId } from './constants'
-import type { Settings } from './settings'
+import { IDLE_AFTER_SEC, type Settings } from './settings'
 
 export interface LaunchRequest {
   game?: GameId
@@ -48,6 +48,12 @@ export function buildLaunchPlan(req: LaunchRequest, settings: Settings): LaunchP
       args.push(`--slot=${req.slot}`)
     }
     args.push('--no-sync')
+  }
+  // Official idle render governor (main.lua, POKEPORT_IDLE_*): only in-game,
+  // never during import/launcher; any input restores the full rate at once.
+  if (settings.idleFps > 0) {
+    env.POKEPORT_IDLE_AFTER = String(IDLE_AFTER_SEC)
+    env.POKEPORT_IDLE_FPS = String(settings.idleFps)
   }
   if (settings.debug) env.POKEPORT_CONSOLE = '1'
   return { args, env, identity: GAME_IDENTITY }

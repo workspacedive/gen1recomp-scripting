@@ -3,7 +3,7 @@
 
 import { List, Picker, Section, Stepper, Text, Toggle } from 'scripting'
 import { strings } from '../core/i18n'
-import type { FpsCap, Settings } from '../core/settings'
+import type { FpsCap, IdleFps, Settings } from '../core/settings'
 import { model, useModel } from '../app/model'
 
 export function SettingsView() {
@@ -14,7 +14,7 @@ export function SettingsView() {
   const set = (patch: Partial<Settings>) => model.updateSettings(patch)
   return (
     <List navigationTitle={t.settings}>
-      <Section header={<Text>t.graphics</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
+      <Section header={<Text>{t.graphics}</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
         {de
           ? 'Grafik-Effekte, Paletten, Zoom und 3D-Tilt stellst du im Spiel unter OPTIONS ein. Hier geht es um die Darstellung der Laufzeit.'
           : 'Shader effects, palettes, zoom and 3D tilt are in the game\'s OPTIONS menu. These settings control the runtime presentation.'}
@@ -29,10 +29,10 @@ export function SettingsView() {
         <Toggle title={t.pixelated} value={s.pixelated} onChanged={(v: boolean) => set({ pixelated: v })} />
         <Toggle title={t.fillEdges} value={s.fillEdges} onChanged={(v: boolean) => set({ fillEdges: v })} />
       </Section>
-      <Section header={<Text>t.performance</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
+      <Section header={<Text>{t.performance}</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
         {de
-          ? 'Der Speicher wächst bei Bedarf automatisch. Die Leistungsstufe (HIGH/BALANCED/LOW) wählst du im Spiel.'
-          : 'Memory grows automatically when needed. The performance tier (HIGH/BALANCED/LOW) is selected in the game.'}
+          ? 'Der Speicher wächst bei Bedarf automatisch. Die Leistungsstufe (HIGH/BALANCED/LOW) wählst du im Spiel. Energiesparen senkt im Spiel nach 20 s ohne Eingabe die Bildrate; Spiellogik und Ton laufen normal weiter, jede Eingabe stellt sofort die volle Rate her.'
+          : 'Memory grows automatically when needed. The performance tier (HIGH/BALANCED/LOW) is selected in the game. Idle power saving lowers the frame rate in-game after 20 s without input; game logic and audio keep running, any input restores the full rate instantly.'}
       </Text>}>
         <Picker title={t.memory} value={s.memoryMB} onChanged={(v: number) => set({ memoryMB: v as Settings['memoryMB'] })}>
           <Text tag={128}>128 MB</Text>
@@ -40,8 +40,14 @@ export function SettingsView() {
           <Text tag={256}>256 MB</Text>
           <Text tag={384}>384 MB</Text>
         </Picker>
+        <Picker title={t.idleSaver} value={s.idleFps} onChanged={(v: number) => set({ idleFps: v as IdleFps })}>
+          <Text tag={0}>{t.off}</Text>
+          <Text tag={30}>30 fps</Text>
+          <Text tag={20}>20 fps</Text>
+          <Text tag={15}>15 fps</Text>
+        </Picker>
       </Section>
-      <Section header={<Text>t.controls</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
+      <Section header={<Text>{t.controls}</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
         {de
           ? 'Touch-Steuerung, Layout und Gamepad-Belegung stellst du im Spiel ein (OPTIONS › CONTROLS). Bluetooth-Controller und Tastaturen werden unterstützt.'
           : 'Touch controls, layout and gamepad bindings are configured in the game (OPTIONS › CONTROLS). Bluetooth controllers and keyboards are supported.'}

@@ -40,7 +40,7 @@ function ReviewSheet({ c, onDone }: { c: ModCandidate; onDone: () => void }) {
           {m.description ? <Text font="footnote">{m.description}</Text> : null}
           <Text font="caption2" foregroundStyle="secondaryLabel">{`${c.fileCount} files · ${formatBytes(c.totalBytes)}`}</Text>
         </Section>
-        <Section header={<Text>t.permissions</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
+        <Section header={<Text>{t.permissions}</Text>} footer={<Text font="caption2" foregroundStyle="secondaryLabel">
           {lang === 'de'
             ? 'Mods laufen in der Sandbox des Spiels. Berechtigungen werden vom Spiel durchgesetzt; RecompDeck zeigt sie vor der Installation an.'
             : 'Mods run inside the game\'s sandbox. Permissions are enforced by the game; RecompDeck shows them before installing.'}

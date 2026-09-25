@@ -3,10 +3,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildPack as buildPackNode, parsePack as parsePackNode } from '../../tools/lib/rdpk.mjs';
 
 const require = createRequire(import.meta.url);
 const B = '../../.cache/test-build/';
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const rdpk = require(B + 'rdpk.js');
 const zip = require(B + 'zipScan.js');
 const manifest = require(B + 'manifest.js');
@@ -204,6 +208,24 @@ test('launch: plans use only documented options', () => {
   assert.throws(() => launch.buildLaunchPlan({ importRomPath: '/etc/passwd' }, s));
   assert.deepEqual(launch.requestFromQuery({ game: 'Yellow', slot: '3' }), { game: 'yellow', slot: 'slot3' });
   assert.equal(launch.requestFromQuery({ game: 'mars' }), null);
+  // idle render governor: off by default, documented POKEPORT_IDLE_* when enabled
+  assert.equal(launch.buildLaunchPlan({ game: 'red' }, s).env.POKEPORT_IDLE_FPS, undefined);
+  const idle = launch.buildLaunchPlan({ game: 'red' }, { ...s, idleFps: 20 });
+  assert.equal(idle.env.POKEPORT_IDLE_FPS, '20');
+  assert.equal(idle.env.POKEPORT_IDLE_AFTER, String(settings.IDLE_AFTER_SEC));
+  assert.equal(settings.sanitizeSettings({ idleFps: 7 }).idleFps, 0);
+  assert.equal(settings.sanitizeSettings({ idleFps: 15 }).idleFps, 15);
+});
+
+test('ui: no JSX text that is an unevaluated expression (e.g. <Text>t.key</Text>)', () => {
+  const dir = path.join(ROOT, 'scripting/RecompDeck');
+  const files = [path.join(dir, 'index.tsx'), ...fs.readdirSync(path.join(dir, 'src/ui')).map((f) => path.join(dir, 'src/ui', f))];
+  const bad = [];
+  for (const f of files.filter((f) => f.endsWith('.tsx'))) {
+    const src = fs.readFileSync(f, 'utf8');
+    for (const m of src.matchAll(/>\s*([a-z][A-Za-z0-9]*\.[A-Za-z_][A-Za-z0-9_.]*)\s*</g)) bad.push(`${path.basename(f)}: ${m[1]}`);
+  }
+  assert.deepEqual(bad, []);
 });
 
 test('settings: sanitising', () => {
@@ -224,7 +246,6 @@ test('pins: formats, allowlist, sha256sums parser', () => {
 });
 
 test('luaTable: reads REAL SaveSerializer.encode output (fixture generated with gen1recomp v0.3.14 under LuaJIT)', async () => {
-  const fs = await import('node:fs');
   // stored as base64: the fixture contains raw non-UTF-8 bytes (\200\255) that
   // text-oriented tooling would otherwise replace with U+FFFD
   const b64 = fs.readFileSync(new URL('./fixtures/save_serializer_sample.lua.b64', import.meta.url), 'ascii');
