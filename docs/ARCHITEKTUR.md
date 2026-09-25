@@ -2798,3 +2798,15 @@ Keines davon in P0-Pfad (§63) referenziert. Fallbacks dokumentiert in §27, §4
 **Logs:** `20:37:19 Failed to build component. TypeError: null is not an object (e.isInternal)` + `20:37:19-27 Failed to render WebView, missing controller.` — Fix: kein WebView mehr, nur RealMapView.
 
 **Verifikation:** `tsc 0`, `vitest 21/92`.
+
+---
+
+## 77.12 v0.4.5 — Entfernt WebView + Fix Build e.isInternal — VERIFIZIERT 2026-09-25 18:46
+
+**Fixes nach 20:43:35 Logs:**
+- `Failed to build component. TypeError: null is not an object (e.isInternal)` + weiterhin `WebView missing controller` trotz 0.4.4 Deaktivierung (return null) — Ursache: `import { WebView } from "scripting"` allein triggert Bundler, selbst wenn nicht gerendert. Fix: `WebView` komplett aus `import` entfernt, `WebMapView` Komponente entfernt, `useWeb` State + Toggle entfernt, nur `RealMapView` Text bleibt.
+- `[260,31] Type string is not assignable to ShapeStyle` — `tileColor(...): any` + `foregroundStyle={col as any}` bleibt, aber `WebView` Entfernung beseitigt auch Build-Crash der denselben File blockierte. `tsc 0` verifiziert.
+
+**Verbleibend:** `RealMapView` 9×9 Text stabil, `Battle` + `Inventar` aus 0.4.3, kein WebView mehr bis `WebViewController` via `views/webview/en.md` VERIFIZIERT + `controller` Prop korrekt (nicht `html`).
+
+**Verifikation:** `tsc 0`, `vitest 21/92`, `dist` 700K 65 Dateien, kein WebView Import mehr.

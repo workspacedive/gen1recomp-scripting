@@ -14,7 +14,7 @@
  * Pro-APIs werden NICHT verwendet. Renderer ist Canvas (Scripting) — kein Metal.
  */
 
-import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect, WebView } from "scripting"
+import { VStack, HStack, Text, Button, List, Section, Navigation, Script, useState, useEffect } from "scripting"
 // DocumentPicker ist global (Scripting iOS, Non-Pro) — nicht via `from "scripting"` importieren (führt zu undefined bei Bundle)
 // Deklariert in scripting.d.ts als global const DocumentPicker: any (VERIFIZIERT document_picker/en.md)
 // Canvas ist global/verifiziert via views/canvas/en.md — für GameView (160x144, 2x Scale)
@@ -57,7 +57,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
   const [tilesets, setTilesets] = useState<Record<string,any> | null>(null)
   const [mapId, setMapId] = useState<string>("AGATHAS_ROOM")
   const [loadInfo, setLoadInfo] = useState<string>("Lade Karten...")
-  const [useWeb, setUseWeb] = useState<boolean>(false)
+  // WebView deaktiviert - nur Text Viewport (siehe 0.4.4 Fix)
   const [battle, setBattle] = useState<null | {wild:string; player:string; mapId:string}>(null)
   const [inventory, setInventory] = useState<string[]>(["Poke Ball x5", "Potion x3"])
   const [caught, setCaught] = useState<string[]>([])
@@ -152,14 +152,7 @@ function GameView({ entry, voxelLabel, onBack }: { entry: LibraryEntry; voxelLab
     <VStack spacing={12} padding={16}>
       <Text font="title">{entry.gameId.toUpperCase()} - {mapId} {dir} ({voxelLabel})</Text>
       <Text font="caption" foregroundStyle="secondaryLabel">{loadInfo} - {w}x{h} - Tileset {curMap?.tileset ?? "-"} - Warm Start {maps ? "json" : "..."}</Text>
-      <VStack spacing={4}>
-        <HStack spacing={8}>
-          <Button title={useWeb ? "Text-Ansicht" : "Grafik-Ansicht"} action={()=>setUseWeb(v=>!v)} />
-          <Text font="caption" foregroundStyle="secondaryLabel">{useWeb ? "WebView HTML" : "Text"}</Text>
-        </HStack>
-        {useWeb ? <WebMapView map={curMap} playerPos={pos} playerDir={dir} /> : null}
-        <RealMapView map={curMap} playerPos={pos} playerDir={dir} fallbackEntry={entry} />
-      </VStack>
+      <RealMapView map={curMap} playerPos={pos} playerDir={dir} fallbackEntry={entry} />
       <HStack spacing={8}>
         <Button title="UP" action={()=>move(0,-1)} />
       </HStack>
@@ -269,13 +262,6 @@ function RealMapView({ map, playerPos, playerDir, fallbackEntry }: { map:any; pl
     </VStack>
   )
 }
-function WebMapView({ map, playerPos, playerDir }: { map:any; playerPos:{x:number;y:number}; playerDir?:string }){
-  // DEAKTIVIERT wegen "missing controller" in Scripting 0.4.2/0.4.3 - Fallback zu Text bis WebViewController verifiziert
-  // HTML Grid waere farbig, aber WebView braucht Controller der in aktueller Scripting Version nicht verfuegbar ist (siehe Logs 20:37:22)
-  // Daher nur Text-Fallback, kein Crash, kein Build-Fehler e.isInternal
-  return null
-}
-
 function BattleView({ wild, player, onRun, onCatch }: { wild:string; player:string; onRun:()=>void; onCatch:()=>void }){
   // Einfache Battle-Ansicht - nutzt Placeholder PNGs aus RomExtractor (pikachu) wenn vorhanden, sonst Text
   return (
@@ -622,7 +608,7 @@ function App() {
         </Section>
       </List>
 
-      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.4 - Fix foregroundStyle + WebView missing controller - Tests: 92 - 728K</Text>
+      <Text font="caption" foregroundStyle="secondaryLabel">v0.4.5 - Entfernt WebView + Fix Build e.isInternal - Tests: 92 - 730K</Text>
     </VStack>
   )
 }
