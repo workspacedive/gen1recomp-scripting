@@ -2,7 +2,7 @@
   "name": "Gen1Recomp",
   "icon": "gamecontroller.fill",
   "color": "rgba(193, 48, 52, 1)",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "entry": "index.tsx",
   "runInApp": true,
   "description": "Offline-first library host and runtime capability gate for Gen1Recomp.",

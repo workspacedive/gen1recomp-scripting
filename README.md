@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.2.0 besitzt jetzt eine persistente Library, bekannte Red-/Blue-/Yellow-Erkennung, verifiziertes Import-Staging mit Recovery-Journal, sichtbares Ordnersystem, Backup-fähigen Index, erweiterten Capability-Report und ein explizites Runtime-Gate. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert den konkreten love.js-Boot, lokale Subresources, Audio oder Save-Persistenz nicht; diese Gates müssen zuerst auf echten Geräten bestehen.
+> **Ehrlicher Status:** Die Scripting-App 0.2.1 besitzt jetzt eine persistente Library, bekannte Red-/Blue-/Yellow-Erkennung, verifiziertes Import-Staging mit Recovery-Journal, sichtbares Ordnersystem, Backup-fähigen Index, erweiterten Capability-Report und ein explizites Runtime-Gate. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert den konkreten love.js-Boot, lokale Subresources, Audio oder Save-Persistenz nicht; diese Gates müssen zuerst auf echten Geräten bestehen.
 
 ## Warum kein schneller Rewrite?
 
@@ -21,9 +21,13 @@ Gen1Recomp v0.3.18 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 - `src/` — hostunabhängige Domain-/Application-Basis.
 - `tests/` — Pfad-, Compatibility-, Update- und Storage-Recovery-Tests.
 
+## Einsatzbereite Testdatei
+
+[`artifacts/Gen1Recomp.scripting`](artifacts/Gen1Recomp.scripting) ist das direkt importierbare, reproduzierbar erzeugte Scripting-Projekt. Die zugehörige SHA-256-Datei liegt daneben. `npm run check` schlägt fehl, sobald das Paket nicht mehr exakt den Projektquellen entspricht; `npm run package:scripting` validiert den Code und baut es neu.
+
 ## Scripting-App ausprobieren
 
-1. Den Ordner `scripting/Gen1Recomp` in Scripting importieren.
+1. `artifacts/Gen1Recomp.scripting` auf das iPhone übertragen und mit Scripting öffnen/importieren.
 2. App starten; der Root `Documents/Gen1Recomp` wird angelegt und ist über die Dateien-App sichtbar.
 3. Eine eigene kanonische Red-/Blue-/Yellow-ROM auswählen. Die Datei wird lokal SHA-1/SHA-256-geprüft und content-addressed gespeichert. Dieses Repository enthält keine ROM.
 4. „Runtime prüfen“ ausführen. Der Bericht landet unter `Diagnostics/capabilities.v1.json`.

@@ -1,4 +1,4 @@
-# Gen1Recomp Scripting Host 0.2.0
+# Gen1Recomp Scripting Host 0.2.1
 
 Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschließlich APIs, die in der geprüften offiziellen App-Store-Dokumentation nicht als Pro markiert sind.
 

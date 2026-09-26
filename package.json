@@ -7,7 +7,10 @@
     "test": "node --import tsx --test tests/**/*.test.ts",
     "typecheck": "tsc --noEmit",
     "check:scripting": "node tools/check-scripting.mjs",
-    "check": "npm run typecheck && npm run check:scripting && npm test"
+    "check:code": "npm run typecheck && npm run check:scripting && npm test",
+    "check:package": "bash tools/package-scripting.sh --check",
+    "package:scripting": "npm run check:code && bash tools/package-scripting.sh",
+    "check": "npm run check:code && npm run check:package"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

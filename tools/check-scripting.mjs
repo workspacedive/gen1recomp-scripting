@@ -6,6 +6,9 @@ const root = resolve('scripting/Gen1Recomp')
 const manifest = JSON.parse(await readFile(resolve(root, 'script.json'), 'utf8'))
 if (manifest.entry !== 'index.tsx') throw new Error('Scripting manifest entry must be index.tsx')
 if (manifest.permissions !== null) throw new Error('Unexpected Scripting permissions declaration')
+const configText = await readFile(resolve(root, 'config.ts'), 'utf8')
+const configVersion = configText.match(/\bversion:\s*'([^']+)'/)?.[1]
+if (configVersion !== manifest.version) throw new Error(`Version mismatch: config=${configVersion}, manifest=${manifest.version}`)
 
 await build({
   entryPoints: [resolve(root, manifest.entry)],

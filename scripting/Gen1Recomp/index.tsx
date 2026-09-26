@@ -6,7 +6,7 @@ import { APP, THEME } from './config'
 import { bootstrap, importContent, libraryRows, ROOT, type LibraryRow } from './host'
 import { runCapabilityProbe, type ProbeReport } from './capability-probe'
 import { evaluateRuntimeGate } from './runtime-gate'
-import { t, type Locale } from './i18n'
+import { runtimeReason, t, type Locale } from './i18n'
 
 const locale: Locale = APP.defaultLocale
 
@@ -44,7 +44,7 @@ function ProbeSummary({ probe }: { probe: ProbeReport }) {
       Local JS {probe.runtime.localScriptSubresource ? '✓' : '✗'} · Worker {probe.workers.dedicatedApiPresent ? '✓' : '✗'} · IndexedDB API {probe.storage.indexedDbApiPresent ? '✓' : '✗'}
     </Text>
     <Text font="caption2" foregroundStyle="secondaryLabel">{t(locale, 'probeOnly')}</Text>
-    <Text font="caption2" foregroundStyle="secondaryLabel">{gate.reasons.join(' · ')}</Text>
+    <Text font="caption2" foregroundStyle="secondaryLabel">{gate.reasons.map(code => runtimeReason(locale, code)).join('\n')}</Text>
   </VStack>
 }
 
@@ -53,7 +53,7 @@ function App() {
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [probe, setProbe] = useState<ProbeReport | null>(null)
   const [message, setMessage] = useState<string>('')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<'idle' | 'import' | 'probe'>('idle')
 
   const reload = async () => {
     await bootstrap()
@@ -63,8 +63,8 @@ function App() {
   useEffect(() => { reload().catch(error => setMessage(String(error))) }, [])
 
   const chooseRom = async () => {
-    if (busy) return
-    setBusy(true)
+    if (busy !== 'idle') return
+    setBusy('import')
     setMessage(t(locale, 'importing'))
     try {
       const selected = await DocumentPicker.pickFiles({ types: ['public.data'] })
@@ -74,18 +74,18 @@ function App() {
       setMessage(`${t(locale, 'imported')}: ${row.displayName}`)
       await reload()
     } catch (error) { setMessage(String(error)) }
-    finally { setBusy(false) }
+    finally { setBusy('idle') }
   }
 
   const probeRuntime = async () => {
-    if (busy) return
-    setBusy(true)
+    if (busy !== 'idle') return
+    setBusy('probe')
     try {
       const result = await runCapabilityProbe()
       setProbe(result)
       setMessage(t(locale, 'probeOnly'))
     } catch (error) { setMessage(String(error)) }
-    finally { setBusy(false) }
+    finally { setBusy('idle') }
   }
 
   const gate = evaluateRuntimeGate(probe)
@@ -100,14 +100,14 @@ function App() {
           <Text font="headline">{t(locale, 'empty')}</Text>
           <Text font="caption" foregroundStyle="secondaryLabel">Red · Blue · Yellow</Text>
         </VStack> : rows.map(row => <GameRow key={row.id} row={row} />)}
-        <Button title={busy ? t(locale, 'importing') : t(locale, 'import')} systemImage="square.and.arrow.down" action={chooseRom} />
+        <Button title={busy === 'import' ? t(locale, 'importing') : t(locale, 'import')} systemImage="square.and.arrow.down" action={chooseRom} />
       </Section>
 
       <Section header={<Text foregroundStyle={THEME.blue} fontWeight="bold">{t(locale, 'diagnostics')}</Text>}>
-        <Button title={t(locale, 'capabilities')} systemImage="stethoscope" action={probeRuntime} />
+        <Button title={busy === 'probe' ? t(locale, 'probing') : t(locale, 'capabilities')} systemImage="stethoscope" action={probeRuntime} />
         {probe ? <ProbeSummary probe={probe} /> : <VStack alignment="leading" spacing={4} padding={{ vertical: 6 }}>
           <Text font="headline" foregroundStyle={THEME.yellow}>{t(locale, 'gateProbe')}</Text>
-          <Text font="caption" foregroundStyle="secondaryLabel">{gate.reasons.join(' · ')}</Text>
+          <Text font="caption" foregroundStyle="secondaryLabel">{gate.reasons.map(code => runtimeReason(locale, code)).join('\n')}</Text>
         </VStack>}
         <Text font="caption">{t(locale, 'note')}</Text>
         {message ? <Text font="caption" foregroundStyle="secondaryLabel">{message}</Text> : null}

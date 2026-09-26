@@ -1,6 +1,6 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.2.0`
+Stand: 2026-09-26 · App-Version `0.2.1`
 
 ## Implementiert
 
@@ -16,6 +16,7 @@ Stand: 2026-09-26 · App-Version `0.2.0`
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
 | Buildprüfung | Node strict typecheck, Scripting-TSX-Bundlegraph, 10 Tests | VERIFIZIERT lokal |
+| Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Bewusst blockiert
 
