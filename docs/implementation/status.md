@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.8`
+Stand: 2026-09-26 · App-Version `0.10.9`
+
+## Iteration 0.10.9
+
+- **VERIFIZIERT (Gerät):** Scripting lehnt das 0.10.8-Artefakt als nicht dekomprimierbar ab.
+- **VERIFIZIERT (lokal):** Info-ZIP und Python lesen alle 29 Einträge des abgelehnten Pakets einschließlich CRC-Prüfung fehlerfrei; eine lokale Beschädigung ist nicht reproduzierbar. Die konkrete Importerabweichung bleibt **TECHNISCH UNBEKANNT**.
+- 0.10.9 verwendet für den äußeren `.scripting`-Transport ausschließlich ZIP STORE. Dadurch entfällt die Dekompression im Scripting-Importer; Projektinhalt und Runtime r13 bleiben identisch.
+- Der reproduzierbare Pakettest verbietet jetzt komprimierte Einträge und prüft den normalize2-Adapter ausdrücklich als Pflichtdatei.
+- **NICHT VERIFIZIERT:** Geräteimport des STORE-Pakets und anschließender QueueableSource-Test.
+- Detailprüfung: [`conformance-audit-0.10.9.md`](../architecture/conformance-audit-0.10.9.md).
 
 ## Iteration 0.10.8
 

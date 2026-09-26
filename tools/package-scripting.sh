@@ -29,12 +29,21 @@ done < <(find "$SOURCE" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.jso
 # Stable metadata makes source-identical packages byte-identical.
 find "$STAGE" -type f -exec touch -t 198001010000 {} +
 mapfile -d '' FILES < <(cd "$STAGE" && find . -type f -print0 | sort -z)
-(cd "$STAGE" && zip -X -q -9 "$EXPECTED" "${FILES[@]}")
+# Scripting's iOS importer reported a valid DEFLATE package as not
+# decompressible on-device. Store entries without compression: .scripting is
+# already a transport archive, and STORE removes that importer compatibility
+# boundary while retaining ZIP CRC/inventory validation and reproducibility.
+(cd "$STAGE" && zip -X -q -0 "$EXPECTED" "${FILES[@]}")
 unzip -tqq "$EXPECTED"
+if unzip -lv "$EXPECTED" | grep -q ' Defl'; then
+  echo "Scripting package unexpectedly contains compressed entries" >&2
+  exit 1
+fi
 cmp "$SOURCE/script.json" <(unzip -p "$EXPECTED" script.json)
 for required in \
   runtime/lovejs/harness.html runtime/lovejs/player.js runtime/lovejs/nogame.love \
-  runtime/lovejs/lua/normalize1.lua runtime/lovejs/lua/normalize2.lua runtime/adapter/normalize1.lua \
+  runtime/lovejs/lua/normalize1.lua runtime/lovejs/lua/normalize2.lua \
+  runtime/adapter/normalize1.lua runtime/adapter/normalize2.lua \
   runtime/lovejs/11.5/love.js runtime/lovejs/11.5/love.wasm runtime/lovejs/11.5/license.txt; do
   unzip -Z1 "$EXPECTED" | grep -Fqx "$required" || {
     echo "runtime asset missing from package: $required" >&2
