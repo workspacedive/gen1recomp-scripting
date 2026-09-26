@@ -9,8 +9,8 @@ const root = new URL('../scripting/Gen1Recomp/runtime/lovejs/', import.meta.url)
 test('vendored love.js candidate exactly matches the pinned inventory', async () => {
   assert.equal(LOVEJS_RUNTIME.sourceRevision, '9355186de22db13bd88bf2a0db75d2925647d036')
   assert.equal(LOVEJS_RUNTIME.loveVersion, '11.5')
-  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r7')
-  assert.equal(LOVEJS_RUNTIME.adapterVersion, 7)
+  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r8')
+  assert.equal(LOVEJS_RUNTIME.adapterVersion, 8)
   assert.equal(LOVEJS_RUNTIME.bridgeProtocol, 1)
   assert.equal(LOVEJS_RUNTIME.updatePolicy, 'reviewed-side-by-side-candidate')
   assert.equal(new Set(LOVEJS_RUNTIME.files.map((file) => file.path)).size, LOVEJS_RUNTIME.files.length)
@@ -36,6 +36,8 @@ test('runtime adapter keeps the upstream player and runtime as opaque pinned fil
   assert.match(harness, /bridge\.send\('resource\.read'/)
   assert.match(harness, /transport: 'gen1HostBridge'/)
   assert.match(harness, /playerUri: window\.Player/)
+  assert.match(harness, /consoleErrors\.push/)
+  assert.match(harness, /bridge\.terminal\('runtime\.error', detail/)
   assert.doesNotMatch(harness, /WebAssembly\.(?:Module|Instance|validate|instantiate)/)
 })
 
@@ -46,6 +48,9 @@ test('host normalization overlay preserves upstream bytes and supplies reviewed 
   for (const operation of ['band', 'bor', 'bxor', 'bnot', 'lshift', 'rshift', 'arshift', 'rol', 'tobit']) {
     assert.match(adapter, new RegExp(`function (?:unsigned|signed)\\.${operation}\\b`), operation)
   }
+  assert.match(adapter, /nativeGetTime = timer and timer\.getTime/)
+  assert.match(adapter, /value == value/)
+  assert.match(adapter, /if value < last then return last end/)
   assert.match(adapter, /nativeLoadString, nativeSetfenv = load, loadstring, setfenv/)
   assert.match(adapter, /load = function\(chunk, chunkname, mode, environment\)/)
   assert.match(adapter, /nativeSetfenv\(fn, environment\)/)

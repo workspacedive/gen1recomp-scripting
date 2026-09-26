@@ -60,6 +60,24 @@
   };
   window.__gen1Bridge = bridge;
 
+  var consoleErrors = [];
+  var nativeConsoleError = console.error.bind(console);
+  console.error = function () {
+    var line = Array.prototype.map.call(arguments, function (value) {
+      try { return String(value); } catch (_) { return '[unprintable]'; }
+    }).join(' ');
+    consoleErrors.push(line.slice(0, 1000));
+    if (consoleErrors.length > 8) consoleErrors.shift();
+    nativeConsoleError.apply(console, arguments);
+  };
+  var nativeAlert = window.alert.bind(window);
+  window.alert = function (message) {
+    var detail = 'window alert: ' + String(message);
+    if (consoleErrors.length) detail += ' | console: ' + consoleErrors.join(' | ');
+    bridge.terminal('runtime.error', detail.slice(0, 6000));
+    return nativeAlert(message);
+  };
+
   var nativeFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var path = typeof input === 'string' ? input : '';

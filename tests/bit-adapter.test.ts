@@ -12,6 +12,11 @@ test('pure-Lua bit adapter satisfies StreamMD5 and shift semantics', async () =>
   const marker = '-- Gen1Recomp host adapter:'
   const shim = adapter.slice(adapter.indexOf(marker))
   const script = `local nativeRequire = require
+local clockValues, clockIndex = { 0 / 0, 4, 3, 5 }, 0
+love = { timer = { getTime = function()
+  clockIndex = clockIndex + 1
+  return clockValues[clockIndex]
+end } }
 local nativeModernLoad = load
 loadstring = function(source, chunkname) return nativeModernLoad(source, chunkname) end
 setfenv = function(fn, environment)
@@ -33,6 +38,11 @@ require = function(name)
   return nativeRequire(name)
 end
 ${shim}\nlocal MD5 = (function()\n${streamMd5}\nend)()\n
+local firstTime = love.timer.getTime()
+assert(firstTime == firstTime and firstTime ~= math.huge and firstTime ~= -math.huge)
+assert(love.timer.getTime() == 4)
+assert(love.timer.getTime() == 4)
+assert(love.timer.getTime() == 5)
 local generated = assert(load("return answer", "@generated.lua", "t", { answer = 42 }))
 assert(generated() == 42)
 local deniedText, deniedMessage = load("return 1", "@generated.lua", "b", {})

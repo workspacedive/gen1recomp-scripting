@@ -148,6 +148,33 @@ do
   end
 end
 
+-- A device-observed Launcher rail failure is reachable with its static,
+-- gap-free palette only when the dynamic phase becomes non-finite. LÖVE
+-- promises a numeric monotonic timer; enforce that contract at the adapter
+-- boundary because NaN otherwise becomes nil table lookups throughout the
+-- payload. The captured console path below keeps the host cause diagnosable.
+do
+  local timer = love and love.timer
+  local nativeGetTime = timer and timer.getTime
+  if type(nativeGetTime) == "function" then
+    local last = 0
+    local function finite(value)
+      return type(value) == "number" and value == value
+        and value ~= math.huge and value ~= -math.huge
+    end
+    timer.getTime = function()
+      local value = nativeGetTime()
+      if not finite(value) then
+        local fallback = os.clock and os.clock() or last
+        value = finite(fallback) and fallback or last
+      end
+      if value < last then return last end
+      last = value
+      return value
+    end
+  end
+end
+
 -- Gen1Recomp host adapter: love.js 11.5 provides neither LuaJIT's bit module
 -- nor Lua 5.2's bit32 module. Keep this compatibility layer outside the game
 -- payload and expose the operations used by the reviewed upstream payload.

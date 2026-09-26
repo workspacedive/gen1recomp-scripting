@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.10.2 besitzt vier native Tabs und getrennte persistente Library-/Mod-/Payload-Speicher. love.js/LÖVE 11.5 und der Gen1Recomp-0.3.20-Payload bis `Module.postrun` sind auf dem echten Gerät **VERIFIZIERT**. Bit-Kompatibilität und ROM-Import bis `Game.load` sind **VERIFIZIERT**. Der nächste Geräteblocker ist exakt auf den fehlenden Lua-5.2-`load(string, name, mode, env)`-Vertrag in love.js' Lua 5.1 eingegrenzt; Runtime r7 ergänzt diesen außerhalb aller Upstreams. Gameplay bleibt bis zum Gerätetest **NICHT VERIFIZIERT**.
+> **Ehrlicher Status:** Die Scripting-App 0.10.3 besitzt vier native Tabs und getrennte persistente Library-/Mod-/Payload-Speicher. love.js/LÖVE 11.5 und der Gen1Recomp-0.3.20-Payload bis `Module.postrun` sind auf dem echten Gerät **VERIFIZIERT**. Bit-Kompatibilität, ROM-Import und der Lua-5.2-`load`-Blocker wurden durch die Gerätefolge eingegrenzt beziehungsweise überwunden. Der aktuelle Launcher-Fehler entsteht aus einem nicht-endlichen Animationsindex; Runtime r8 normalisiert den LÖVE-Timer und erfasst die Konsole des separaten frühen Fensteralarms. Gameplay bleibt **NICHT VERIFIZIERT**.
 
 ## Warum kein schneller Rewrite?
 
@@ -16,7 +16,7 @@ Gen1Recomp v0.3.20 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 - [`docs/audit/ui-ux.md`](docs/audit/ui-ux.md) — APK-/Launcher-UI-Audit und begründete Scripting-Abbildung.
 - [`docs/architecture/target-architecture.md`](docs/architecture/target-architecture.md) — Zielarchitektur, Datenmodell, Mermaid-Diagramme, Updates, Recovery, Saves, Mods, Sicherheit, Performance, Risiken, Roadmap und Abnahme.
 - [`docs/architecture/component-updates.md`](docs/architecture/component-updates.md) — revisionsgebundene love.js-/Payload-/Mod-Analyse, Trust-Modell, Staging, Health-Checks und Rollback.
-- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md) bis [`0.10.2`](docs/architecture/conformance-audit-0.10.2.md) — explizite Prüfungen jeder Iteration gegen die vereinbarte Architektur.
+- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md) bis [`0.10.3`](docs/architecture/conformance-audit-0.10.3.md) — explizite Prüfungen jeder Iteration gegen die vereinbarte Architektur.
 - [`docs/architecture/upstream-update-sources.md`](docs/architecture/upstream-update-sources.md) — revisionsgebundene Quellen für Updater, Mods, love.js und Scripting-APIs.
 - [`docs/implementation/status.md`](docs/implementation/status.md) — aktueller App-Stand, Runtime-Gates und nächste implementierbare Stufe.
 - [`AGENT.md`](AGENT.md) und [`SKILLS.md`](SKILLS.md) — verbindlicher Agent-Workflow und wiederverwendbare Prüfskills.

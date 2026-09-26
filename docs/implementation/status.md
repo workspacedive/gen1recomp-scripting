@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.2`
+Stand: 2026-09-26 · App-Version `0.10.3`
+
+## Iteration 0.10.3
+
+- **TEILWEISE VERIFIZIERT (Gerät):** Der vorherige `Data.lua:271`-Fehler erschien nicht erneut; ein Lauf erreichte stattdessen einen allgemeinen love.js-Fensteralarm.
+- **VERIFIZIERT (Gerät):** Nach Neustart zeichnete der Launcher bis `Theme.versionRail`; die statisch lückenlose Farbliste wurde mit einem ungültigen dynamischen Index angesprochen.
+- Adapter r8 normalisiert nicht-endliche oder rückwärts laufende `love.timer.getTime()`-Werte und wahrt damit LÖVEs numerischen, monotonen Timervertrag.
+- Der Harness übermittelt bei einem frühen `window.alert` bis zu acht begrenzte `console.error`-Zeilen über die bestehende Bridge. WASM bleibt opak.
+- **NICHT VERIFIZIERT:** Timerfix, früher Fensterfehler, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- Detailprüfung: [`conformance-audit-0.10.3.md`](../architecture/conformance-audit-0.10.3.md).
 
 ## Iteration 0.10.2
 

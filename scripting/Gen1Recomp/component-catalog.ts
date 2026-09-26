@@ -18,9 +18,9 @@ export const COMPONENTS = Object.freeze({
   },
   lovejs: {
     id: "lovejs-runtime",
-    runtimeId: "lovejs-11.5-r7",
+    runtimeId: "lovejs-11.5-r8",
     loveVersion: "11.5",
-    adapterVersion: 7,
+    adapterVersion: 8,
     bridgeProtocol: 1,
     sourceRevision: "9355186de22db13bd88bf2a0db75d2925647d036",
     javascriptSha256: "34b300f06ecb44d92edb1183c11a38c1cc324ba10a9f7af96b8efa1d1df15147",
