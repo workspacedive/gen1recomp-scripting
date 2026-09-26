@@ -13,10 +13,13 @@ test('pure-Lua bit adapter satisfies StreamMD5 and shift semantics', async () =>
   const shim = adapter.slice(adapter.indexOf(marker))
   const script = `local nativeRequire = require
 local clockValues, clockIndex = { 0 / 0, 4, 3, 5 }, 0
-love = { timer = { getTime = function()
-  clockIndex = clockIndex + 1
-  return clockValues[clockIndex]
-end } }
+love = {
+  timer = { getTime = function()
+    clockIndex = clockIndex + 1
+    return clockValues[clockIndex]
+  end },
+  graphics = { setColor = function() end, rectangle = function() end },
+}
 local nativeModernLoad = load
 loadstring = function(source, chunkname) return nativeModernLoad(source, chunkname) end
 setfenv = function(fn, environment)
@@ -33,8 +36,14 @@ local diagnosticGame = {
   load = function() error("preserved root cause") end,
   draw = function() error("secondary draw failure") end,
 }
+local diagnosticTheme = { PAL = {} }
+for _, name in ipairs({ "railRed", "railBlue", "railGold", "railAmber",
+  "railSilver", "railCrystal", "railFireRed", "railLeafGreen" }) do
+  diagnosticTheme.PAL[name] = { 10, 20, 30 }
+end
 require = function(name)
   if name == "src.core.Game" then return diagnosticGame end
+  if name == "src.ui.kit.Theme" then return diagnosticTheme end
   return nativeRequire(name)
 end
 ${shim}\nlocal MD5 = (function()\n${streamMd5}\nend)()\n
@@ -81,6 +90,9 @@ assert(not loaded and loadError:match("preserved root cause"))
 local drawn, drawError = pcall(game.draw, game)
 assert(not drawn and drawError:match("game boot failed before the first draw"))
 assert(drawError:match("preserved root cause"))
+local theme = require("src.ui.kit.Theme")
+assert(theme.__hostRailCompatibility == true)
+assert(pcall(theme.versionRail, 0, 0, 4, 1))
 `
 
   const state = lauxlib.luaL_newstate()

@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.3`
+Stand: 2026-09-26 · App-Version `0.10.4`
+
+## Iteration 0.10.4
+
+- Statt weiterer unsystematischer Einzelkorrekturen wurde der vollständige gepinnte Payload statisch gegen bekannte Lua-5.1-/LuaJIT-Abweichungen geprüft.
+- Adapter r9 korrigiert den exakten Fließkomma-Wrap in `Theme.versionRail` durch einen begrenzten Moduladapter mit explizitem Index-Modulo; die restliche Theme-Implementierung bleibt unverändert.
+- Frühe und späte Alert-/Konsolenfehler werden auch nach `Module.postrun` dauerhaft in `Diagnostics/gen1recomp-gameplay-runtime-error.v1.json` geschrieben.
+- **VERIFIZIERT (automatisiert/statisch):** Rail-Wrap, Timer, Bit, MD5, Load, Root-Cause-Erhaltung und das Inventar weiterer post-Lua-5.1-Konstrukte.
+- **NICHT VERIFIZIERT:** r9, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- Detailprüfung: [`conformance-audit-0.10.4.md`](../architecture/conformance-audit-0.10.4.md).
 
 ## Iteration 0.10.3
 

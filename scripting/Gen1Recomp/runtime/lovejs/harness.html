@@ -74,7 +74,7 @@
   window.alert = function (message) {
     var detail = 'window alert: ' + String(message);
     if (consoleErrors.length) detail += ' | console: ' + consoleErrors.join(' | ');
-    bridge.terminal('runtime.error', detail.slice(0, 6000));
+    bridge.send('runtime.error', detail.slice(0, 6000));
     return nativeAlert(message);
   };
 

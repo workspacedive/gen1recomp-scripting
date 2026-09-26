@@ -170,6 +170,8 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   await ensureDirectory(PATHS.diagnostics)
   const finalPath = `${PATHS.diagnostics}/${options.finalName}`
   const progressPath = `${PATHS.diagnostics}/${options.progressName}`
+  const runtimeErrorPath = `${PATHS.diagnostics}/${options.probe}-runtime-error.v1.json`
+  await removeIfExists(runtimeErrorPath)
   const startedAt = new Date().toISOString()
   const controller = new WebViewController({ ephemeral: true })
   const milestones: string[] = []
@@ -213,7 +215,7 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   })
   let timer: ReturnType<typeof setTimeout> | null = null
   try {
-    await controller.addScriptMessageHandler("gen1HostBridge", (raw?: unknown) => {
+    await controller.addScriptMessageHandler("gen1HostBridge", async (raw?: unknown) => {
       const message = parseRuntimeBridgeMessage(raw)
       if (!message) return { accepted: false }
       if (message.type === "session.config") {
@@ -248,6 +250,17 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
       if (message.type === "player.loaded") advanceStage("runtime-ready")
       queueProgress().catch(() => { /* The final report still records in-memory milestones. */ })
 
+      if (message.type === "runtime.error") {
+        await FileManager.writeAsString(runtimeErrorPath, JSON.stringify({
+          schemaVersion: 1,
+          recordedAt: new Date().toISOString(),
+          runtimeId: LOVEJS_RUNTIME.id,
+          probe: options.probe,
+          stage,
+          detail: message.detail,
+          milestones: [...milestones],
+        }, null, 2))
+      }
       if (message.type === "resources.error" || message.type === "runtime.error") {
         resolveEvent?.(failed("error", message.detail))
       } else if (message.type === "runtime.timeout") {

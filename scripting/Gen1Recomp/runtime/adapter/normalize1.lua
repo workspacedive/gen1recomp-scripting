@@ -314,6 +314,40 @@ do
         end
         return originalDraw(self, ...)
       end
+    elseif name == "src.ui.kit.Theme" and type(module) == "table"
+        and not rawget(module, "__hostRailCompatibility") then
+      module.__hostRailCompatibility = true
+      -- Lua 5.1's floating modulo can round a wrapped value to exactly 1.0.
+      -- Upstream then indexes the ninth element of its eight-color rail. Keep
+      -- the same gradient while explicitly wrapping the integer index.
+      module.versionRail = function(x, y, w, h)
+        local graphics = love and love.graphics
+        if not graphics then return end
+        local function snap(value) return math.floor(value + 0.5) end
+        x, y, w, h = snap(x), snap(y), snap(w), snap(h)
+        if w <= 0 or h <= 0 then return end
+        local palette = module.PAL
+        local colors = {
+          palette.railRed, palette.railBlue, palette.railGold,
+          palette.railAmber, palette.railSilver, palette.railCrystal,
+          palette.railFireRed, palette.railLeafGreen,
+        }
+        local count = #colors
+        local now = love.timer and love.timer.getTime and love.timer.getTime() or 0
+        if type(now) ~= "number" or now ~= now
+            or now == math.huge or now == -math.huge then now = 0 end
+        local phase = (now % 24) / 24
+        for px = 0, w - 1 do
+          local position = ((px / w - phase) % 1) * count
+          local index = math.floor(position) % count
+          local a, b = colors[index + 1], colors[(index + 1) % count + 1]
+          local amount = position - math.floor(position)
+          graphics.setColor((a[1] + (b[1] - a[1]) * amount) / 255,
+            (a[2] + (b[2] - a[2]) * amount) / 255,
+            (a[3] + (b[3] - a[3]) * amount) / 255, 1)
+          graphics.rectangle("fill", x + px, y, 1, h)
+        end
+      end
     end
     return module
   end
