@@ -1,0 +1,430 @@
+import {
+  Button, Label, List, Navigation, NavigationStack, ProgressView,
+  Script, Section, TabView, Text, VStack, useEffect, useState,
+} from "scripting"
+import { APP } from "./config"
+import { runCapabilityProbe } from "./capability-probe"
+import { evaluateRuntimeGate } from "./runtime-gate"
+import { bootstrap, importContent, libraryRows, ROOT, type LibraryRow } from "./host"
+import {
+  COMPONENTS, checkUpstreamRelease, loadCachedReleaseStatus, type UpstreamReleaseStatus,
+} from "./component-catalog"
+import {
+  APPROVED_PAYLOAD, loadStagedPayload, recoverPayloadTransaction, stageApprovedPayload,
+  type StagedPayload,
+} from "./component-store"
+import {
+  importModZip, listInstalledMods, recoverPendingModImport, removeInstalledMod,
+  type InstalledMod,
+} from "./mod-store"
+import {
+  installRuntimeCandidate, loadRuntimeCandidate, recoverRuntimeTransaction,
+  presentGen1Gameplay, presentGen1PayloadPreview, runGen1PayloadBootProbe, runLoveJsBootProbe, type RuntimeCandidate,
+} from "./runtime-store"
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function GamesView(props: {
+  tag?: number
+  tabItem?: any
+  rows: LibraryRow[]
+  busy: boolean
+  notice: string
+  refresh: () => Promise<void>
+  importGame: () => Promise<void>
+  launchGame: (row: LibraryRow) => Promise<void>
+}) {
+  return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
+    <List navigationTitle="Spiele" navigationBarTitleDisplayMode="large">
+      <Section header={<Text>Bibliothek</Text>} footer={<Text>
+        Originaldateien bleiben dauerhaft nach SHA-256 getrennt in „Auf meinem iPhone/Gen1Recomp“.
+      </Text>}>
+        {props.rows.length === 0
+          ? <VStack spacing={8}><Text>Noch kein Spiel importiert.</Text><Text>Der Import ist dauerhaft und offline nutzbar.</Text></VStack>
+          : props.rows.map((row) => <VStack key={row.sha256} alignment="leading" spacing={4}>
+              <Text>{row.displayName}</Text>
+              <Text>{`${row.game} · ${row.region} · ${row.language}`}</Text>
+              <Text>{`${row.byteLength} Bytes · ${row.status}`}</Text>
+              {row.status === "runtime-unverified"
+                ? <Button title="Experimentell starten" systemImage="play.fill" disabled={props.busy}
+                    action={() => props.launchGame(row)} />
+                : null}
+            </VStack>)}
+      </Section>
+      <Section header={<Text>Aktionen</Text>}>
+        <Button title="Spieldatei importieren" systemImage="square.and.arrow.down" disabled={props.busy} action={props.importGame} />
+        <Button title="Bibliothek aktualisieren" systemImage="arrow.clockwise" disabled={props.busy} action={props.refresh} />
+        {props.busy ? <ProgressView /> : null}
+        {props.notice ? <Text>{props.notice}</Text> : null}
+      </Section>
+      <Section header={<Text>Laufzeitstatus</Text>} footer={<Text>
+        Der experimentelle Start übergibt genau diese erneut verifizierte ROM schreibgeschützt an den unveränderten offiziellen Importpfad. Gameplay, Audio, Eingabe, Saves und Lifecycle bleiben bis zum Gerätetest ungeprüft.
+      </Text>}>
+        <Text>{APP.runtimeEnabled ? "Laufzeit freigegeben" : "Nur expliziter experimenteller Gerätetest"}</Text>
+      </Section>
+    </List>
+  </NavigationStack>
+}
+
+function ModsView(props: {
+  tag?: number
+  tabItem?: any
+  mods: InstalledMod[]
+  busy: boolean
+  notice: string
+  refresh: () => Promise<void>
+  importMod: () => Promise<void>
+  removeMod: (mod: InstalledMod) => Promise<void>
+}) {
+  return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
+    <List navigationTitle="Mods" navigationBarTitleDisplayMode="large">
+      <Section header={<Text>Lokale Pakete</Text>} footer={<Text>
+        Pakete werden vor dem Entpacken auf Pfade, Symlinks, Kompression und Größen geprüft. Fehlerdetails landen in Diagnostics/mod-import-last-failure.v1.json. Aktivierung folgt erst mit der verifizierten Spiellaufzeit.
+      </Text>}>
+        {props.mods.length === 0 ? <Text>Keine Mod-Pakete gespeichert.</Text> : props.mods.map((mod) =>
+          <VStack key={`${mod.id}-${mod.version}-${mod.sha256}`} alignment="leading" spacing={4}>
+            <Text>{mod.name}</Text>
+            <Text>{`${mod.id} · ${mod.version} · API ${mod.api}`}</Text>
+            <Text>{`Sicher gespeichert · noch nicht aktiviert · ${mod.sha256.slice(0, 12)}…`}</Text>
+            <Button title="Paket entfernen" systemImage="trash" disabled={props.busy} action={() => props.removeMod(mod)} />
+          </VStack>)}
+      </Section>
+      <Section header={<Text>Installation</Text>}>
+        <Button title="Mod-ZIP prüfen und speichern" systemImage="shippingbox.and.arrow.backward" disabled={props.busy} action={props.importMod} />
+        <Button title="Liste aktualisieren" systemImage="arrow.clockwise" disabled={props.busy} action={props.refresh} />
+        {props.busy ? <ProgressView /> : null}
+        {props.notice ? <Text>{props.notice}</Text> : null}
+      </Section>
+    </List>
+  </NavigationStack>
+}
+
+function DiagnosticsView(props: {
+  tag?: number
+  tabItem?: any
+  busy: boolean
+  summary: string
+  details: string[]
+  runtime: RuntimeCandidate | null
+  stagedPayload: StagedPayload | null
+  runtimeStatus: string
+  payloadBootStatus: string
+  run: () => Promise<void>
+  runRuntime: () => Promise<void>
+  runPayload: () => Promise<void>
+  runPreview: () => Promise<void>
+}) {
+  return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
+    <List navigationTitle="Diagnose" navigationBarTitleDisplayMode="large">
+      <Section header={<Text>Geräteprüfung</Text>} footer={<Text>
+        Der Bericht wird in Documents/Gen1Recomp/Diagnostics/capabilities.v3.json gespeichert.
+      </Text>}>
+        <Button title="Prüfung ausführen" systemImage="stethoscope" disabled={props.busy} action={props.run} />
+        {props.busy ? <ProgressView /> : null}
+        <Text>{props.summary || "Noch keine Prüfung in dieser Sitzung."}</Text>
+        {props.details.map((detail, index) => <Text key={`${index}-${detail}`}>{detail}</Text>)}
+      </Section>
+      <Section header={<Text>love.js Boot-Gate · EXPERIMENTELL</Text>} footer={<Text>
+        Installiert ausschließlich den fest gepinnten LÖVE-11.5-Kandidaten und startet „nogame.love“. Der verifizierte Gen1Recomp-Payload bleibt unangetastet und inaktiv.
+      </Text>}>
+        <Text>{props.runtime ? `Kandidat ${props.runtime.id} installiert` : "Runtime-Kandidat noch nicht installiert"}</Text>
+        <Button title="Runtime installieren und Boot testen" systemImage="play.square.stack" disabled={props.busy} action={props.runRuntime} />
+        {props.runtimeStatus ? <Text>{props.runtimeStatus}</Text> : null}
+      </Section>
+      <Section header={<Text>Gen1Recomp Payload-Gate · EXPERIMENTELL</Text>} footer={<Text>
+        Überträgt nur den erneut gehashten Payload 0.3.20 über dieselbe API-Bridge und prüft Module.postrun. ROMs, Mods und Saves werden nicht gemountet; es entsteht kein aktiver Core-Pointer.
+      </Text>}>
+        <Text>{props.stagedPayload
+          ? `Payload ${props.stagedPayload.version} bereit · ${props.stagedPayload.sha256.slice(0, 12)}…`
+          : "Payload muss zuerst unter Einstellungen sicher gespeichert werden."}</Text>
+        <Button title="Gen1Recomp-Payload Boot testen" systemImage="testtube.2"
+          disabled={props.busy || props.stagedPayload == null} action={props.runPayload} />
+        <Button title="Launcher-Vorschau öffnen" systemImage="rectangle.on.rectangle"
+          disabled={props.busy || props.stagedPayload == null} action={props.runPreview} />
+        {props.payloadBootStatus ? <Text>{props.payloadBootStatus}</Text> : null}
+      </Section>
+      <Section header={<Text>Interpretation</Text>}>
+        <Text>„nogame“ belegt die Runtime. Das Payload-Gate belegt höchstens Initialisierung bis postrun ohne ROM, Mods oder Save-Bridge. Erst spätere sichtbare Paritäts-, Audio-, Persistenz- und Lifecycle-Tests können Gameplay freigeben.</Text>
+      </Section>
+    </List>
+  </NavigationStack>
+}
+
+function SettingsView(props: {
+  tag?: number
+  tabItem?: any
+  busy: boolean
+  update: UpstreamReleaseStatus | null
+  stagedPayload: StagedPayload | null
+  notice: string
+  checkUpdates: () => Promise<void>
+  stagePayload: () => Promise<void>
+}) {
+  const updateText = props.update == null ? "Noch nicht geprüft" :
+    props.update.state === "current" ? `Aktuell: ${props.update.latestVersion}` :
+    props.update.state === "available" ? `Payload ${props.update.latestVersion} ist verfügbar` :
+    props.update.state === "metadata-incomplete" ? "Release-Metadaten unvollständig – keine Installation" :
+    "Versionsformat nicht sicher vergleichbar"
+  return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
+    <List navigationTitle="Einstellungen" navigationBarTitleDisplayMode="large">
+      <Section header={<Text>Komponenten</Text>} footer={<Text>
+        Komponenten werden getrennt versioniert. Eine Prüfung lädt nur Metadaten; sie aktiviert oder überschreibt nichts.
+      </Text>}>
+        <Text>{`Scripting-Projekt ${COMPONENTS.hostProject.version}`}</Text>
+        <Text>{`Gen1Recomp Audit-Pin ${COMPONENTS.gen1recomp.version}`}</Text>
+        <Text>{`love.js / LÖVE ${COMPONENTS.lovejs.loveVersion} · Adapter r${COMPONENTS.lovejs.adapterVersion} · Bridge v${COMPONENTS.lovejs.bridgeProtocol}`}</Text>
+        <Text>Runtime-Updates werden als geprüfte Kandidaten seitlich installiert; vorhandene Versionen werden nicht überschrieben.</Text>
+        <Text>{updateText}</Text>
+        <Button title="Gen1Recomp-Release prüfen" systemImage="arrow.triangle.2.circlepath" disabled={props.busy} action={props.checkUpdates} />
+        <Text>{props.stagedPayload
+          ? `Payload ${props.stagedPayload.version} sicher gespeichert · Aktivierung gesperrt`
+          : `Freigegebener Download-Pin: ${APPROVED_PAYLOAD.version}`}</Text>
+        <Button title="Freigegebenen Payload laden und prüfen" systemImage="arrow.down.app"
+          disabled={props.busy || props.update?.latestVersion !== APPROVED_PAYLOAD.version || props.stagedPayload != null}
+          action={props.stagePayload} />
+        {props.busy ? <ProgressView /> : null}
+        {props.notice ? <Text>{props.notice}</Text> : null}
+      </Section>
+      <Section header={<Text>Update-Sicherheit</Text>}>
+        <Text>Download → SHA-256 → Kompatibilitätsgate → Staging → Health-Check → atomare Aktivierung → Rollback.</Text>
+        <Text>Netzwerk-Aktivierung bleibt deaktiviert, bis die Laufzeitgates auf einem echten Gerät bestanden sind.</Text>
+      </Section>
+      <Section header={<Text>Speicher</Text>}>
+        <Text>{ROOT}</Text>
+        <Text>Spiele, Mods, Saves und Diagnose bleiben getrennt von austauschbaren Core-Komponenten.</Text>
+      </Section>
+    </List>
+  </NavigationStack>
+}
+
+function App() {
+  const [tabIndex, setTabIndex] = useState(0)
+  const [rows, setRows] = useState<LibraryRow[]>([])
+  const [mods, setMods] = useState<InstalledMod[]>([])
+  const [busy, setBusy] = useState(false)
+  const [gameNotice, setGameNotice] = useState("Initialisierung …")
+  const [modNotice, setModNotice] = useState("")
+  const [diagnosticSummary, setDiagnosticSummary] = useState("")
+  const [diagnosticDetails, setDiagnosticDetails] = useState<string[]>([])
+  const [runtime, setRuntime] = useState<RuntimeCandidate | null>(null)
+  const [runtimeStatus, setRuntimeStatus] = useState("")
+  const [payloadBootStatus, setPayloadBootStatus] = useState("")
+  const [update, setUpdate] = useState<UpstreamReleaseStatus | null>(null)
+  const [stagedPayload, setStagedPayload] = useState<StagedPayload | null>(null)
+  const [settingsNotice, setSettingsNotice] = useState("")
+
+  async function refreshGames(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      await bootstrap()
+      setRows(await libraryRows())
+      setGameNotice("Bibliothek bereit.")
+    } catch (error) { setGameNotice(`Fehler: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function refreshMods(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      await bootstrap()
+      const recovered = await recoverPendingModImport()
+      setMods(await listInstalledMods())
+      setModNotice(recovered ? "Unterbrochener Mod-Import sicher verworfen." : "Mod-Speicher bereit.")
+    } catch (error) { setModNotice(`Fehler: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function chooseGame(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      const files = await DocumentPicker.pickFiles({ allowsMultipleSelection: false, types: ["public.data"] })
+      if (files.length === 0) { setGameNotice("Import abgebrochen."); return }
+      const row = await importContent(files[0])
+      setRows(await libraryRows())
+      setGameNotice(`${row.displayName} wurde sicher importiert.`)
+    } catch (error) { setGameNotice(`Import fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { DocumentPicker.stopAcessingSecurityScopedResources(); setBusy(false) }
+  }
+
+  async function chooseMod(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      const files = await DocumentPicker.pickFiles({ allowsMultipleSelection: false, types: ["public.zip-archive"] })
+      if (files.length === 0) { setModNotice("Import abgebrochen."); return }
+      const mod = await importModZip(files[0])
+      setMods(await listInstalledMods())
+      setModNotice(`${mod.name} ${mod.version} wurde geprüft und sicher gespeichert.`)
+    } catch (error) { setModNotice(`Mod-Import fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { DocumentPicker.stopAcessingSecurityScopedResources(); setBusy(false) }
+  }
+
+  async function removeMod(mod: InstalledMod): Promise<void> {
+    if (busy) return
+    const confirmed = await Dialog.confirm({
+      title: "Mod-Paket entfernen?", message: `${mod.name} ${mod.version} wird aus dem lokalen Mod-Speicher entfernt.`,
+      cancelLabel: "Abbrechen", confirmLabel: "Entfernen",
+    })
+    if (!confirmed) return
+    setBusy(true)
+    try {
+      await removeInstalledMod(mod)
+      setMods(await listInstalledMods())
+      setModNotice(`${mod.name} wurde entfernt.`)
+    } catch (error) { setModNotice(`Entfernen fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function runDiagnostics(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      await bootstrap()
+      const report = await runCapabilityProbe()
+      const gate = evaluateRuntimeGate(report)
+      setDiagnosticSummary(gate.status === "candidate" ? "Kandidat – weitere Laufzeittests nötig" : "Laufzeitgate blockiert")
+      setDiagnosticDetails([
+        `WASM-API ${report.wasm.apiPresent ? "✓" : "✗"} · WebGL ${report.graphics.clearReadback ? "✓" : "✗"} · Audio ${report.audio.contextConstructed ? "✓" : "✗"}`,
+        "Direkte WASM-Probe gemäß Bridge-Richtlinie nicht ausgeführt.",
+        `Lokales JS ${report.runtime.localScriptSubresource ? "✓" : "✗"} · IndexedDB ${report.storage.indexedDbApiPresent ? "✓" : "✗"}`,
+        ...gate.reasons,
+      ])
+    } catch (error) { setDiagnosticSummary(`Diagnose fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function testLoveJsRuntime(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    setRuntimeStatus("Runtime wird aus dem signierten Projektbestand kopiert und vollständig gehasht …")
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      setRuntimeStatus("Lokaler love.js-Boot läuft; automatischer Host-Abbruch spätestens nach 40 Sekunden …")
+      const report = await runLoveJsBootProbe()
+      setRuntimeStatus(report.status === "ready"
+        ? `Boot-Gate bestanden: ${report.detail} · Canvas ${report.canvasWidth}×${report.canvasHeight} · WASM ${report.webAssembly ? "✓" : "✗"} · IndexedDB ${report.indexedDB ? "✓" : "✗"}. Gameplay bleibt gesperrt.`
+        : `Boot-Gate ${report.status} · Phase ${report.stage}: ${report.detail} · Meilensteine: ${report.milestones.join(" → ") || "keine"}. Bericht wurde gespeichert.`)
+    } catch (error) { setRuntimeStatus(`love.js-Test fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function testGen1Payload(): Promise<void> {
+    if (busy || stagedPayload == null) return
+    setBusy(true)
+    setPayloadBootStatus("Payload und Runtime werden erneut gehasht; Bridge-Transfer kann bis zu 105 Sekunden dauern …")
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      const report = await runGen1PayloadBootProbe()
+      setPayloadBootStatus(report.status === "ready"
+        ? `Payload-Gate bestanden: ${report.detail} · Canvas ${report.canvasWidth}×${report.canvasHeight}. Dies beweist noch kein Gameplay und aktiviert nichts.`
+        : `Payload-Gate ${report.status} · Phase ${report.stage}: ${report.detail} · Meilensteine: ${report.milestones.join(" → ") || "keine"}.`)
+    } catch (error) { setPayloadBootStatus(`Payload-Test fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function showGen1Preview(): Promise<void> {
+    if (busy || stagedPayload == null) return
+    setBusy(true)
+    setPayloadBootStatus("Launcher-Vorschau wird über die Bridge vorbereitet …")
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      const report = await presentGen1PayloadPreview()
+      setPayloadBootStatus(report.status === "ready"
+        ? "Launcher-Vorschau wurde geschlossen. Keine Aktivierung und kein ROM-/Save-Mount."
+        : `Vorschau ${report.status} · Phase ${report.stage}: ${report.detail}`)
+    } catch (error) { setPayloadBootStatus(`Vorschau fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function launchGame(row: LibraryRow): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    setGameNotice(`${row.displayName}: ROM und Runtime werden vor dem experimentellen Start erneut geprüft …`)
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      const report = await presentGen1Gameplay(row)
+      setGameNotice(report.status === "ready"
+        ? `${row.displayName}: Laufzeitfenster geschlossen. Bitte sichtbares Gameplay, Eingabe, Audio und Save-Verhalten berichten.`
+        : `Spielstart ${report.status} · Phase ${report.stage}: ${report.detail}`)
+    } catch (error) { setGameNotice(`Experimenteller Start fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function checkUpdates(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      const result = await checkUpstreamRelease()
+      setUpdate(result)
+      setSettingsNotice(result.state === "available"
+        ? "Metadaten geprüft. Ein eingebauter Pin entscheidet getrennt, ob nur sicheres Staging angeboten wird."
+        : "Release-Metadaten wurden gelesen; es wurde nichts verändert.")
+    } catch (error) { setSettingsNotice(`Update-Prüfung fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function stagePayload(): Promise<void> {
+    if (busy || update == null) return
+    setBusy(true)
+    setSettingsNotice("Payload wird geladen, gehasht und strukturell geprüft …")
+    try {
+      const staged = await stageApprovedPayload(update, (phase) => {
+        setSettingsNotice(`Payload-Staging · ${phase} …`)
+      })
+      setStagedPayload(staged)
+      setSettingsNotice(`Payload ${staged.version} wurde sicher gespeichert. Aktivierung bleibt bis zum Runtime-Gate gesperrt.`)
+    } catch (error) { setSettingsNotice(`Payload-Staging fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  // Local state only; network update checks always require an explicit tap.
+  useEffect(() => {
+    setBusy(true)
+    bootstrap().then(async () => {
+      setRows(await libraryRows())
+      const recovered = await recoverPendingModImport()
+      setMods(await listInstalledMods())
+      setUpdate(await loadCachedReleaseStatus())
+      const payloadRecovered = await recoverPayloadTransaction()
+      const runtimeRecovered = await recoverRuntimeTransaction()
+      setStagedPayload(await loadStagedPayload())
+      setRuntime(await loadRuntimeCandidate())
+      if (payloadRecovered) setSettingsNotice("Unterbrochener Payload-Download sicher verworfen.")
+      if (runtimeRecovered) setRuntimeStatus("Unterbrochene Runtime-Installation sicher verworfen.")
+      setGameNotice("Bibliothek bereit.")
+      if (recovered) setModNotice("Unterbrochener Mod-Import sicher verworfen.")
+    }).catch((error) => setGameNotice(`Initialisierung fehlgeschlagen: ${errorMessage(error)}`))
+      .finally(() => setBusy(false))
+  }, [])
+
+  return <TabView tabIndex={tabIndex} onTabIndexChanged={setTabIndex}>
+    <GamesView tag={0} tabItem={<Label title="Spiele" systemImage="gamecontroller" />}
+      rows={rows} busy={busy} notice={gameNotice} refresh={refreshGames} importGame={chooseGame} launchGame={launchGame} />
+    <ModsView tag={1} tabItem={<Label title="Mods" systemImage="puzzlepiece.extension" />}
+      mods={mods} busy={busy} notice={modNotice} refresh={refreshMods} importMod={chooseMod} removeMod={removeMod} />
+    <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}
+      busy={busy} summary={diagnosticSummary} details={diagnosticDetails} runtime={runtime} stagedPayload={stagedPayload}
+      runtimeStatus={runtimeStatus} payloadBootStatus={payloadBootStatus}
+      run={runDiagnostics} runRuntime={testLoveJsRuntime} runPayload={testGen1Payload}
+      runPreview={showGen1Preview} />
+    <SettingsView tag={3} tabItem={<Label title="Einstellungen" systemImage="gearshape" />}
+      busy={busy} update={update} stagedPayload={stagedPayload} notice={settingsNotice}
+      checkUpdates={checkUpdates} stagePayload={stagePayload} />
+  </TabView>
+}
+
+async function run(): Promise<void> {
+  await Navigation.present({ element: <App /> })
+  Script.exit()
+}
+
+run()

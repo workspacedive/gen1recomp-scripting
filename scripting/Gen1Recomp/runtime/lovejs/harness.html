@@ -1,0 +1,222 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Gen1Recomp love.js Gate</title>
+<style>
+  html,body{margin:0;background:#111;color:#fff;width:100%;height:100%;overflow:hidden}
+  canvas{width:100%;height:100%;display:none;outline:none}
+  #spinner{position:fixed;inset:0;display:grid;place-items:center;font:16px system-ui}
+  #spinner.pending::after{content:"Preparing love.js…"}
+  #spinner.loading::after{content:"Booting LÖVE 11.5…"}
+  #spinner.error::after{content:"love.js failed"}
+  #touchpad{display:none;position:fixed;inset:0;z-index:20;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none;font:700 17px system-ui}
+  #touchpad.active{display:block}
+  .pad{position:absolute;bottom:max(22px,env(safe-area-inset-bottom));pointer-events:auto}
+  .dpad{left:22px;width:156px;height:156px}
+  .actions{right:22px;width:150px;height:130px}
+  .system{left:50%;transform:translateX(-50%);display:flex;gap:14px}
+  .key{position:absolute;border:2px solid rgba(255,255,255,.72);background:rgba(20,24,29,.58);color:#fff;border-radius:50%;width:52px;height:52px;display:grid;place-items:center;box-sizing:border-box;-webkit-backdrop-filter:blur(4px)}
+  .key.pressed{background:rgba(255,255,255,.72);color:#111}
+  .up{left:52px;top:0}.down{left:52px;bottom:0}.left{left:0;top:52px}.right{right:0;top:52px}
+  .a{right:0;top:0;width:64px;height:64px}.b{left:0;bottom:0;width:64px;height:64px}
+  .system .key{position:static;width:70px;height:34px;border-radius:18px;font-size:11px}
+</style>
+<canvas id="canvas" tabindex="0"></canvas>
+<div id="spinner" class="pending"></div>
+<div id="touchpad" aria-label="Gameplay controller">
+  <div class="pad dpad">
+    <div class="key up" data-key="ArrowUp" data-code="ArrowUp" data-keycode="38">▲</div>
+    <div class="key down" data-key="ArrowDown" data-code="ArrowDown" data-keycode="40">▼</div>
+    <div class="key left" data-key="ArrowLeft" data-code="ArrowLeft" data-keycode="37">◀</div>
+    <div class="key right" data-key="ArrowRight" data-code="ArrowRight" data-keycode="39">▶</div>
+  </div>
+  <div class="pad actions">
+    <div class="key a" data-key="z" data-code="KeyZ" data-keycode="90">A</div>
+    <div class="key b" data-key="x" data-code="KeyX" data-keycode="88">B</div>
+  </div>
+  <div class="pad system">
+    <div class="key" data-key="Tab" data-code="Tab" data-keycode="9">SELECT</div>
+    <div class="key" data-key="Escape" data-code="Escape" data-keycode="27">START</div>
+  </div>
+</div>
+<script>
+(function () {
+  var terminal = false;
+  var bridgedPaths = [];
+  var gamePath = '';
+  var runtimeTimeoutMs = 30000;
+  var resourceCache = {};
+  var bridge = {
+    send: function (type, detail, data) {
+      return window.webkit.messageHandlers.gen1HostBridge.postMessage({
+        protocolVersion: 1,
+        type: type,
+        detail: String(detail || ''),
+        data: data || {}
+      });
+    },
+    terminal: function (type, detail, data) {
+      if (terminal) return;
+      terminal = true;
+      bridge.send(type, detail, data);
+    },
+    readResource: async function (path) {
+      if (resourceCache[path]) return resourceCache[path];
+      var offset = 0;
+      var output = null;
+      while (true) {
+        var reply = await bridge.send('resource.read', path, {
+          path: path, offset: offset, length: 131072
+        });
+        if (!reply || reply.ok !== true || reply.path !== path || reply.offset !== offset)
+          throw new Error(path + ': invalid host resource reply');
+        if (!output) output = new Uint8Array(reply.total);
+        var raw = atob(reply.base64);
+        for (var index = 0; index < raw.length; index += 1)
+          output[offset + index] = raw.charCodeAt(index);
+        offset += raw.length;
+        if (reply.eof) break;
+        if (raw.length === 0 || offset > reply.total)
+          throw new Error(path + ': invalid host resource range');
+      }
+      if (!output || offset !== output.length)
+        throw new Error(path + ': incomplete host resource');
+      resourceCache[path] = output;
+      return output;
+    }
+  };
+  window.__gen1Bridge = bridge;
+
+  var consoleErrors = [];
+  var nativeConsoleError = console.error.bind(console);
+  console.error = function () {
+    var line = Array.prototype.map.call(arguments, function (value) {
+      try { return String(value); } catch (_) { return '[unprintable]'; }
+    }).join(' ');
+    consoleErrors.push(line.slice(0, 1000));
+    if (consoleErrors.length > 8) consoleErrors.shift();
+    nativeConsoleError.apply(console, arguments);
+  };
+  var nativeAlert = window.alert.bind(window);
+  window.alert = function (message) {
+    var detail = 'window alert: ' + String(message);
+    if (consoleErrors.length) detail += ' | console: ' + consoleErrors.join(' | ');
+    bridge.send('runtime.error', detail.slice(0, 6000));
+    return nativeAlert(message);
+  };
+
+  function enableTouchController() {
+    var pad = document.getElementById('touchpad');
+    var held = {};
+    function dispatch(type, button) {
+      var keyCode = Number(button.dataset.keycode);
+      var event = new KeyboardEvent(type, {
+        key: button.dataset.key, code: button.dataset.code,
+        keyCode: keyCode, which: keyCode, bubbles: true, cancelable: true
+      });
+      window.dispatchEvent(event);
+    }
+    function release(pointerId) {
+      var button = held[pointerId];
+      if (!button) return;
+      delete held[pointerId];
+      button.classList.remove('pressed');
+      dispatch('keyup', button);
+    }
+    pad.querySelectorAll('[data-key]').forEach(function (button) {
+      button.addEventListener('pointerdown', function (event) {
+        event.preventDefault();
+        if (held[event.pointerId]) return;
+        held[event.pointerId] = button;
+        button.classList.add('pressed');
+        try { button.setPointerCapture(event.pointerId); } catch (_) {}
+        dispatch('keydown', button);
+        canvas.focus();
+      });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) {
+        button.addEventListener(type, function (event) {
+          event.preventDefault();
+          release(event.pointerId);
+        });
+      });
+    });
+    window.addEventListener('blur', function () {
+      Object.keys(held).forEach(release);
+    });
+    pad.classList.add('active');
+  }
+
+  var nativeFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    var path = typeof input === 'string' ? input : '';
+    if (bridgedPaths.indexOf(path) < 0) return nativeFetch(input, init);
+    return bridge.readResource(path).then(function (bytes) {
+      return new Response(bytes.slice(), {
+        status: 200,
+        headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(bytes.length) }
+      });
+    });
+  };
+
+  var canvas = document.getElementById('canvas');
+  var spinner = document.getElementById('spinner');
+  new MutationObserver(function () {
+    if (spinner.className === '') bridge.terminal('runtime.ready', 'Module.postrun reached', {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      indexedDB: typeof indexedDB !== 'undefined',
+      webAssembly: typeof WebAssembly !== 'undefined',
+      playerUri: window.Player && typeof window.Player.uri === 'string' ? window.Player.uri : ''
+    });
+    if (spinner.className === 'error') bridge.terminal('runtime.error', 'player error state');
+  }).observe(spinner, { attributes: true, attributeFilter: ['class'] });
+
+  bridge.send('bridge.ready', 'Host bridge reachable', {
+    indexedDB: typeof indexedDB !== 'undefined',
+    webAssembly: typeof WebAssembly !== 'undefined'
+  });
+
+  bridge.send('session.config', 'Request boot session configuration').then(function (config) {
+    if (!config || config.ok !== true || !Array.isArray(config.resourcePaths)
+      || typeof config.gamePath !== 'string' || typeof config.timeoutMs !== 'number'
+      || typeof config.touchController !== 'boolean')
+      throw new Error('Invalid host session configuration');
+    bridgedPaths = config.resourcePaths.slice();
+    gamePath = config.gamePath;
+    runtimeTimeoutMs = config.timeoutMs;
+    if (config.touchController) enableTouchController();
+    setTimeout(function () {
+      bridge.terminal('runtime.timeout', 'No Module.postrun milestone within ' + runtimeTimeoutMs + ' milliseconds');
+    }, runtimeTimeoutMs);
+    return Promise.all(bridgedPaths.map(function (path) {
+      return fetch(path, { cache: 'no-store' }).then(function (response) {
+        return response.arrayBuffer().then(function (bytes) {
+          if (!response.ok || bytes.byteLength === 0) throw new Error(path + ': empty response');
+          return { path: path, bytes: bytes.byteLength, transport: 'gen1HostBridge' };
+        });
+      });
+    }));
+  }).then(function (results) {
+    bridge.send('resources.ready', 'All boot packages transferred through host bridge', { resources: results });
+    var script = document.createElement('script');
+    script.src = 'player.js?g=norun&v=11.5&n=1';
+    script.onload = function () {
+      var originalRequestPkgs = Player.requestPkgs;
+      Player.requestPkgs = function (uri) {
+        return originalRequestPkgs(uri).then(function (cache) {
+          bridgedPaths.forEach(function (path) {
+            if (resourceCache[path]) cache[path] = resourceCache[path];
+          });
+          return cache;
+        });
+      };
+      bridge.send('player.loaded', 'Official player loaded; host resources attached before start');
+      Player.start(gamePath, []);
+    };
+    script.onerror = function () { bridge.terminal('runtime.error', 'player.js failed to load'); };
+    document.body.appendChild(script);
+  }).catch(function (error) {
+    bridge.terminal('resources.error', String(error));
+  });
+}());
+</script>
