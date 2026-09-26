@@ -1,6 +1,17 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.4.0`
+Stand: 2026-09-26 · App-Version `0.5.0`
+
+## Iteration 0.5.0
+
+- Der offizielle love.js-/LÖVE-11.5-Bestand aus Revision `9355186de22db13bd88bf2a0db75d2925647d036` ist reproduzierbar eingebettet: unverändertes `player.js`, `love.js`, `love.wasm`, `nogame.love`, beide Normalizer und Lizenzdatei.
+- `runtime-manifest.ts` bindet jede der acht Dateien einschließlich des separaten Host-Harness an SHA-256. Installation erfolgt aus `Script.directory` über `Transactions/runtime-lovejs-11.5-r1` nach `Cores/runtimes/lovejs-11.5-r1`; Quell- und Zielkopie werden vollständig gehasht.
+- Ein unvollständiges Transaktionsverzeichnis wird beim Start entfernt. Vor jedem Boot werden alle Kandidatendateien erneut geprüft; vorhandene unbekannte Zielordner werden nie überschrieben.
+- Der Host-Harness nutzt ausschließlich den dokumentierten lokalen `WebViewController.loadFile`-Pfad und einen einzigen `runtimeEvent`-Message-Handler. Der upstream Player wird nicht gepatcht und der Gen1Recomp-Payload wird weder kopiert noch gemountet, ausgewertet oder gestartet.
+- Das Boot-Gate startet ausschließlich das offizielle `nogame.love`, wartet höchstens 30 Sekunden auf den durch `Module.postrun` sichtbaren Player-Zustand und speichert einen datensparsamen Bericht in `Diagnostics/lovejs-boot.v1.json`.
+- `APP.runtimeEnabled` bleibt `false`; ein erfolgreiches `nogame`-Boot beweist ausdrücklich weder Gameplay noch Audio, Saves, Lifecycle oder Kompatibilität des Gen1Recomp-Payloads.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — Provenienz, Byteinventar, Trennung, Transaktion und Sperren sind statisch/reproduzierbar geprüft. Ob WKWebView lokale Fetches von `.love`, Lua und WASM in genau diesem `loadFile`-Kontext zulässt und `postrun` erreicht, muss der echte Gerätetest zeigen.
 
 ## Iteration 0.4.0
 
@@ -74,7 +85,9 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Capability-Probe v2 | dokumentiertes lokales `loadFile` mit relativer JS-Subresource, WASM validate/instantiate, SIMD, WebGL context+Readback, AudioContext-Konstruktion, Worker/SAB/Isolation/OffscreenCanvas, IndexedDB-/Gamepad-/Touch-API, Umgebung | PROBE, keine Runtime-Zertifizierung; konkrete WASM/Data-Subresource ausstehend |
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 27 Tests | VERIFIZIERT lokal |
+| Gepinnter love.js-Kandidat | offizieller LÖVE-11.5-Bestand, acht SHA-256-gebundene Dateien, transaktionale Installation und vollständige Revalidierung vor Boot | TEILWEISE VERIFIZIERT; Geräte-Boot ausstehend |
+| Runtime-Bridge | separater lokaler HTML-Harness + ein dokumentierter `runtimeEvent`-Handler; upstream Runtime und Gen1Recomp bleiben unverändert | EXPERIMENTELL; Geräte-Boot ausstehend |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 29 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund
@@ -87,9 +100,9 @@ Status: **VERIFIZIERT durch realen Gerätelauf und offizielle Beispiele; in 0.2.
 
 Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tests vorhanden sind:
 
-1. reproduzierbarer love.js-Compatibility-Build des verifizierten v0.3.18-Payloads;
-2. `loadFile`-/Read-Access-Test für lokale HTML/JS/WASM/Data-Subresources;
-3. love.js-Boot bis zu einem eindeutigen Runtime-Ready-Handshake;
+1. Gerätebestätigung des reproduzierbaren, gepinnten love.js-11.5-Kandidaten;
+2. `loadFile`-/Read-Access-Test für dessen lokale `.love`-/Lua-/WASM-Subresources;
+3. love.js-`nogame`-Boot bis zum eindeutigen `postrun`-Handshake;
 4. WebAudio-Funktion nach User-Gesture sowie Aussetzer-/Lifecycle-Test;
 5. VFS-Save → sichtbarer Host-Commit mit Generation, Hash und ACK;
 6. Relaunch-, App-Kill- und WebContent-Kill-Recovery;
@@ -100,4 +113,4 @@ Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tes
 
 ## Nächster implementierbarer Schritt
 
-R1 erzeugt außerhalb des App-Projekts ein gepinntes, lizenzkonformes love.js-Core-Artefakt mit Manifest und Dateihashes. Anschließend wird es **manuell** über einen Core-Import in `Cores/<core>/<version>/<hash>` gestaged. Automatische Downloads und Aktivierung kommen erst nach erfolgreichem lokalen Device-Gate. So bleibt die App offline-first und ein fehlgeschlagener Spike kann weder Library noch Saves gefährden.
+0.5.0 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.

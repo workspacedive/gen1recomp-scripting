@@ -10,9 +10,9 @@ export const COMPONENTS = Object.freeze({
   },
   gen1recomp: {
     id: "gen1recomp-payload",
-    version: "0.3.18",
-    sourceRevision: "b83f805a7c7b6043370b783ea7a4b65fd8c93ef4",
-    payloadSha256: "853a539f64f892248846d4fd7ec31837b8450b573cdb3658b23d64ae08d5f732",
+    version: "0.3.20",
+    sourceRevision: "64dd9cb3a377b398b6132d223a121878f68b4b07",
+    payloadSha256: "c0da7035afb110cb9b45556a44c855bd27c96903737128fa8114209b9eb7f0a5",
     payloadHost: "love",
     updateMode: "staged-payload",
   },

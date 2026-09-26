@@ -1,4 +1,4 @@
-# Gen1Recomp Scripting Host 0.4.0
+# Gen1Recomp Scripting Host 0.5.0
 
 Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschließlich APIs, die in der geprüften offiziellen App-Store-Dokumentation nicht als Pro markiert sind. Seit 0.2.2 werden `DocumentPicker`, `FileManager`, `Crypto` und `WebViewController` korrekt als von Scripting injizierte Globals verwendet; nur UI-/React-Symbole werden aus `scripting` importiert.
 
@@ -14,8 +14,10 @@ Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschli
 - lokaler Mod-Paketspeicher mit eigenem ZIP-/DEFLATE-/CRC-32-Code, 32.768-Eintragslimit, 200:1-Entpacklimit, sicherer Einzelextraktion, SHA-256-Identität und phasengenauer Fehlerdiagnose,
 - keine hostseitige Archiv-API; PRO-pflichtige Archivwege sind regressionsgesperrt,
 - opt-in Payload-Staging für den fest gepinnten Gen1Recomp-0.3.20-Kandidaten mit URL-/Host-/Größen-/SHA-256-/ZIP-/Version-Gates und weiterhin gesperrter Aktivierung,
-- vorhandene deutsche/englische Textbasis; die neuen 0.3.x-Tabtexte sind noch deutsch und als offene Lokalisierungsarbeit dokumentiert,
-- bewusst **kein** Runtime-Start, solange ein konkreter love.js-Build, lokale Subresources, persistente VFS-Saves, Audio und Kill-Recovery auf echten Geräten nicht verifiziert sind.
+- fest gepinnter offizieller love.js-/LÖVE-11.5-Kandidat aus Commit `9355186…`, dessen acht Dateien vor und nach der transaktionalen Installation vollständig per SHA-256 geprüft werden,
+- separater, enger WebView-Bridge-Harness: Er startet ausschließlich upstream `nogame.love`, meldet `postrun`/Fehler/Timeout über `runtimeEvent` und schreibt das Ergebnis nach `Diagnostics/lovejs-boot.v1.json`,
+- vorhandene deutsche/englische Textbasis; die neuen Tabtexte sind noch deutsch und als offene Lokalisierungsarbeit dokumentiert,
+- bewusst **kein** Gen1Recomp-Spielstart, solange der love.js-Boot und anschließend persistente VFS-Saves, Audio, Lifecycle sowie Gameplay-Parität auf echten Geräten nicht verifiziert sind.
 
 ## Datenintegrität
 
@@ -25,8 +27,8 @@ Ein Import verändert die ausgewählte Quelldatei nicht. Die App schreibt zuerst
 
 Die Probe ist keine Runtime-Zertifizierung. Insbesondere testet sie noch nicht:
 
-- love.js-Boot mit Gen1Recomp,
-- konkrete `game.js`/`.wasm`/`.data`-Subresources (die Probe belegt nur eine relative lokale JS-Datei),
+- Ergebnis des neuen love.js-`nogame`-Boot-Gates auf echter Scripting/iOS-Hardware,
+- love.js-Boot mit dem getrennt gestagten Gen1Recomp-Payload,
 - Audio-Latenz oder Aussetzer,
 - IndexedDB-Schreib-/Relaunch-Persistenz,
 - sichtbaren Host-Save-Commit und Recovery nach App-/WebContent-Kill.

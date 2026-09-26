@@ -17,6 +17,10 @@ import {
   importModZip, listInstalledMods, recoverPendingModImport, removeInstalledMod,
   type InstalledMod,
 } from "./mod-store"
+import {
+  installRuntimeCandidate, loadRuntimeCandidate, recoverRuntimeTransaction, runLoveJsBootProbe,
+  type RuntimeCandidate,
+} from "./runtime-store"
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -98,7 +102,10 @@ function DiagnosticsView(props: {
   busy: boolean
   summary: string
   details: string[]
+  runtime: RuntimeCandidate | null
+  runtimeStatus: string
   run: () => Promise<void>
+  runRuntime: () => Promise<void>
 }) {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Diagnose" navigationBarTitleDisplayMode="large">
@@ -110,8 +117,15 @@ function DiagnosticsView(props: {
         <Text>{props.summary || "Noch keine Prüfung in dieser Sitzung."}</Text>
         {props.details.map((detail, index) => <Text key={`${index}-${detail}`}>{detail}</Text>)}
       </Section>
+      <Section header={<Text>love.js Boot-Gate · EXPERIMENTELL</Text>} footer={<Text>
+        Installiert ausschließlich den fest gepinnten LÖVE-11.5-Kandidaten und startet „nogame.love“. Der verifizierte Gen1Recomp-Payload bleibt unangetastet und inaktiv.
+      </Text>}>
+        <Text>{props.runtime ? `Kandidat ${props.runtime.id} installiert` : "Runtime-Kandidat noch nicht installiert"}</Text>
+        <Button title="Runtime installieren und Boot testen" systemImage="play.square.stack" disabled={props.busy} action={props.runRuntime} />
+        {props.runtimeStatus ? <Text>{props.runtimeStatus}</Text> : null}
+      </Section>
       <Section header={<Text>Interpretation</Text>}>
-        <Text>Die Prüfung belegt Host-APIs und lokale Ressourcen. Sie belegt noch keinen love.js-Spielstart.</Text>
+        <Text>Die Geräteprüfung belegt einzelne Host-APIs. Ein erfolgreiches Boot-Gate belegt zusätzlich nur, dass der unveränderte love.js-Player mit seinem „nogame“-Paket postrun erreicht – nicht Gameplay, Audio, Saves oder Gen1Recomp-Kompatibilität.</Text>
       </Section>
     </List>
   </NavigationStack>
@@ -172,6 +186,8 @@ function App() {
   const [modNotice, setModNotice] = useState("")
   const [diagnosticSummary, setDiagnosticSummary] = useState("")
   const [diagnosticDetails, setDiagnosticDetails] = useState<string[]>([])
+  const [runtime, setRuntime] = useState<RuntimeCandidate | null>(null)
+  const [runtimeStatus, setRuntimeStatus] = useState("")
   const [update, setUpdate] = useState<UpstreamReleaseStatus | null>(null)
   const [stagedPayload, setStagedPayload] = useState<StagedPayload | null>(null)
   const [settingsNotice, setSettingsNotice] = useState("")
@@ -258,6 +274,22 @@ function App() {
     finally { setBusy(false) }
   }
 
+  async function testLoveJsRuntime(): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    setRuntimeStatus("Runtime wird aus dem signierten Projektbestand kopiert und vollständig gehasht …")
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      setRuntimeStatus("Lokaler love.js-Boot läuft; maximal 30 Sekunden …")
+      const report = await runLoveJsBootProbe()
+      setRuntimeStatus(report.status === "ready"
+        ? `Boot-Gate bestanden: ${report.detail} · Canvas ${report.canvasWidth}×${report.canvasHeight} · WASM ${report.webAssembly ? "✓" : "✗"} · IndexedDB ${report.indexedDB ? "✓" : "✗"}. Gameplay bleibt gesperrt.`
+        : `Boot-Gate ${report.status}: ${report.detail}. Bericht wurde gespeichert.`)
+    } catch (error) { setRuntimeStatus(`love.js-Test fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
   async function checkUpdates(): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -292,8 +324,11 @@ function App() {
       setMods(await listInstalledMods())
       setUpdate(await loadCachedReleaseStatus())
       const payloadRecovered = await recoverPayloadTransaction()
+      const runtimeRecovered = await recoverRuntimeTransaction()
       setStagedPayload(await loadStagedPayload())
+      setRuntime(await loadRuntimeCandidate())
       if (payloadRecovered) setSettingsNotice("Unterbrochener Payload-Download sicher verworfen.")
+      if (runtimeRecovered) setRuntimeStatus("Unterbrochene Runtime-Installation sicher verworfen.")
       setGameNotice("Bibliothek bereit.")
       if (recovered) setModNotice("Unterbrochener Mod-Import sicher verworfen.")
     }).catch((error) => setGameNotice(`Initialisierung fehlgeschlagen: ${errorMessage(error)}`))
@@ -306,7 +341,8 @@ function App() {
     <ModsView tag={1} tabItem={<Label title="Mods" systemImage="puzzlepiece.extension" />}
       mods={mods} busy={busy} notice={modNotice} refresh={refreshMods} importMod={chooseMod} removeMod={removeMod} />
     <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}
-      busy={busy} summary={diagnosticSummary} details={diagnosticDetails} run={runDiagnostics} />
+      busy={busy} summary={diagnosticSummary} details={diagnosticDetails} runtime={runtime} runtimeStatus={runtimeStatus}
+      run={runDiagnostics} runRuntime={testLoveJsRuntime} />
     <SettingsView tag={3} tabItem={<Label title="Einstellungen" systemImage="gearshape" />}
       busy={busy} update={update} stagedPayload={stagedPayload} notice={settingsNotice}
       checkUpdates={checkUpdates} stagePayload={stagePayload} />

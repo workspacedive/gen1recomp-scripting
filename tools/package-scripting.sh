@@ -23,7 +23,8 @@ while IFS= read -r -d '' file; do
   relative="${file#"$SOURCE/"}"
   mkdir -p "$STAGE/$(dirname "$relative")"
   cp "$file" "$STAGE/$relative"
-done < <(find "$SOURCE" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.json' -o -name '*.md' \) -print0 | sort -z)
+done < <(find "$SOURCE" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.json' -o -name '*.md' \
+  -o -name '*.html' -o -name '*.js' -o -name '*.wasm' -o -name '*.love' -o -name '*.lua' -o -name '*.txt' \) -print0 | sort -z)
 
 # Stable metadata makes source-identical packages byte-identical.
 find "$STAGE" -type f -exec touch -t 198001010000 {} +
@@ -31,6 +32,15 @@ mapfile -d '' FILES < <(cd "$STAGE" && find . -type f -print0 | sort -z)
 (cd "$STAGE" && zip -X -q -9 "$EXPECTED" "${FILES[@]}")
 unzip -tqq "$EXPECTED"
 cmp "$SOURCE/script.json" <(unzip -p "$EXPECTED" script.json)
+for required in \
+  runtime/lovejs/harness.html runtime/lovejs/player.js runtime/lovejs/nogame.love \
+  runtime/lovejs/lua/normalize1.lua runtime/lovejs/lua/normalize2.lua \
+  runtime/lovejs/11.5/love.js runtime/lovejs/11.5/love.wasm runtime/lovejs/11.5/license.txt; do
+  unzip -Z1 "$EXPECTED" | grep -Fqx "$required" || {
+    echo "runtime asset missing from package: $required" >&2
+    exit 1
+  }
+done
 
 if $CHECK_ONLY; then
   if [ ! -f "$ARTIFACT" ] || ! cmp -s "$EXPECTED" "$ARTIFACT"; then

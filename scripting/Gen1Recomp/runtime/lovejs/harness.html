@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Gen1Recomp love.js Gate</title>
+<style>
+  html,body{margin:0;background:#111;color:#fff;width:100%;height:100%;overflow:hidden}
+  canvas{width:100%;height:100%;display:none;outline:none}
+  #spinner{position:fixed;inset:0;display:grid;place-items:center;font:16px system-ui}
+  #spinner.pending::after{content:"Preparing love.js…"}
+  #spinner.loading::after{content:"Booting LÖVE 11.5…"}
+  #spinner.error::after{content:"love.js failed"}
+</style>
+<canvas id="canvas" tabindex="0"></canvas>
+<div id="spinner" class="pending"></div>
+<script>
+(function () {
+  var sent = false;
+  function post(kind, detail) {
+    if (sent) return;
+    sent = true;
+    window.webkit.messageHandlers.runtimeEvent.postMessage({
+      kind: kind,
+      detail: String(detail || ''),
+      at: new Date().toISOString(),
+      canvasWidth: document.getElementById('canvas').width,
+      canvasHeight: document.getElementById('canvas').height,
+      indexedDB: typeof indexedDB !== 'undefined',
+      webAssembly: typeof WebAssembly !== 'undefined'
+    });
+  }
+  window.__gen1recompRuntimePost = post;
+  var spinner = document.getElementById('spinner');
+  new MutationObserver(function () {
+    if (spinner.className === '') post('ready', 'Module.postrun reached');
+    if (spinner.className === 'error') post('error', 'player error state');
+  }).observe(spinner, { attributes: true, attributeFilter: ['class'] });
+  setTimeout(function () { post('timeout', 'No postrun milestone within 30 seconds'); }, 30000);
+}());
+</script>
+<script src="player.js?g=nogame.love&v=11.5&n=1" onerror="window.__gen1recompRuntimePost('error','player.js failed to load')"></script>

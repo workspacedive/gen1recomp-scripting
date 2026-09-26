@@ -90,5 +90,6 @@ declare class WebViewController {
   loadFile(path: string, allowingReadAccessTo?: string): Promise<boolean>
   waitForLoad(): Promise<boolean>
   evaluateJavaScript<T = any>(javascript: string): Promise<T>
+  addScriptMessageHandler<P = any, R = any>(name: string, handler: (params?: P) => R): Promise<void>
   dispose(): void
 }
