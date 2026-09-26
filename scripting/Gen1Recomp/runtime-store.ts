@@ -2,6 +2,7 @@ import { Script } from "scripting"
 import { PATHS } from "./host"
 import { LOVEJS_RUNTIME } from "./runtime-manifest"
 import { parseRuntimeBridgeMessage } from "./runtime-bridge"
+import { BRIDGED_RUNTIME_PATHS, parseRuntimeResourceRequest, type BridgedRuntimePath } from "./runtime-resource"
 
 const RUNTIMES_ROOT = `${PATHS.cores}/runtimes`
 const DESTINATION = `${RUNTIMES_ROOT}/${LOVEJS_RUNTIME.id}`
@@ -134,6 +135,12 @@ export async function installRuntimeCandidate(): Promise<RuntimeCandidate> {
 
 export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
   await verifyRuntimeCandidate()
+  const resources = new Map<BridgedRuntimePath, ScriptingData>()
+  const resourceOffsets = new Map<BridgedRuntimePath, number>()
+  for (const path of BRIDGED_RUNTIME_PATHS) {
+    resources.set(path, await FileManager.readAsData(`${DESTINATION}/${path}`))
+    resourceOffsets.set(path, 0)
+  }
   await ensureDirectory(PATHS.diagnostics)
   const finalPath = `${PATHS.diagnostics}/lovejs-boot.v1.json`
   const progressPath = `${PATHS.diagnostics}/lovejs-boot-progress.v1.json`
@@ -180,6 +187,24 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
     await controller.addScriptMessageHandler("gen1HostBridge", (raw?: unknown) => {
       const message = parseRuntimeBridgeMessage(raw)
       if (!message) return { accepted: false }
+      if (message.type === "resource.read") {
+        const request = parseRuntimeResourceRequest(message)
+        if (!request) return { accepted: false, error: "invalid-resource-request" }
+        const resource = resources.get(request.path)
+        const expectedOffset = resourceOffsets.get(request.path)
+        if (!resource || expectedOffset == null || request.offset !== expectedOffset
+          || request.offset >= resource.size) return { accepted: false, error: "resource-range" }
+        const end = Math.min(resource.size, request.offset + request.length)
+        resourceOffsets.set(request.path, end)
+        return {
+          ok: true,
+          path: request.path,
+          offset: request.offset,
+          total: resource.size,
+          base64: resource.slice(request.offset, end).toBase64String(),
+          eof: end === resource.size,
+        }
+      }
       milestones.push(message.type)
       if (message.type === "bridge.ready") advanceStage("resource-preflight")
       if (message.type === "resources.ready") advanceStage("player-load")

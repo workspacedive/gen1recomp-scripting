@@ -42,6 +42,9 @@ declare namespace JSX {
 }
 
 interface ScriptingData {
+  readonly size: number
+  slice(start?: number, end?: number): ScriptingData
+  toBase64String(): string
   toHexString(): string
   toUint8Array(): Uint8Array | null
 }

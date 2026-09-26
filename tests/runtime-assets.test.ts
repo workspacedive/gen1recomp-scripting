@@ -9,8 +9,8 @@ const root = new URL('../scripting/Gen1Recomp/runtime/lovejs/', import.meta.url)
 test('vendored love.js candidate exactly matches the pinned inventory', async () => {
   assert.equal(LOVEJS_RUNTIME.sourceRevision, '9355186de22db13bd88bf2a0db75d2925647d036')
   assert.equal(LOVEJS_RUNTIME.loveVersion, '11.5')
-  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r2')
-  assert.equal(LOVEJS_RUNTIME.adapterVersion, 2)
+  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r3')
+  assert.equal(LOVEJS_RUNTIME.adapterVersion, 3)
   assert.equal(LOVEJS_RUNTIME.bridgeProtocol, 1)
   assert.equal(LOVEJS_RUNTIME.updatePolicy, 'reviewed-side-by-side-candidate')
   assert.equal(new Set(LOVEJS_RUNTIME.files.map((file) => file.path)).size, LOVEJS_RUNTIME.files.length)
@@ -29,7 +29,9 @@ test('runtime adapter keeps the upstream player and runtime as opaque pinned fil
   assert.match(harness, /player\.js\?g=nogame\.love&v=11\.5&n=1/)
   assert.match(harness, /bridge\.send\('bridge\.ready'/)
   assert.match(harness, /bridge\.send\('resources\.ready'/)
-  assert.doesNotMatch(harness, /love\.wasm/)
+  assert.match(harness, /bridge\.send\('resource\.read'/)
+  assert.match(harness, /transport: 'gen1HostBridge'/)
+  assert.doesNotMatch(harness, /WebAssembly\.(?:Module|Instance|validate|instantiate)/)
 })
 
 test('capability probe does not instantiate or inspect WASM directly', async () => {

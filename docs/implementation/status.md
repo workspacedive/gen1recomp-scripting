@@ -1,6 +1,17 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.6.0`
+Stand: 2026-09-26 · App-Version `0.7.0`
+
+## Iteration 0.7.0
+
+- **Gerätebefund 0.6.0:** `gen1HostBridge` selbst funktioniert (`bridge.ready`). Der lokale Browser-`fetch` scheiterte dagegen bereits beim Adapter-Preflight mit `TypeError: Load failed`; `resources.error` wurde korrekt über die Bridge zurückgemeldet. Ursache ist damit **VERIFIZIERT** auf lokale `file:`-Fetches eingegrenzt, bevor love.js oder WASM ausgeführt wurden.
+- Adapter r3 installiert einen eng allowlisteten Resource-Bridge-Pfad für exakt `nogame.love`, beide Normalizer und `11.5/love.wasm`. Andere Pfade, negative/unganzzahlige Offsets, leere oder über 128 KiB große Anforderungen werden abgelehnt.
+- Der Host liest die zuvor vollständig gehashten Kandidatendateien als opake Daten, liefert ausschließlich angeforderte Bereiche als Base64-Antwort und gibt weder Dateisystempfade noch beliebigen Dateizugriff an die WebView frei.
+- Der Harness ersetzt `fetch` nur für diese vier exakten Runtimepfade. Er setzt die geordneten 128-KiB-Teile wieder zusammen, cached sie im WebView-Speicher und liefert dem unveränderten upstream Player normale erfolgreiche `Response`-Objekte. `player.js` und `love.js` bleiben byteidentisch.
+- Der Host interpretiert oder instanziiert WASM weiterhin nicht, ruft keine Exporte auf und greift nicht auf linearen Speicher zu. WASM wird als opaker, updategebundener Runtimebestand über die Bridge transportiert; ausschließlich upstream love.js/Emscripten besitzt die interne Instanziierung.
+- Kandidat `lovejs-11.5-r3` wird mit Adapterversion 3 seitlich neben r1/r2 installiert und überschreibt keine frühere Version. Es bleibt ohne aktiven Pointer.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — Ursache des r2-Fehlers und Bridge-Erreichbarkeit sind geräteverifiziert; Chunk-Protokoll, Allowlist und Bytepins sind reproduzierbar getestet. Der r3-Transfer-/Boot-Test steht aus.
 
 ## Iteration 0.6.0
 
@@ -107,8 +118,8 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
 | Gepinnter love.js-Kandidat | offizieller LÖVE-11.5-Bestand, acht SHA-256-gebundene Dateien, transaktionale Installation und vollständige Revalidierung vor Boot | TEILWEISE VERIFIZIERT; Geräte-Boot ausstehend |
-| Runtime-Bridge | versioniertes `gen1HostBridge`-Protokoll v1 mit Meilensteinen; upstream Runtime und Gen1Recomp bleiben unverändert | EXPERIMENTELL; r2-Gerätetest ausstehend |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 32 Tests | VERIFIZIERT lokal |
+| Runtime-Bridge | `gen1HostBridge` v1 mit Meilensteinen und allowlistetem 128-KiB-Ressourcentransport; upstream Runtime und Gen1Recomp bleiben unverändert | EXPERIMENTELL; r3-Gerätetest ausstehend |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 33 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund
@@ -134,4 +145,4 @@ Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tes
 
 ## Nächster implementierbarer Schritt
 
-0.6.0 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** mit Kandidat `lovejs-11.5-r2` ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.
+0.7.0 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** mit Kandidat `lovejs-11.5-r3` ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.

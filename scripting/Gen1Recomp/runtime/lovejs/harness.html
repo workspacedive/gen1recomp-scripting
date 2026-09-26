@@ -15,6 +15,10 @@
 <script>
 (function () {
   var terminal = false;
+  var bridgedPaths = [
+    'nogame.love', 'lua/normalize1.lua', 'lua/normalize2.lua', '11.5/love.wasm'
+  ];
+  var resourceCache = {};
   var bridge = {
     send: function (type, detail, data) {
       return window.webkit.messageHandlers.gen1HostBridge.postMessage({
@@ -28,9 +32,45 @@
       if (terminal) return;
       terminal = true;
       bridge.send(type, detail, data);
+    },
+    readResource: async function (path) {
+      if (resourceCache[path]) return resourceCache[path];
+      var offset = 0;
+      var output = null;
+      while (true) {
+        var reply = await bridge.send('resource.read', path, {
+          path: path, offset: offset, length: 131072
+        });
+        if (!reply || reply.ok !== true || reply.path !== path || reply.offset !== offset)
+          throw new Error(path + ': invalid host resource reply');
+        if (!output) output = new Uint8Array(reply.total);
+        var raw = atob(reply.base64);
+        for (var index = 0; index < raw.length; index += 1)
+          output[offset + index] = raw.charCodeAt(index);
+        offset += raw.length;
+        if (reply.eof) break;
+        if (raw.length === 0 || offset > reply.total)
+          throw new Error(path + ': invalid host resource range');
+      }
+      if (!output || offset !== output.length)
+        throw new Error(path + ': incomplete host resource');
+      resourceCache[path] = output;
+      return output;
     }
   };
   window.__gen1Bridge = bridge;
+
+  var nativeFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    var path = typeof input === 'string' ? input : '';
+    if (bridgedPaths.indexOf(path) < 0) return nativeFetch(input, init);
+    return bridge.readResource(path).then(function (bytes) {
+      return new Response(bytes.slice(), {
+        status: 200,
+        headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(bytes.length) }
+      });
+    });
+  };
 
   var canvas = document.getElementById('canvas');
   var spinner = document.getElementById('spinner');
@@ -49,18 +89,15 @@
     webAssembly: typeof WebAssembly !== 'undefined'
   });
 
-  var resources = [
-    'nogame.love', 'lua/normalize1.lua', 'lua/normalize2.lua', '11.5/love.js'
-  ];
-  Promise.all(resources.map(function (path) {
+  Promise.all(bridgedPaths.map(function (path) {
     return fetch(path, { cache: 'no-store' }).then(function (response) {
       return response.arrayBuffer().then(function (bytes) {
-        if (bytes.byteLength === 0) throw new Error(path + ': empty response');
-        return { path: path, bytes: bytes.byteLength, status: response.status };
+        if (!response.ok || bytes.byteLength === 0) throw new Error(path + ': empty response');
+        return { path: path, bytes: bytes.byteLength, transport: 'gen1HostBridge' };
       });
     });
   })).then(function (results) {
-    bridge.send('resources.ready', 'Adapter resources are readable; WASM remains runtime-owned', { resources: results });
+    bridge.send('resources.ready', 'All runtime packages transferred through host bridge', { resources: results });
     var script = document.createElement('script');
     script.src = 'player.js?g=nogame.love&v=11.5&n=1';
     script.onload = function () { bridge.send('player.loaded', 'player.js returned from initial execution'); };
