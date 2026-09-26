@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.9`
+Stand: 2026-09-26 · App-Version `0.11.0`
+
+## Iteration 0.11.0
+
+- **VERIFIZIERT (Gerät):** Das STORE-Paket 0.10.9 lässt sich importieren; allgemeine Audioausgabe ist vorhanden. Der Funktionswert erreicht dennoch weiterhin `Music.applyVolume`.
+- Nach drei unveränderten Gerätebefunden werden keine weiteren spekulativen Konstruktor-Zeitpunktkorrekturen vorgenommen.
+- Adapter r14 validiert stattdessen den Rückgabevertrag am letzten stabilen Punkt vor Music: dem über den nachweislich aktiven Require-Adapter geladenen Export `ChipAudio.playMusic`.
+- Ungültige Rückgaben werden mit Typ und verfügbarer Funktionsherkunft als Fehler an `Music.startSong` zurückgegeben. Dessen vorhandener `pcall` verwirft den Song kontrolliert, statt den Funktionswert in `applyVolume` zu dereferenzieren.
+- **NICHT VERIFIZIERT:** Fortschritt über den Kartenaufbau, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.0.md`](../architecture/conformance-audit-0.11.0.md).
 
 ## Iteration 0.10.9
 

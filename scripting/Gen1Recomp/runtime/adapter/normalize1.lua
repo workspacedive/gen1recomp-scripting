@@ -315,6 +315,41 @@ do
         end
         return originalDraw(self, ...)
       end
+    elseif name == "src.core.ChipAudio" and type(module) == "table"
+        and not rawget(module, "__hostSourceContract") then
+      module.__hostSourceContract = true
+      local originalPlayMusic = module.playMusic
+      if type(originalPlayMusic) == "function" then
+        module.playMusic = function(...)
+          local source, message = originalPlayMusic(...)
+          if source ~= nil then
+            local kind = type(source)
+            local valid = false
+            if kind == "userdata" or kind == "table" then
+              local ok, setVolume, queue, getFreeBufferCount = pcall(function()
+                return source.setVolume, source.queue, source.getFreeBufferCount
+              end)
+              valid = ok and type(setVolume) == "function"
+                and type(queue) == "function"
+                and type(getFreeBufferCount) == "function"
+            end
+            if not valid then
+              local origin = ""
+              if kind == "function" and debug and debug.getinfo then
+                local ok, info = pcall(debug.getinfo, source, "Sln")
+                if ok and info then
+                  origin = (" (%s:%s, %s)"):format(
+                    tostring(info.short_src or info.source or "?"),
+                    tostring(info.linedefined or "?"), tostring(info.what or "?"))
+                end
+              end
+              error("ChipAudio.playMusic returned " .. kind
+                .. " instead of Source" .. origin, 0)
+            end
+          end
+          return source, message
+        end
+      end
     elseif name == "src.ui.kit.Theme" and type(module) == "table"
         and not rawget(module, "__hostRailCompatibility") then
       module.__hostRailCompatibility = true

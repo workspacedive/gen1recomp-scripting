@@ -36,6 +36,9 @@ local diagnosticGame = {
   load = function() error("preserved root cause") end,
   draw = function() error("secondary draw failure") end,
 }
+local diagnosticChipAudio = {
+  playMusic = function() return function() end end,
+}
 local diagnosticTheme = { PAL = {} }
 for _, name in ipairs({ "railRed", "railBlue", "railGold", "railAmber",
   "railSilver", "railCrystal", "railFireRed", "railLeafGreen" }) do
@@ -43,6 +46,7 @@ for _, name in ipairs({ "railRed", "railBlue", "railGold", "railAmber",
 end
 require = function(name)
   if name == "src.core.Game" then return diagnosticGame end
+  if name == "src.core.ChipAudio" then return diagnosticChipAudio end
   if name == "src.ui.kit.Theme" then return diagnosticTheme end
   return nativeRequire(name)
 end
@@ -90,6 +94,10 @@ assert(not loaded and loadError:match("preserved root cause"))
 local drawn, drawError = pcall(game.draw, game)
 assert(not drawn and drawError:match("game boot failed before the first draw"))
 assert(drawError:match("preserved root cause"))
+local chipAudio = require("src.core.ChipAudio")
+assert(chipAudio.__hostSourceContract == true)
+local audioOk, audioError = pcall(chipAudio.playMusic)
+assert(not audioOk and audioError:match("ChipAudio%.playMusic returned function instead of Source"))
 local theme = require("src.ui.kit.Theme")
 assert(theme.__hostRailCompatibility == true)
 assert(pcall(theme.versionRail, 0, 0, 4, 1))
