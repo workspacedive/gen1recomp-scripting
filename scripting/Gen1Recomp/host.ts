@@ -1,4 +1,3 @@
-import { Crypto, FileManager } from 'scripting'
 import { APP } from './config'
 import { identifyGame, type KnownGameId } from './game-manifest'
 

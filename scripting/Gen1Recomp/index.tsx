@@ -1,5 +1,5 @@
 import {
-  Button, DocumentPicker, HStack, Image, Label, List, Navigation, NavigationStack,
+  Button, HStack, Image, Label, List, Navigation, NavigationStack,
   Script, Section, Spacer, Text, VStack, useEffect, useState
 } from 'scripting'
 import { APP, THEME } from './config'

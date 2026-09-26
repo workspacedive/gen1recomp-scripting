@@ -1,0 +1,69 @@
+// Narrow compile-time contract for APIs used by this project.
+// Derived from the official Scripting App Store documentation examples.
+// Service APIs are injected globals; only UI/React symbols are module exports.
+
+declare module 'scripting' {
+  export const Button: any
+  export const HStack: any
+  export const Image: any
+  export const Label: any
+  export const List: any
+  export const Navigation: any
+  export const NavigationStack: any
+  export const Script: any
+  export const Section: any
+  export const Spacer: any
+  export const Text: any
+  export const VStack: any
+  export function useEffect(effect: () => void | (() => void), dependencies: unknown[]): void
+  export function useState<T>(initial: T): [T, (value: T | ((previous: T) => T)) => void]
+}
+
+declare const createElement: (...args: any[]) => any
+declare const Fragment: any
+
+declare namespace JSX {
+  interface IntrinsicAttributes { key?: string | number }
+  interface IntrinsicElements { [name: string]: any }
+}
+
+interface ScriptingData {
+  toHexString(): string
+}
+
+declare const Crypto: {
+  sha1(data: ScriptingData): ScriptingData
+  sha256(data: ScriptingData): ScriptingData
+}
+
+declare const FileManager: {
+  readonly documentsDirectory: string
+  createDirectory(path: string, recursive?: boolean): Promise<void>
+  exists(path: string): Promise<boolean>
+  readAsData(path: string): Promise<ScriptingData>
+  readAsString(path: string): Promise<string>
+  writeAsData(path: string, data: ScriptingData): Promise<void>
+  writeAsString(path: string, data: string): Promise<void>
+  copyFile(path: string, newPath: string): Promise<void>
+  rename(path: string, newPath: string): Promise<void>
+  remove(path: string): Promise<void>
+  stat(path: string): Promise<{ size: number; type: string; creationDate: number; modificationDate: number }>
+}
+
+declare const DocumentPicker: {
+  pickFiles(options?: {
+    initialDirectory?: string
+    types?: string[]
+    shouldShowFileExtensions?: boolean
+    allowsMultipleSelection?: boolean
+  }): Promise<string[]>
+  stopAcessingSecurityScopedResources(): void
+}
+
+declare class WebViewController {
+  constructor(options?: { ephemeral?: boolean })
+  loadFile(path: string, allowingReadAccessTo?: string): Promise<boolean>
+  waitForLoad(): Promise<boolean>
+  evaluateJavaScript<T = any>(javascript: string): Promise<T>
+  dispose(): void
+}

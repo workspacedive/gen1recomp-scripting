@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.2.1 besitzt jetzt eine persistente Library, bekannte Red-/Blue-/Yellow-Erkennung, verifiziertes Import-Staging mit Recovery-Journal, sichtbares Ordnersystem, Backup-fähigen Index, erweiterten Capability-Report und ein explizites Runtime-Gate. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert den konkreten love.js-Boot, lokale Subresources, Audio oder Save-Persistenz nicht; diese Gates müssen zuerst auf echten Geräten bestehen.
+> **Ehrlicher Status:** Die Scripting-App 0.2.2 besitzt jetzt eine persistente Library, bekannte Red-/Blue-/Yellow-Erkennung, verifiziertes Import-Staging mit Recovery-Journal, sichtbares Ordnersystem, Backup-fähigen Index, erweiterten Capability-Report und ein explizites Runtime-Gate. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert den konkreten love.js-Boot, lokale Subresources, Audio oder Save-Persistenz nicht; diese Gates müssen zuerst auf echten Geräten bestehen.
 
 ## Warum kein schneller Rewrite?
 
@@ -41,7 +41,7 @@ npm install
 npm run check
 ```
 
-Aktuell: 10 Unit-Tests. Zusätzlich bündelt `npm run check:scripting` den vollständigen Scripting-Importgraphen mit `scripting` als externer Host-API und erkennt Syntax-/Importfehler. Die TSX-API selbst wird wegen der nur in der App verfügbaren `scripting`-Typen nicht als Node-Typvertrag ausgegeben; ihre verwendeten APIs wurden gegen die offizielle App-Store-Dokumentations-ZIP geprüft. Ein echter Scripting-Gerätetest bleibt ein Release-Gate.
+Aktuell: 10 Unit-Tests. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
 
 ## Free-Tier-Regel
 

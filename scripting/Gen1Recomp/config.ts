@@ -1,5 +1,5 @@
 export const APP = {
-  version: '0.2.1',
+  version: '0.2.2',
   storageSchema: 1,
   librarySchema: 1,
   capabilitySchema: 2,
@@ -7,7 +7,7 @@ export const APP = {
   maxImportBytes: 64 * 1024 * 1024,
   runtimeEnabled: false,
   requiredCoreHostContract: 1,
-}
+} as const
 
 export const THEME = {
   red: '#c13034',

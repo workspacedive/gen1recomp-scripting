@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --import tsx --test tests/**/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "check:scripting": "node tools/check-scripting.mjs",
+    "typecheck:scripting": "tsc -p tsconfig.scripting.json --noEmit",
+    "check:scripting": "npm run typecheck:scripting && node tools/check-scripting.mjs",
     "check:code": "npm run typecheck && npm run check:scripting && npm test",
     "check:package": "bash tools/package-scripting.sh --check",
     "package:scripting": "npm run check:code && bash tools/package-scripting.sh",

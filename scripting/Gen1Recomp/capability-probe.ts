@@ -1,4 +1,3 @@
-import { FileManager, WebViewController } from 'scripting'
 import { APP } from './config'
 import { PATHS, saveCapabilityReport } from './host'
 
