@@ -1,14 +1,14 @@
 export const LOVEJS_RUNTIME = Object.freeze({
-  id: "lovejs-11.5-r5",
+  id: "lovejs-11.5-r6",
   loveVersion: "11.5",
-  adapterVersion: 5,
+  adapterVersion: 6,
   bridgeProtocol: 1,
   sourceRevision: "9355186de22db13bd88bf2a0db75d2925647d036",
-  supersedes: "lovejs-11.5-r4",
+  supersedes: "lovejs-11.5-r5",
   updatePolicy: "reviewed-side-by-side-candidate",
   files: [
     { path: "harness.html", sha256: "62b376203c5a4c7ad7bacfea09577bc1447487e65061cb165aeead9b9c9d4ee7" },
-    { path: "adapter/normalize1.lua", sha256: "4eef1dfa0f198c826156a170e74e4e0fa9a6bbdf372574d0ecc50973eadd09ea" },
+    { path: "adapter/normalize1.lua", sha256: "a8a5503c1a849dd243cee2dd3d81c3cdbaed4de5cf0819b905e9f9b7d93ba6e8" },
     { path: "player.js", sha256: "fd8c0391855467307ae92abcdd31a814a60a3ec049e3113fdc1f78b824d356cf" },
     { path: "nogame.love", sha256: "0b5b290f702d8b2f7107a92a10d4e3a14f7f0b8097230fc6ad59226123eb180d" },
     { path: "lua/normalize1.lua", sha256: "76a3002bf521add045973022be3318f74d0836f2ff9e90a505a08afabeb82a9e" },

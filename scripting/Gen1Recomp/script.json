@@ -2,7 +2,7 @@
   "name": "Gen1Recomp",
   "icon": "gamecontroller.fill",
   "color": "rgba(193, 48, 52, 1)",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "entry": "index.tsx",
   "runInApp": true,
   "description": "Offline-first game and mod manager with diagnostics and a safe runtime gate.",

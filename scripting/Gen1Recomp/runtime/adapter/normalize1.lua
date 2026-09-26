@@ -201,3 +201,44 @@ do
     end
   end
 end
+
+-- Gen1Recomp's asynchronous ROM-import completion intentionally catches a
+-- bootGame failure before returning to the frame loop. Preserve that original
+-- failure on the Game singleton so the following draw reports the actionable
+-- cause instead of masking it with a secondary nil StateStack error.
+do
+  local originalRequire = require
+  local unpackValues = table.unpack or unpack
+  local function pack(...)
+    return { n = select("#", ...), ... }
+  end
+  require = function(name)
+    local module = originalRequire(name)
+    if name == "src.core.Game" and type(module) == "table"
+        and not rawget(module, "__hostLoadDiagnostic") then
+      module.__hostLoadDiagnostic = true
+      local originalLoad, originalDraw = module.load, module.draw
+      module.load = function(self, ...)
+        local arguments = pack(...)
+        local results = pack(xpcall(function()
+          return originalLoad(self, unpackValues(arguments, 1, arguments.n))
+        end, function(message)
+          return debug.traceback(tostring(message), 2)
+        end))
+        if not results[1] then
+          self.__hostLoadError = results[2]
+          error(results[2], 0)
+        end
+        return unpackValues(results, 2, results.n)
+      end
+      module.draw = function(self, ...)
+        local loadError = rawget(self, "__hostLoadError")
+        if loadError then
+          error("Gen1Recomp game boot failed before the first draw:\n" .. loadError, 0)
+        end
+        return originalDraw(self, ...)
+      end
+    end
+    return module
+  end
+end

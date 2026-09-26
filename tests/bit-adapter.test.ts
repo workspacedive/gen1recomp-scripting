@@ -11,7 +11,16 @@ test('pure-Lua bit adapter satisfies StreamMD5 and shift semantics', async () =>
   const streamMd5 = await readFile(new URL('./fixtures/StreamMD5.lua', import.meta.url), 'utf8')
   const marker = '-- Gen1Recomp host adapter:'
   const shim = adapter.slice(adapter.indexOf(marker))
-  const script = `${shim}\nlocal MD5 = (function()\n${streamMd5}\nend)()\n
+  const script = `local nativeRequire = require
+local diagnosticGame = {
+  load = function() error("preserved root cause") end,
+  draw = function() error("secondary draw failure") end,
+}
+require = function(name)
+  if name == "src.core.Game" then return diagnosticGame end
+  return nativeRequire(name)
+end
+${shim}\nlocal MD5 = (function()\n${streamMd5}\nend)()\n
 local vectors = {
   {"", "d41d8cd98f00b204e9800998ecf8427e"},
   {"abc", "900150983cd24fb0d6963f7d28e17f72"},
@@ -33,6 +42,12 @@ assert(bit.arshift(-2, 32) == -1)
 assert(bit.rol(0x12345678, 8) == 0x34567812)
 assert(bit.tobit(0xffffffff) == -1)
 assert(bit32.bnot(0) == 4294967295)
+local game = require("src.core.Game")
+local loaded, loadError = pcall(game.load, game)
+assert(not loaded and loadError:match("preserved root cause"))
+local drawn, drawError = pcall(game.draw, game)
+assert(not drawn and drawError:match("game boot failed before the first draw"))
+assert(drawError:match("preserved root cause"))
 `
 
   const state = lauxlib.luaL_newstate()

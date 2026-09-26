@@ -1,6 +1,13 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.0`
+Stand: 2026-09-26 · App-Version `0.10.1`
+
+## Iteration 0.10.1
+
+- **VERIFIZIERT (Gerät):** Der Bit-/StreamMD5-Blocker ist beim experimentellen Start beseitigt; ROM-Import und Übergabe erreichen das Gen-1-Game-Objekt.
+- **NICHT VERIFIZIERT:** `Game.load` scheitert vor der StateStack-Initialisierung. Upstreams `pcall` verdeckt den Root Cause, worauf der erste Draw nur `Game.stack == nil` meldet.
+- Adapter r6 bewahrt ausschließlich im Fehlerfall den ursprünglichen `Game.load`-Traceback für den nächsten Gerätetest; erfolgreiches Laden und Zeichnen bleiben unverändert.
+- Detailprüfung: [`conformance-audit-0.10.1.md`](../architecture/conformance-audit-0.10.1.md).
 
 ## Iteration 0.10.0
 

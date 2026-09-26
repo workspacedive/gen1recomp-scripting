@@ -9,8 +9,8 @@ const root = new URL('../scripting/Gen1Recomp/runtime/lovejs/', import.meta.url)
 test('vendored love.js candidate exactly matches the pinned inventory', async () => {
   assert.equal(LOVEJS_RUNTIME.sourceRevision, '9355186de22db13bd88bf2a0db75d2925647d036')
   assert.equal(LOVEJS_RUNTIME.loveVersion, '11.5')
-  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r5')
-  assert.equal(LOVEJS_RUNTIME.adapterVersion, 5)
+  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r6')
+  assert.equal(LOVEJS_RUNTIME.adapterVersion, 6)
   assert.equal(LOVEJS_RUNTIME.bridgeProtocol, 1)
   assert.equal(LOVEJS_RUNTIME.updatePolicy, 'reviewed-side-by-side-candidate')
   assert.equal(new Set(LOVEJS_RUNTIME.files.map((file) => file.path)).size, LOVEJS_RUNTIME.files.length)
@@ -50,6 +50,8 @@ test('host normalization overlay preserves upstream bytes and supplies reviewed 
   assert.match(adapter, /name == "POKEPORT_IMPORT_ROM"/)
   assert.match(adapter, /name == "POKEPORT_FORCE_IMPORT"/)
   assert.match(adapter, /\/usr\/local\/share\/lua\/5\.1\/import\.gb/)
+  assert.match(adapter, /self\.__hostLoadError = results\[2\]/)
+  assert.match(adapter, /game boot failed before the first draw/)
 })
 
 test('capability probe does not instantiate or inspect WASM directly', async () => {
