@@ -11,6 +11,7 @@ test('resource bridge is allowlisted and range-bounded', () => {
     'payload/gen1recomp-0.3.20.love', 'rom/import.gb',
   ])
   assert.equal(runtimeCandidatePath('lua/normalize1.lua'), 'adapter/normalize1.lua')
+  assert.equal(runtimeCandidatePath('lua/normalize2.lua'), 'adapter/normalize2.lua')
   assert.equal(runtimeCandidatePath('11.5/love.wasm'), '11.5/love.wasm')
   const valid = parseRuntimeBridgeMessage({
     protocolVersion: 1,

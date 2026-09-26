@@ -26,7 +26,9 @@ export function isBridgedRuntimePath(path: string): path is BridgedRuntimePath {
 }
 
 export function runtimeCandidatePath(path: BridgedRuntimePath): string {
-  return path === "lua/normalize1.lua" ? "adapter/normalize1.lua" : path
+  if (path === "lua/normalize1.lua") return "adapter/normalize1.lua"
+  if (path === "lua/normalize2.lua") return "adapter/normalize2.lua"
+  return path
 }
 
 export interface RuntimeResourceRequest {

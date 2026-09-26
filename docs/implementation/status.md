@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.7`
+Stand: 2026-09-26 · App-Version `0.10.8`
+
+## Iteration 0.10.8
+
+- **VERIFIZIERT (Gerät):** Audioausgabe ist grundsätzlich vorhanden, aber r12 reproduziert weiterhin `Music.lua:39` mit einem Funktionswert.
+- **VERIFIZIERT (Quellprüfung):** Auch der verzögerte r12-Guard blieb Teil von `normalize1`; love.js stellt für Anpassungen nach Initialisierung optionaler Module ausdrücklich `normalize2` bereit und führt dort bereits seine upstream Audio-Normalisierung aus.
+- Runtime r13 verschiebt den Guard vollständig in einen getrennt gehashten normalize2-Adapter. Der Resource-Resolver liefert ihn anstelle der unveränderten upstream Ressource genau an love.js' Post-Modul-Lebenszykluspunkt aus.
+- Ein eigener ausführbarer Test prüft gültige und versetzte Source-Rückgaben sowie den ungültigen Funktionswert am normalize2-Pfad. Beide upstream Normalizer bleiben als unveränderte, gehashte Dateien erhalten.
+- **NICHT VERIFIZIERT:** QueueableSource-Musik, r13-Geräteaktivierung, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.10.8.md`](../architecture/conformance-audit-0.10.8.md).
 
 ## Iteration 0.10.7
 

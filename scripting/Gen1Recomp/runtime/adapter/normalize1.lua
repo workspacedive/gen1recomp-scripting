@@ -289,44 +289,7 @@ do
     return { n = select("#", ...), ... }
   end
 
-  -- normalize1 executes before optional LÖVE modules are guaranteed to exist.
-  -- Install this correction lazily from the require path used to load the
-  -- game, by which point love.audio has been initialized. r11 attempted the
-  -- same guard eagerly and therefore did nothing on the observed device.
-  local audioGuardInstalled = false
-  local function installAudioGuard()
-    if audioGuardInstalled then return end
-    local audio = love and love.audio
-    local nativeNewQueueableSource = audio and audio.newQueueableSource
-    if type(nativeNewQueueableSource) ~= "function" then return end
-
-    local function isSource(value)
-      local kind = type(value)
-      if kind ~= "userdata" and kind ~= "table" then return false end
-      local ok, setVolume, queue, getFreeBufferCount = pcall(function()
-        return value.setVolume, value.queue, value.getFreeBufferCount
-      end)
-      return ok and type(setVolume) == "function" and type(queue) == "function"
-        and type(getFreeBufferCount) == "function"
-    end
-    audio.newQueueableSource = function(...)
-      local results = pack(nativeNewQueueableSource(...))
-      if isSource(results[1]) then
-        return unpackValues(results, 1, results.n)
-      end
-      for index = 2, results.n do
-        if isSource(results[index]) then return results[index] end
-      end
-      local kinds = {}
-      for index = 1, results.n do kinds[index] = type(results[index]) end
-      error("love.js audio contract: newQueueableSource returned ["
-        .. table.concat(kinds, ",") .. "] instead of Source", 2)
-    end
-    audioGuardInstalled = true
-  end
-
   require = function(name)
-    installAudioGuard()
     local module = originalRequire(name)
     if name == "src.core.Game" and type(module) == "table"
         and not rawget(module, "__hostLoadDiagnostic") then

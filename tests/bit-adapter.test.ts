@@ -13,24 +13,12 @@ test('pure-Lua bit adapter satisfies StreamMD5 and shift semantics', async () =>
   const shim = adapter.slice(adapter.indexOf(marker))
   const script = `local nativeRequire = require
 local clockValues, clockIndex = { 0 / 0, 4, 3, 5 }, 0
-local audioMode = "secondary-source"
-local queueableSource = {
-  setVolume = function() end,
-  queue = function() end,
-  getFreeBufferCount = function() return 1 end,
-}
-local function nativeNewQueueableSource()
-  if audioMode == "secondary-source" then return function() end, queueableSource end
-  return function() end
-end
 love = {
   timer = { getTime = function()
     clockIndex = clockIndex + 1
     return clockValues[clockIndex]
   end },
   graphics = { setColor = function() end, rectangle = function() end },
-  -- Audio is deliberately absent while normalize1 executes. LÖVE initializes
-  -- optional modules later; the adapter must install from the game require.
 }
 local nativeModernLoad = load
 loadstring = function(source, chunkname) return nativeModernLoad(source, chunkname) end
@@ -64,13 +52,6 @@ assert(firstTime == firstTime and firstTime ~= math.huge and firstTime ~= -math.
 assert(love.timer.getTime() == 4)
 assert(love.timer.getTime() == 4)
 assert(love.timer.getTime() == 5)
-love.audio = { newQueueableSource = nativeNewQueueableSource }
-local game = require("src.core.Game")
-assert(love.audio.newQueueableSource ~= nativeNewQueueableSource)
-assert(love.audio.newQueueableSource(44100, 16, 2, 32) == queueableSource)
-audioMode = "invalid"
-local validAudio, audioError = pcall(love.audio.newQueueableSource, 44100, 16, 2, 32)
-assert(not validAudio and audioError:match("returned %[function%] instead of Source"))
 local generated = assert(load("return answer", "@generated.lua", "t", { answer = 42 }))
 assert(generated() == 42)
 local deniedText, deniedMessage = load("return 1", "@generated.lua", "b", {})
@@ -103,6 +84,7 @@ assert(bit.arshift(-2, 32) == -1)
 assert(bit.rol(0x12345678, 8) == 0x34567812)
 assert(bit.tobit(0xffffffff) == -1)
 assert(bit32.bnot(0) == 4294967295)
+local game = require("src.core.Game")
 local loaded, loadError = pcall(game.load, game)
 assert(not loaded and loadError:match("preserved root cause"))
 local drawn, drawError = pcall(game.draw, game)
