@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.6`
+Stand: 2026-09-26 · App-Version `0.10.7`
+
+## Iteration 0.10.7
+
+- **VERIFIZIERT (Gerät):** r11 änderte den `Music.lua:39`-Fehler nicht; der QueueableSource-Guard war auf dem Gerätepfad nicht aktiv.
+- **VERIFIZIERT (Quellprüfung):** r11 versuchte die Installation während `normalize1`, bevor `love.audio` als optionales LÖVE-Modul garantiert verfügbar ist. Ein ausgeführter Guard hätte den beobachteten Funktionswert nicht passieren lassen.
+- Adapter r12 installiert den Guard deshalb verzögert aus dem bestehenden Require-Adapter, sobald `love.audio.newQueueableSource` existiert, aber weiterhin vor dem Laden/Benutzen von `ChipAudio`.
+- Der ausführbare Lua-Test bildet die späte Audio-Modulinitialisierung nach und beweist Installation, Wiederherstellung eines späteren Source-Rückgabewerts und kontrollierte Zurückweisung des Funktionswerts.
+- **NICHT VERIFIZIERT:** r12-Aktivierung auf dem Gerät, Musik/SFX, weiterer Spielfortschritt, Saves und Lifecycle.
+- Detailprüfung: [`conformance-audit-0.10.7.md`](../architecture/conformance-audit-0.10.7.md).
 
 ## Iteration 0.10.6
 
