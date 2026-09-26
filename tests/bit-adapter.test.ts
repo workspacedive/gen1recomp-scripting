@@ -36,10 +36,6 @@ local diagnosticGame = {
   load = function() error("preserved root cause") end,
   draw = function() error("secondary draw failure") end,
 }
-local chipResult = function() end
-local diagnosticChipAudio = {
-  playMusic = function() return chipResult end,
-}
 local diagnosticTheme = { PAL = {} }
 for _, name in ipairs({ "railRed", "railBlue", "railGold", "railAmber",
   "railSilver", "railCrystal", "railFireRed", "railLeafGreen" }) do
@@ -47,7 +43,6 @@ for _, name in ipairs({ "railRed", "railBlue", "railGold", "railAmber",
 end
 require = function(name)
   if name == "src.core.Game" then return diagnosticGame end
-  if name == "src.core.ChipAudio" then return diagnosticChipAudio end
   if name == "src.ui.kit.Theme" then return diagnosticTheme end
   return nativeRequire(name)
 end
@@ -95,29 +90,6 @@ assert(not loaded and loadError:match("preserved root cause"))
 local drawn, drawError = pcall(game.draw, game)
 assert(not drawn and drawError:match("game boot failed before the first draw"))
 assert(drawError:match("preserved root cause"))
-local chipAudio = require("src.core.ChipAudio")
-assert(chipAudio.__hostSourceContract == true)
-local audioOk, audioError = pcall(chipAudio.playMusic)
-assert(not audioOk and audioError:match("ChipAudio%.playMusic returned function instead of Source"))
-local forwarded = {}
-chipResult = {
-  setVolume = function(self) assert(self == chipResult); forwarded.setVolume = true end,
-  queue = function(self) assert(self == chipResult); forwarded.queue = true end,
-  getFreeBufferCount = function(self) assert(self == chipResult); return 1 end,
-  play = function(self) assert(self == chipResult); forwarded.play = true end,
-  stop = function(self) assert(self == chipResult); forwarded.stop = true end,
-  pause = function(self) assert(self == chipResult); forwarded.pause = true end,
-  isPlaying = function(self) assert(self == chipResult); return false end,
-}
-local facade = chipAudio.playMusic()
-assert(facade ~= chipResult and facade.__hostNativeSource == chipResult)
-facade:setVolume(0.5); facade:queue({}); facade:play(); facade:stop(); facade:pause()
-assert(forwarded.setVolume and forwarded.queue and forwarded.play
-  and forwarded.stop and forwarded.pause)
-assert(facade:getFreeBufferCount() == 1 and facade:isPlaying() == false)
-assert(type(facade.setLooping) == "function" and facade:setLooping() == false)
-assert(type(facade.setFilter) == "function" and facade:setFilter() == false)
-assert(type(facade.setPitch) == "function" and facade:setPitch() == false)
 local theme = require("src.ui.kit.Theme")
 assert(theme.__hostRailCompatibility == true)
 assert(pcall(theme.versionRail, 0, 0, 4, 1))

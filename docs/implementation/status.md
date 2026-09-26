@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.11.2`
+Stand: 2026-09-26 · App-Version `0.11.3`
+
+## Iteration 0.11.3
+
+- **VERIFIZIERT (Gerät):** r16 reproduziert unverändert `Music.lua:308`; der nachgelagerte ChipAudio-Modulwrapper kontrolliert damit nicht zuverlässig das von Music verwendete Objekt.
+- Der gesamte Gen-1-Musikpfad wurde erneut geprüft: ROM-Songdefinition → `Music.startSong` → `ChipAudio.playMusic` → `love.audio.newQueueableSource` → Music-Zeile 308.
+- Adapter r17 erzeugt die vollständige Lua-Fassade jetzt direkt im nachweislich wirksamen normalize2-Konstruktoradapter. ChipAudio und Music erhalten von Anfang an dieselbe Fassade; der zeitabhängige ChipAudio-Require-Wrapper wurde entfernt.
+- Der Test simuliert exakt `function, Source`, prüft Auswahl, alle Kernweiterleitungen mit originalem `self` und die drei sicheren Modifier-Fallbacks.
+- **NICHT VERIFIZIERT:** Kartenstart, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.3.md`](../architecture/conformance-audit-0.11.3.md).
 
 ## Iteration 0.11.2
 

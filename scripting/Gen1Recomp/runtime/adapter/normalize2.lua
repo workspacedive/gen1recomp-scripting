@@ -161,26 +161,52 @@ do
   local audio = love and love.audio
   local nativeNewQueueableSource = audio and audio.newQueueableSource
   if type(nativeNewQueueableSource) == "function" then
-    local unpackValues = table.unpack or unpack
     local function pack(...)
       return { n = select("#", ...), ... }
     end
-    local function isSource(value)
-      local kind = type(value)
-      if kind ~= "userdata" and kind ~= "table" then return false end
-      local ok, setVolume, queue, getFreeBufferCount = pcall(function()
-        return value.setVolume, value.queue, value.getFreeBufferCount
+    local function adaptSource(nativeSource)
+      local kind = type(nativeSource)
+      if kind ~= "userdata" and kind ~= "table" then return nil end
+      local ok, methods = pcall(function()
+        return {
+          setVolume = nativeSource.setVolume,
+          queue = nativeSource.queue,
+          getFreeBufferCount = nativeSource.getFreeBufferCount,
+          play = nativeSource.play,
+          stop = nativeSource.stop,
+          pause = nativeSource.pause,
+          isPlaying = nativeSource.isPlaying,
+        }
       end)
-      return ok and type(setVolume) == "function" and type(queue) == "function"
-        and type(getFreeBufferCount) == "function"
+      if not ok then return nil end
+      for _, name in ipairs({ "setVolume", "queue", "getFreeBufferCount",
+          "play", "stop", "pause", "isPlaying" }) do
+        if type(methods[name]) ~= "function" then return nil end
+      end
+
+      -- Return a mutable Lua object from the constructor itself. ChipAudio and
+      -- Music therefore share one complete contract rather than passing the
+      -- opaque love.js proxy through several module-local adapters.
+      local facade = { __hostNativeSource = nativeSource }
+      for _, name in ipairs({ "setVolume", "queue", "getFreeBufferCount",
+          "play", "stop", "pause", "isPlaying" }) do
+        local nativeMethod = methods[name]
+        facade[name] = function(_, ...)
+          return nativeMethod(nativeSource, ...)
+        end
+      end
+      -- Queue looping is synthesized by ChipSynth's allowLoops path. These
+      -- Source modifiers are unsupported or unsafe on love.js' queue proxy.
+      facade.setLooping = function() return false end
+      facade.setFilter = function() return false end
+      facade.setPitch = function() return false end
+      return facade
     end
     audio.newQueueableSource = function(...)
       local results = pack(nativeNewQueueableSource(...))
-      if isSource(results[1]) then
-        return unpackValues(results, 1, results.n)
-      end
-      for index = 2, results.n do
-        if isSource(results[index]) then return results[index] end
+      for index = 1, results.n do
+        local source = adaptSource(results[index])
+        if source then return source end
       end
       local kinds = {}
       for index = 1, results.n do kinds[index] = type(results[index]) end
