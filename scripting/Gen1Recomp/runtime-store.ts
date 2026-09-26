@@ -155,6 +155,7 @@ interface BootProbeOptions {
   finalName: string
   progressName: string
   presentOnReady?: boolean
+  touchController?: boolean
 }
 
 async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport> {
@@ -215,7 +216,7 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   })
   let timer: ReturnType<typeof setTimeout> | null = null
   try {
-    await controller.addScriptMessageHandler("gen1HostBridge", async (raw?: unknown) => {
+    await controller.addScriptMessageHandler("gen1HostBridge", (raw?: unknown) => {
       const message = parseRuntimeBridgeMessage(raw)
       if (!message) return { accepted: false }
       if (message.type === "session.config") {
@@ -224,6 +225,7 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
           gamePath: options.gamePath,
           resourcePaths: options.resourcePaths,
           timeoutMs: options.runtimeTimeoutMs,
+          touchController: options.touchController === true,
         }
       }
       if (message.type === "resource.read") {
@@ -251,7 +253,7 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
       queueProgress().catch(() => { /* The final report still records in-memory milestones. */ })
 
       if (message.type === "runtime.error") {
-        await FileManager.writeAsString(runtimeErrorPath, JSON.stringify({
+        FileManager.writeAsString(runtimeErrorPath, JSON.stringify({
           schemaVersion: 1,
           recordedAt: new Date().toISOString(),
           runtimeId: LOVEJS_RUNTIME.id,
@@ -259,7 +261,7 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
           stage,
           detail: message.detail,
           milestones: [...milestones],
-        }, null, 2))
+        }, null, 2)).catch(() => { /* Preserve bridge reply; later attempts replace this diagnostic. */ })
       }
       if (message.type === "resources.error" || message.type === "runtime.error") {
         resolveEvent?.(failed("error", message.detail))
@@ -387,5 +389,6 @@ export async function presentGen1Gameplay(row: LibraryRow): Promise<LoveJsBootRe
     finalName: "gen1recomp-gameplay.v1.json",
     progressName: "gen1recomp-gameplay-progress.v1.json",
     presentOnReady: true,
+    touchController: true,
   })
 }

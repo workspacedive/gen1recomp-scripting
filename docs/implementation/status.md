@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.4`
+Stand: 2026-09-26 · App-Version `0.10.5`
+
+## Iteration 0.10.5
+
+- **VERIFIZIERT (Quellprüfung):** Der 0.10.4-Fehler `Invalid host session configuration` war eine Hostregression: ein versehentlich asynchroner Script-Message-Handler verletzte Scripting's synchronen Bridge-Rückgabevertrag.
+- Runtime r10 stellt den synchronen Handler wieder her; späte Fehler werden fire-and-forget mit eigener Fehlerbehandlung persistiert. Ein Regressionstest sperrt den asynchronen Handler.
+- Der ROM-/Gameplay-Modus besitzt nun einen hosteigenen Multitouch-Controller für D-Pad, A, B, START und SELECT über die unveränderten Gen1Recomp-Standardtasten.
+- `nogame`, Payload-Gate und Launcher-Vorschau aktivieren den Controller nicht.
+- **NICHT VERIFIZIERT:** r10, Controllerereignisse, Rail-Fix, Gameplay, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- Detailprüfung: [`conformance-audit-0.10.5.md`](../architecture/conformance-audit-0.10.5.md).
 
 ## Iteration 0.10.4
 

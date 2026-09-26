@@ -9,9 +9,36 @@
   #spinner.pending::after{content:"Preparing love.js…"}
   #spinner.loading::after{content:"Booting LÖVE 11.5…"}
   #spinner.error::after{content:"love.js failed"}
+  #touchpad{display:none;position:fixed;inset:0;z-index:20;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none;font:700 17px system-ui}
+  #touchpad.active{display:block}
+  .pad{position:absolute;bottom:max(22px,env(safe-area-inset-bottom));pointer-events:auto}
+  .dpad{left:22px;width:156px;height:156px}
+  .actions{right:22px;width:150px;height:130px}
+  .system{left:50%;transform:translateX(-50%);display:flex;gap:14px}
+  .key{position:absolute;border:2px solid rgba(255,255,255,.72);background:rgba(20,24,29,.58);color:#fff;border-radius:50%;width:52px;height:52px;display:grid;place-items:center;box-sizing:border-box;-webkit-backdrop-filter:blur(4px)}
+  .key.pressed{background:rgba(255,255,255,.72);color:#111}
+  .up{left:52px;top:0}.down{left:52px;bottom:0}.left{left:0;top:52px}.right{right:0;top:52px}
+  .a{right:0;top:0;width:64px;height:64px}.b{left:0;bottom:0;width:64px;height:64px}
+  .system .key{position:static;width:70px;height:34px;border-radius:18px;font-size:11px}
 </style>
 <canvas id="canvas" tabindex="0"></canvas>
 <div id="spinner" class="pending"></div>
+<div id="touchpad" aria-label="Gameplay controller">
+  <div class="pad dpad">
+    <div class="key up" data-key="ArrowUp" data-code="ArrowUp" data-keycode="38">▲</div>
+    <div class="key down" data-key="ArrowDown" data-code="ArrowDown" data-keycode="40">▼</div>
+    <div class="key left" data-key="ArrowLeft" data-code="ArrowLeft" data-keycode="37">◀</div>
+    <div class="key right" data-key="ArrowRight" data-code="ArrowRight" data-keycode="39">▶</div>
+  </div>
+  <div class="pad actions">
+    <div class="key a" data-key="z" data-code="KeyZ" data-keycode="90">A</div>
+    <div class="key b" data-key="x" data-code="KeyX" data-keycode="88">B</div>
+  </div>
+  <div class="pad system">
+    <div class="key" data-key="Tab" data-code="Tab" data-keycode="9">SELECT</div>
+    <div class="key" data-key="Escape" data-code="Escape" data-keycode="27">START</div>
+  </div>
+</div>
 <script>
 (function () {
   var terminal = false;
@@ -78,6 +105,47 @@
     return nativeAlert(message);
   };
 
+  function enableTouchController() {
+    var pad = document.getElementById('touchpad');
+    var held = {};
+    function dispatch(type, button) {
+      var keyCode = Number(button.dataset.keycode);
+      var event = new KeyboardEvent(type, {
+        key: button.dataset.key, code: button.dataset.code,
+        keyCode: keyCode, which: keyCode, bubbles: true, cancelable: true
+      });
+      window.dispatchEvent(event);
+    }
+    function release(pointerId) {
+      var button = held[pointerId];
+      if (!button) return;
+      delete held[pointerId];
+      button.classList.remove('pressed');
+      dispatch('keyup', button);
+    }
+    pad.querySelectorAll('[data-key]').forEach(function (button) {
+      button.addEventListener('pointerdown', function (event) {
+        event.preventDefault();
+        if (held[event.pointerId]) return;
+        held[event.pointerId] = button;
+        button.classList.add('pressed');
+        try { button.setPointerCapture(event.pointerId); } catch (_) {}
+        dispatch('keydown', button);
+        canvas.focus();
+      });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) {
+        button.addEventListener(type, function (event) {
+          event.preventDefault();
+          release(event.pointerId);
+        });
+      });
+    });
+    window.addEventListener('blur', function () {
+      Object.keys(held).forEach(release);
+    });
+    pad.classList.add('active');
+  }
+
   var nativeFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var path = typeof input === 'string' ? input : '';
@@ -110,11 +178,13 @@
 
   bridge.send('session.config', 'Request boot session configuration').then(function (config) {
     if (!config || config.ok !== true || !Array.isArray(config.resourcePaths)
-      || typeof config.gamePath !== 'string' || typeof config.timeoutMs !== 'number')
+      || typeof config.gamePath !== 'string' || typeof config.timeoutMs !== 'number'
+      || typeof config.touchController !== 'boolean')
       throw new Error('Invalid host session configuration');
     bridgedPaths = config.resourcePaths.slice();
     gamePath = config.gamePath;
     runtimeTimeoutMs = config.timeoutMs;
+    if (config.touchController) enableTouchController();
     setTimeout(function () {
       bridge.terminal('runtime.timeout', 'No Module.postrun milestone within ' + runtimeTimeoutMs + ' milliseconds');
     }, runtimeTimeoutMs);
