@@ -149,6 +149,7 @@ interface BootProbeOptions {
   hostTimeoutMs: number
   finalName: string
   progressName: string
+  presentOnReady?: boolean
 }
 
 async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport> {
@@ -297,6 +298,9 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
     await progressWrites
     await FileManager.writeAsString(finalPath, JSON.stringify(report, null, 2))
     try { await removeIfExists(progressPath) } catch { /* Final report is authoritative. */ }
+    if (report.status === "ready" && options.presentOnReady) {
+      await controller.present({ fullscreen: true, navigationTitle: "Gen1Recomp · Experimentell" })
+    }
     return report
   } finally {
     if (timer != null) clearTimeout(timer)
@@ -328,5 +332,21 @@ export async function runGen1PayloadBootProbe(): Promise<LoveJsBootReport> {
     hostTimeoutMs: 105_000,
     finalName: "gen1recomp-payload-boot.v1.json",
     progressName: "gen1recomp-payload-boot-progress.v1.json",
+  })
+}
+
+export async function presentGen1PayloadPreview(): Promise<LoveJsBootReport> {
+  const payload = await readVerifiedStagedPayload()
+  return runBootProbe({
+    probe: "gen1recomp-payload",
+    gamePath: GEN1_PAYLOAD_BRIDGE_PATH,
+    resourcePaths: [GEN1_PAYLOAD_BRIDGE_PATH, ...RUNTIME_SUPPORT_PATHS],
+    extraResources: new Map([[GEN1_PAYLOAD_BRIDGE_PATH, payload.data]]),
+    payloadVersion: payload.metadata.version,
+    runtimeTimeoutMs: 90_000,
+    hostTimeoutMs: 105_000,
+    finalName: "gen1recomp-preview.v1.json",
+    progressName: "gen1recomp-preview-progress.v1.json",
+    presentOnReady: true,
   })
 }

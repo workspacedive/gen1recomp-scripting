@@ -1,6 +1,16 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.8.0`
+Stand: 2026-09-26 · App-Version `0.9.0`
+
+## Iteration 0.9.0
+
+Drei aufeinanderfolgende Schritte wurden umgesetzt:
+
+1. **Begrenztes Payload-Staging:** Der Netzwerkabruf besitzt zusätzlich zum Request-Timeout ein dokumentiertes `AbortSignal.timeout(180_000)`. Vor Download, Response-Lesen, Größen-/Hashprüfung, ZIP-Preflight, Metadatenprüfung, Schreiben, zweitem Hash und atomarer Publikation wird `Diagnostics/payload-stage-progress.v1.json` aktualisiert. Die UI zeigt dieselbe Phase; ein Hänger ist damit zeitlich begrenzt oder nach Prozessabbruch lokalisierbar.
+2. **Payload-Boot-Gate:** Der in 0.8.0 ergänzte, erneut größen-/SHA-256-geprüfte Bridge-Boot bleibt separat verfügbar und schreibt `gen1recomp-payload-boot.v1.json`. Er mountet weiterhin keine ROMs, Mods oder Saves.
+3. **Sichtbare Launcher-Vorschau:** Nach demselben fail-closed Payload-Boot kann exakt dieselbe WebView über die dokumentierte `WebViewController.present`-API fullscreen angezeigt werden. Der Bericht wird vor Darstellung gespeichert; beim Schließen wird die WebView entsorgt. Die Vorschau aktiviert keinen Core und besitzt noch keinen ROM-/Save-Bridgepfad.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — love.js/nogame ist geräteverifiziert. Begrenztes Staging, Payload-Boot und sichtbare Vorschau benötigen den neuen Gerätelauf.
 
 ## Iteration 0.8.0
 
@@ -130,7 +140,7 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
 | Gepinnter love.js-Kandidat | offizieller LÖVE-11.5-Bestand, acht SHA-256-gebundene Dateien, transaktionale Installation und vollständige Revalidierung vor Boot | TEILWEISE VERIFIZIERT; Geräte-Boot ausstehend |
 | Runtime-Bridge | `gen1HostBridge` v1 mit Meilensteinen, Sessionkonfiguration und allowlistetem 128-KiB-Ressourcentransport; upstream Runtime und Gen1Recomp bleiben unverändert | love.js/nogame VERIFIZIERT; Payload-Gate EXPERIMENTELL |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 33 Tests | VERIFIZIERT lokal |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 35 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund
@@ -156,4 +166,4 @@ Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tes
 
 ## Nächster implementierbarer Schritt
 
-0.8.0 muss auf einem echten Gerät über **Diagnose → Gen1Recomp-Payload Boot testen** mit Kandidat `lovejs-11.5-r4` und dem bereits geprüften Payload 0.3.20 ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.
+0.9.0 muss zuerst das begrenzte Payload-Staging abschließen. Danach folgen **Gen1Recomp-Payload Boot testen** und bei Erfolg **Launcher-Vorschau öffnen**. Erst ein bestätigter sichtbarer Launcher erlaubt die nächste getrennte Stufe: einen einzelnen verifizierten Library-ROM-Datensatz über eine neue, schreibgeschützte Import-Bridge bereitzustellen. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.

@@ -20,6 +20,7 @@ declare module 'scripting' {
   export function fetch(input: string, init?: {
     headers?: Record<string, string>
     timeout?: number
+    signal?: AbortSignal
     debugLabel?: string
   }): Promise<{
     ok: boolean
@@ -94,5 +95,6 @@ declare class WebViewController {
   waitForLoad(): Promise<boolean>
   evaluateJavaScript<T = any>(javascript: string): Promise<T>
   addScriptMessageHandler<P = any, R = any>(name: string, handler: (params?: P) => R): Promise<void>
+  present(options?: { fullscreen?: boolean; navigationTitle?: string }): Promise<void>
   dispose(): void
 }

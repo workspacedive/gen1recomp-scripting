@@ -19,7 +19,7 @@ import {
 } from "./mod-store"
 import {
   installRuntimeCandidate, loadRuntimeCandidate, recoverRuntimeTransaction,
-  runGen1PayloadBootProbe, runLoveJsBootProbe, type RuntimeCandidate,
+  presentGen1PayloadPreview, runGen1PayloadBootProbe, runLoveJsBootProbe, type RuntimeCandidate,
 } from "./runtime-store"
 
 function errorMessage(error: unknown): string {
@@ -109,6 +109,7 @@ function DiagnosticsView(props: {
   run: () => Promise<void>
   runRuntime: () => Promise<void>
   runPayload: () => Promise<void>
+  runPreview: () => Promise<void>
 }) {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Diagnose" navigationBarTitleDisplayMode="large">
@@ -135,6 +136,8 @@ function DiagnosticsView(props: {
           : "Payload muss zuerst unter Einstellungen sicher gespeichert werden."}</Text>
         <Button title="Gen1Recomp-Payload Boot testen" systemImage="testtube.2"
           disabled={props.busy || props.stagedPayload == null} action={props.runPayload} />
+        <Button title="Launcher-Vorschau öffnen" systemImage="rectangle.on.rectangle"
+          disabled={props.busy || props.stagedPayload == null} action={props.runPreview} />
         {props.payloadBootStatus ? <Text>{props.payloadBootStatus}</Text> : null}
       </Section>
       <Section header={<Text>Interpretation</Text>}>
@@ -321,6 +324,21 @@ function App() {
     finally { setBusy(false) }
   }
 
+  async function showGen1Preview(): Promise<void> {
+    if (busy || stagedPayload == null) return
+    setBusy(true)
+    setPayloadBootStatus("Launcher-Vorschau wird über die Bridge vorbereitet …")
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      const report = await presentGen1PayloadPreview()
+      setPayloadBootStatus(report.status === "ready"
+        ? "Launcher-Vorschau wurde geschlossen. Keine Aktivierung und kein ROM-/Save-Mount."
+        : `Vorschau ${report.status} · Phase ${report.stage}: ${report.detail}`)
+    } catch (error) { setPayloadBootStatus(`Vorschau fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
   async function checkUpdates(): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -339,7 +357,9 @@ function App() {
     setBusy(true)
     setSettingsNotice("Payload wird geladen, gehasht und strukturell geprüft …")
     try {
-      const staged = await stageApprovedPayload(update)
+      const staged = await stageApprovedPayload(update, (phase) => {
+        setSettingsNotice(`Payload-Staging · ${phase} …`)
+      })
       setStagedPayload(staged)
       setSettingsNotice(`Payload ${staged.version} wurde sicher gespeichert. Aktivierung bleibt bis zum Runtime-Gate gesperrt.`)
     } catch (error) { setSettingsNotice(`Payload-Staging fehlgeschlagen: ${errorMessage(error)}`) }
@@ -374,7 +394,8 @@ function App() {
     <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}
       busy={busy} summary={diagnosticSummary} details={diagnosticDetails} runtime={runtime} stagedPayload={stagedPayload}
       runtimeStatus={runtimeStatus} payloadBootStatus={payloadBootStatus}
-      run={runDiagnostics} runRuntime={testLoveJsRuntime} runPayload={testGen1Payload} />
+      run={runDiagnostics} runRuntime={testLoveJsRuntime} runPayload={testGen1Payload}
+      runPreview={showGen1Preview} />
     <SettingsView tag={3} tabItem={<Label title="Einstellungen" systemImage="gearshape" />}
       busy={busy} update={update} stagedPayload={stagedPayload} notice={settingsNotice}
       checkUpdates={checkUpdates} stagePayload={stagePayload} />

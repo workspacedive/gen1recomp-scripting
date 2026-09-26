@@ -91,12 +91,24 @@ export async function readVerifiedStagedPayload(): Promise<{ metadata: StagedPay
   return { metadata, data }
 }
 
-export async function stageApprovedPayload(status: UpstreamReleaseStatus): Promise<StagedPayload> {
+export async function stageApprovedPayload(
+  status: UpstreamReleaseStatus,
+  onProgress?: (phase: string) => void,
+): Promise<StagedPayload> {
+  const progressPath = `${PATHS.diagnostics}/payload-stage-progress.v1.json`
+  const step = async (phase: string): Promise<void> => {
+    onProgress?.(phase)
+    await FileManager.writeAsString(progressPath, JSON.stringify({
+      schemaVersion: 1, phase, at: new Date().toISOString(), version: APPROVED_PAYLOAD.version,
+    }, null, 2))
+  }
   assertReleaseApproval(status)
   const existing = await loadStagedPayload()
   if (existing) {
+    await step("existing-candidate-rehash")
     const digest = Crypto.sha256(await FileManager.readAsData(`${DESTINATION}/game.love`)).toHexString().toLowerCase()
     if (digest !== existing.sha256) throw new Error("Der bereits gespeicherte Payload ist beschädigt; er wurde nicht ersetzt.")
+    await removeIfExists(progressPath)
     return existing
   }
 
@@ -105,8 +117,10 @@ export async function stageApprovedPayload(status: UpstreamReleaseStatus): Promi
   await recoverPayloadTransaction()
   await ensureDirectory(TRANSACTION)
   try {
+    await step("network-download")
     const response = await fetch(APPROVED_PAYLOAD.url, {
-      timeout: 120,
+      timeout: 180,
+      signal: AbortSignal.timeout(180_000),
       debugLabel: "Pinned Gen1Recomp payload",
     })
     if (!response.ok) throw new Error(`Payload-Download antwortete mit HTTP ${response.status}.`)
@@ -117,7 +131,9 @@ export async function stageApprovedPayload(status: UpstreamReleaseStatus): Promi
     if (response.expectedContentLength != null && response.expectedContentLength !== APPROVED_PAYLOAD.bytes) {
       throw new Error("Die angekündigte Payload-Größe stimmt nicht mit dem eingebauten Pin überein.")
     }
+    await step("network-response-data")
     const data = await response.data()
+    await step("size-and-sha256")
     const bytes = data.toUint8Array()
     if (bytes == null || bytes.length !== APPROVED_PAYLOAD.bytes) {
       throw new Error("Die geladene Payload-Größe stimmt nicht mit dem eingebauten Pin überein.")
@@ -125,7 +141,9 @@ export async function stageApprovedPayload(status: UpstreamReleaseStatus): Promi
     const digest = Crypto.sha256(data).toHexString().toLowerCase()
     if (digest !== APPROVED_PAYLOAD.sha256) throw new Error("SHA-256 des Payloads stimmt nicht mit dem eingebauten Pin überein.")
 
+    await step("zip-preflight")
     const archive = preflightZipArchive(bytes)
+    await step("payload-metadata")
     const versionRecord = archive.records.find((entry) => entry.path === "src/core/Version.lua" && !entry.isDirectory)
     if (!versionRecord) throw new Error("Der Payload enthält keine src/core/Version.lua.")
     const versionText = new TextDecoder("utf-8", { fatal: true }).decode(extractZipEntry(bytes, versionRecord))
@@ -144,12 +162,16 @@ export async function stageApprovedPayload(status: UpstreamReleaseStatus): Promi
       state: "stored-runtime-gated",
       artifact: "game.love",
     }
+    await step("transaction-write")
     await FileManager.writeAsData(`${TRANSACTION}/game.love`, data)
     await FileManager.writeAsString(`${TRANSACTION}/payload.v1.json`, JSON.stringify(staged, null, 2))
+    await step("transaction-rehash")
     const stagedDigest = Crypto.sha256(await FileManager.readAsData(`${TRANSACTION}/game.love`)).toHexString().toLowerCase()
     if (stagedDigest !== digest) throw new Error("Die staged Payload-Kopie hat die SHA-256-Nachprüfung nicht bestanden.")
     if (await exists(DESTINATION)) throw new Error("Ein unvollständiger Payload-Zielordner erfordert manuelle Diagnose; nichts wurde überschrieben.")
+    await step("atomic-publish")
     await FileManager.rename(TRANSACTION, DESTINATION)
+    await removeIfExists(progressPath)
     return staged
   } catch (error) {
     try { await removeIfExists(TRANSACTION) } catch { /* Preserve the original error. */ }
