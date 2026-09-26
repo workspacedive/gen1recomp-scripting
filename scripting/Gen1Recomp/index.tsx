@@ -281,7 +281,7 @@ function App() {
     try {
       const candidate = await installRuntimeCandidate()
       setRuntime(candidate)
-      setRuntimeStatus("Lokaler love.js-Boot läuft; maximal 30 Sekunden …")
+      setRuntimeStatus("Lokaler love.js-Boot läuft; automatischer Host-Abbruch spätestens nach 40 Sekunden …")
       const report = await runLoveJsBootProbe()
       setRuntimeStatus(report.status === "ready"
         ? `Boot-Gate bestanden: ${report.detail} · Canvas ${report.canvasWidth}×${report.canvasHeight} · WASM ${report.webAssembly ? "✓" : "✗"} · IndexedDB ${report.indexedDB ? "✓" : "✗"}. Gameplay bleibt gesperrt.`

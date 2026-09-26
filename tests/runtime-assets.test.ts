@@ -24,3 +24,10 @@ test('runtime adapter keeps the upstream player and runtime as opaque pinned fil
   assert.match(harness, /window\.webkit\.messageHandlers\.runtimeEvent\.postMessage/)
   assert.match(harness, /player\.js\?g=nogame\.love&v=11\.5&n=1/)
 })
+
+test('native host watchdog prevents an unanswered WebView bridge from hanging the UI', async () => {
+  const adapter = await readFile(new URL('../../runtime-store.ts', root), 'utf8')
+  assert.match(adapter, /Promise\.race\(\[execution, hostTimeout\]\)/)
+  assert.match(adapter, /40000/)
+  assert.match(adapter, /lovejs-boot-progress\.v1\.json/)
+})

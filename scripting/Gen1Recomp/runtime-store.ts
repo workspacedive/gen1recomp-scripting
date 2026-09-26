@@ -22,6 +22,7 @@ export interface LoveJsBootReport {
   testedAt: string
   runtimeId: string
   status: "ready" | "error" | "timeout"
+  stage: "load-file" | "wait-for-load" | "runtime-event" | "complete"
   detail: string
   canvasWidth: number
   canvasHeight: number
@@ -122,9 +123,33 @@ export async function installRuntimeCandidate(): Promise<RuntimeCandidate> {
 
 export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
   await verifyRuntimeCandidate()
+  await ensureDirectory(PATHS.diagnostics)
+  const finalPath = `${PATHS.diagnostics}/lovejs-boot.v1.json`
+  const progressPath = `${PATHS.diagnostics}/lovejs-boot-progress.v1.json`
+  const startedAt = new Date().toISOString()
   const controller = new WebViewController({ ephemeral: true })
+  let stage: LoveJsBootReport["stage"] = "load-file"
   let resolveEvent: ((value: LoveJsBootReport) => void) | null = null
   const event = new Promise<LoveJsBootReport>((resolve) => { resolveEvent = resolve })
+  const writeProgress = async (): Promise<void> => {
+    await FileManager.writeAsString(progressPath, JSON.stringify({
+      schemaVersion: 1, runtimeId: LOVEJS_RUNTIME.id, startedAt, stage,
+    }, null, 2))
+  }
+  const failed = (status: "error" | "timeout", detail: string): LoveJsBootReport => ({
+    schemaVersion: 1,
+    testedAt: new Date().toISOString(),
+    runtimeId: LOVEJS_RUNTIME.id,
+    status,
+    stage,
+    detail,
+    canvasWidth: 0,
+    canvasHeight: 0,
+    indexedDB: false,
+    webAssembly: false,
+    provesGameplay: false,
+  })
+  let timer: ReturnType<typeof setTimeout> | null = null
   try {
     await controller.addScriptMessageHandler("runtimeEvent", (raw?: unknown) => {
       const value = raw && typeof raw === "object" ? raw as Record<string, unknown> : {}
@@ -134,6 +159,7 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
         testedAt: new Date().toISOString(),
         runtimeId: LOVEJS_RUNTIME.id,
         status: kind,
+        stage: "complete",
         detail: typeof value.detail === "string" ? value.detail : "Unknown WebView event",
         canvasWidth: typeof value.canvasWidth === "number" ? value.canvasWidth : 0,
         canvasHeight: typeof value.canvasHeight === "number" ? value.canvasHeight : 0,
@@ -144,14 +170,36 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
       resolveEvent?.(report)
       return { accepted: true }
     })
-    const entry = `${DESTINATION}/harness.html`
-    const loaded = await controller.loadFile(entry, DESTINATION)
-    if (!loaded || !(await controller.waitForLoad())) throw new Error("Die lokale love.js-Testseite konnte nicht geladen werden.")
-    const report = await event
-    await ensureDirectory(PATHS.diagnostics)
-    await FileManager.writeAsString(`${PATHS.diagnostics}/lovejs-boot.v1.json`, JSON.stringify(report, null, 2))
+
+    const execution = (async (): Promise<LoveJsBootReport> => {
+      await writeProgress()
+      const entry = `${DESTINATION}/harness.html`
+      const loaded = await controller.loadFile(entry, DESTINATION)
+      if (!loaded) throw new Error("loadFile meldete false.")
+      stage = "wait-for-load"
+      await writeProgress()
+      if (!(await controller.waitForLoad())) throw new Error("waitForLoad meldete false.")
+      stage = "runtime-event"
+      await writeProgress()
+      return event
+    })()
+    const hostTimeout = new Promise<LoveJsBootReport>((resolve) => {
+      timer = setTimeout(() => resolve(failed(
+        "timeout", `Host-Timeout nach 40 Sekunden in Phase ${stage}.`,
+      )), 40000)
+    })
+    let report: LoveJsBootReport
+    try {
+      report = await Promise.race([execution, hostTimeout])
+    } catch (error) {
+      report = failed("error", error instanceof Error ? error.message : String(error))
+    }
+    if (timer != null) clearTimeout(timer)
+    await FileManager.writeAsString(finalPath, JSON.stringify(report, null, 2))
+    try { await removeIfExists(progressPath) } catch { /* Final report is authoritative. */ }
     return report
   } finally {
+    if (timer != null) clearTimeout(timer)
     controller.dispose()
   }
 }

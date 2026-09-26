@@ -1,6 +1,16 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.5.0`
+Stand: 2026-09-26 · App-Version `0.5.1`
+
+## Iteration 0.5.1
+
+- **Gerätebefund:** Capability-Probe v2 schrieb einen vollständigen Bericht, der lokales JavaScript, WebAssembly-Validierung/-Instanziierung einschließlich SIMD, WebGL 1/2 mit Readback, WebAudio-Konstruktion, IndexedDB-API, Touch und Gamepad-API bestätigt. `crossOriginIsolated` und `SharedArrayBuffer` sind auf diesem Gerät nicht verfügbar. Dieser Bericht ist **VERIFIZIERT**, aber ausdrücklich keine Runtime-Zertifizierung.
+- Der anschließend gestartete love.js-Test kehrte nicht zur UI zurück und erzeugte keinen `lovejs-boot.v1.json`. Deshalb ist noch **TECHNISCH UNBEKANNT**, ob er in `loadFile`, `waitForLoad`, beim Runtime-Event oder durch einen blockierten WebContent-Prozess hing.
+- 0.5.1 ergänzt einen hostseitigen, vom WebView-Harness unabhängigen 40-Sekunden-Watchdog um die gesamte Lade-/Eventkette. Somit hängt die Aktion auch dann nicht unbegrenzt, wenn WebView-JavaScript oder dessen Timer blockiert.
+- Während des Tests wird `Diagnostics/lovejs-boot-progress.v1.json` vor jeder Await-Phase geschrieben (`load-file`, `wait-for-load`, `runtime-event`). Bei regulärem Abschluss wird er durch den autoritativen Endbericht ersetzt und entfernt.
+- Fehler und Host-Timeout werden jetzt ebenfalls als `lovejs-boot.v1.json` gespeichert; dessen `stage` lokalisiert die blockierende Phase. Gameplay bleibt unverändert gesperrt.
+
+Status: **EXPERIMENTELL** — die Endlosschleife ist fail-closed begrenzt; die konkrete Blockierphase benötigt den erneuten Gerätetest.
 
 ## Iteration 0.5.0
 
@@ -87,7 +97,7 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
 | Gepinnter love.js-Kandidat | offizieller LÖVE-11.5-Bestand, acht SHA-256-gebundene Dateien, transaktionale Installation und vollständige Revalidierung vor Boot | TEILWEISE VERIFIZIERT; Geräte-Boot ausstehend |
 | Runtime-Bridge | separater lokaler HTML-Harness + ein dokumentierter `runtimeEvent`-Handler; upstream Runtime und Gen1Recomp bleiben unverändert | EXPERIMENTELL; Geräte-Boot ausstehend |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 29 Tests | VERIFIZIERT lokal |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 30 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund
@@ -113,4 +123,4 @@ Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tes
 
 ## Nächster implementierbarer Schritt
 
-0.5.0 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.
+0.5.1 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** erneut ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.

@@ -46,7 +46,7 @@ npm install
 npm run check
 ```
 
-Aktuell: 29 Unit-Tests einschließlich adversarieller ZIP-Preflight-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
+Aktuell: 30 Unit-Tests einschließlich adversarieller ZIP-Preflight-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
 
 ## Free-Tier-Regel
 
