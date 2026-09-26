@@ -24,8 +24,10 @@ declare module 'scripting' {
   }): Promise<{
     ok: boolean
     status: number
+    url: string
     expectedContentLength?: number
     text(): Promise<string>
+    data(): Promise<ScriptingData>
   }>
   export function useEffect(effect: () => void | (() => void), dependencies: unknown[]): void
   export function useState<T>(initial: T): [T, (value: T | ((previous: T) => T)) => void]

@@ -10,6 +10,10 @@ import {
   COMPONENTS, checkUpstreamRelease, loadCachedReleaseStatus, type UpstreamReleaseStatus,
 } from "./component-catalog"
 import {
+  APPROVED_PAYLOAD, loadStagedPayload, recoverPayloadTransaction, stageApprovedPayload,
+  type StagedPayload,
+} from "./component-store"
+import {
   importModZip, listInstalledMods, recoverPendingModImport, removeInstalledMod,
   type InstalledMod,
 } from "./mod-store"
@@ -118,8 +122,10 @@ function SettingsView(props: {
   tabItem?: any
   busy: boolean
   update: UpstreamReleaseStatus | null
+  stagedPayload: StagedPayload | null
   notice: string
   checkUpdates: () => Promise<void>
+  stagePayload: () => Promise<void>
 }) {
   const updateText = props.update == null ? "Noch nicht geprüft" :
     props.update.state === "current" ? `Aktuell: ${props.update.latestVersion}` :
@@ -136,6 +142,12 @@ function SettingsView(props: {
         <Text>{`love.js / LÖVE ${COMPONENTS.lovejs.loveVersion}`}</Text>
         <Text>{updateText}</Text>
         <Button title="Gen1Recomp-Release prüfen" systemImage="arrow.triangle.2.circlepath" disabled={props.busy} action={props.checkUpdates} />
+        <Text>{props.stagedPayload
+          ? `Payload ${props.stagedPayload.version} sicher gespeichert · Aktivierung gesperrt`
+          : `Freigegebener Download-Pin: ${APPROVED_PAYLOAD.version}`}</Text>
+        <Button title="Freigegebenen Payload laden und prüfen" systemImage="arrow.down.app"
+          disabled={props.busy || props.update?.latestVersion !== APPROVED_PAYLOAD.version || props.stagedPayload != null}
+          action={props.stagePayload} />
         {props.busy ? <ProgressView /> : null}
         {props.notice ? <Text>{props.notice}</Text> : null}
       </Section>
@@ -161,6 +173,7 @@ function App() {
   const [diagnosticSummary, setDiagnosticSummary] = useState("")
   const [diagnosticDetails, setDiagnosticDetails] = useState<string[]>([])
   const [update, setUpdate] = useState<UpstreamReleaseStatus | null>(null)
+  const [stagedPayload, setStagedPayload] = useState<StagedPayload | null>(null)
   const [settingsNotice, setSettingsNotice] = useState("")
 
   async function refreshGames(): Promise<void> {
@@ -252,9 +265,21 @@ function App() {
       const result = await checkUpstreamRelease()
       setUpdate(result)
       setSettingsNotice(result.state === "available"
-        ? "Nur Metadaten geprüft. Download und Aktivierung bleiben aus Sicherheitsgründen gesperrt."
+        ? "Metadaten geprüft. Ein eingebauter Pin entscheidet getrennt, ob nur sicheres Staging angeboten wird."
         : "Release-Metadaten wurden gelesen; es wurde nichts verändert.")
     } catch (error) { setSettingsNotice(`Update-Prüfung fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
+  async function stagePayload(): Promise<void> {
+    if (busy || update == null) return
+    setBusy(true)
+    setSettingsNotice("Payload wird geladen, gehasht und strukturell geprüft …")
+    try {
+      const staged = await stageApprovedPayload(update)
+      setStagedPayload(staged)
+      setSettingsNotice(`Payload ${staged.version} wurde sicher gespeichert. Aktivierung bleibt bis zum Runtime-Gate gesperrt.`)
+    } catch (error) { setSettingsNotice(`Payload-Staging fehlgeschlagen: ${errorMessage(error)}`) }
     finally { setBusy(false) }
   }
 
@@ -266,6 +291,9 @@ function App() {
       const recovered = await recoverPendingModImport()
       setMods(await listInstalledMods())
       setUpdate(await loadCachedReleaseStatus())
+      const payloadRecovered = await recoverPayloadTransaction()
+      setStagedPayload(await loadStagedPayload())
+      if (payloadRecovered) setSettingsNotice("Unterbrochener Payload-Download sicher verworfen.")
       setGameNotice("Bibliothek bereit.")
       if (recovered) setModNotice("Unterbrochener Mod-Import sicher verworfen.")
     }).catch((error) => setGameNotice(`Initialisierung fehlgeschlagen: ${errorMessage(error)}`))
@@ -280,7 +308,8 @@ function App() {
     <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}
       busy={busy} summary={diagnosticSummary} details={diagnosticDetails} run={runDiagnostics} />
     <SettingsView tag={3} tabItem={<Label title="Einstellungen" systemImage="gearshape" />}
-      busy={busy} update={update} notice={settingsNotice} checkUpdates={checkUpdates} />
+      busy={busy} update={update} stagedPayload={stagedPayload} notice={settingsNotice}
+      checkUpdates={checkUpdates} stagePayload={stagePayload} />
   </TabView>
 }
 

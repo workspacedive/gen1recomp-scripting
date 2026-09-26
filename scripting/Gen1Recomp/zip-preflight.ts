@@ -78,7 +78,7 @@ function locateRoot(paths: string[]): { rootPrefix: string, manifestPath: string
  * Parses only the ZIP central directory. No archive entry is trusted or
  * extracted until this function accepts every path and size.
  */
-export function preflightModZip(bytes: Uint8Array): ZipPreflight {
+function preflightZip(bytes: Uint8Array, requireModManifest: boolean): ZipPreflight {
   if (bytes.length < 22 || bytes.length > MOD_ARCHIVE_LIMITS.archiveBytes) {
     throw new Error("Das Mod-ZIP ist leer, beschädigt oder zu groß (maximal 64 MiB).")
   }
@@ -195,6 +195,16 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
       expandedBytes > Math.max(1, compressedBytes) * MOD_ARCHIVE_LIMITS.expansionRatio) {
     throw new Error(`Das ZIP überschreitet das erlaubte Entpackverhältnis von ${MOD_ARCHIVE_LIMITS.expansionRatio}:1.`)
   }
-  const root = locateRoot(entries.filter((path) => !path.endsWith("/")))
+  const root = requireModManifest
+    ? locateRoot(entries.filter((path) => !path.endsWith("/")))
+    : { rootPrefix: "", manifestPath: "" }
   return { entries, records, compressedBytes, expandedBytes, ...root }
+}
+
+export function preflightModZip(bytes: Uint8Array): ZipPreflight {
+  return preflightZip(bytes, true)
+}
+
+export function preflightZipArchive(bytes: Uint8Array): ZipPreflight {
+  return preflightZip(bytes, false)
 }

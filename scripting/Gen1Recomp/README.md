@@ -1,4 +1,4 @@
-# Gen1Recomp Scripting Host 0.3.3
+# Gen1Recomp Scripting Host 0.4.0
 
 Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschließlich APIs, die in der geprüften offiziellen App-Store-Dokumentation nicht als Pro markiert sind. Seit 0.2.2 werden `DocumentPicker`, `FileManager`, `Crypto` und `WebViewController` korrekt als von Scripting injizierte Globals verwendet; nur UI-/React-Symbole werden aus `scripting` importiert.
 
@@ -13,6 +13,7 @@ Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschli
 - explizites Runtime-Gate mit maschinenlesbaren Blockiergründen,
 - lokaler Mod-Paketspeicher mit eigenem ZIP-/DEFLATE-/CRC-32-Code, 32.768-Eintragslimit, 200:1-Entpacklimit, sicherer Einzelextraktion, SHA-256-Identität und phasengenauer Fehlerdiagnose,
 - keine hostseitige Archiv-API; PRO-pflichtige Archivwege sind regressionsgesperrt,
+- opt-in Payload-Staging für den fest gepinnten Gen1Recomp-0.3.20-Kandidaten mit URL-/Host-/Größen-/SHA-256-/ZIP-/Version-Gates und weiterhin gesperrter Aktivierung,
 - vorhandene deutsche/englische Textbasis; die neuen 0.3.x-Tabtexte sind noch deutsch und als offene Lokalisierungsarbeit dokumentiert,
 - bewusst **kein** Runtime-Start, solange ein konkreter love.js-Build, lokale Subresources, persistente VFS-Saves, Audio und Kill-Recovery auf echten Geräten nicht verifiziert sind.
 

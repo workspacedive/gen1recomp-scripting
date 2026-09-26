@@ -1,6 +1,18 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.3.3`
+Stand: 2026-09-26 · App-Version `0.4.0`
+
+## Iteration 0.4.0
+
+- Der durch den Gerätetest bestätigte Free-Tier-Modimport ist jetzt als **VERIFIZIERT** dokumentiert.
+- Einstellungen können nach einer expliziten Release-Metadatenprüfung den exakt im Projekt gepinnten Gen1Recomp-Payload 0.3.20 herunterladen und ausschließlich als inaktiven Kandidaten speichern.
+- Vor Publikation werden feste URL/Version/Dateiname/Bytezahl/SHA-256, erlaubter finaler GitHub-Host, vollständige ZIP-Struktur sowie `src/core/Version.lua` geprüft. Kandidaten-Lua wird nie ausgeführt.
+- `engine`, `payloadHost` und `minShell` werden als Literale gelesen und gegen den eingebauten Vertrauenspin gegatet. Download, zweite Hashprüfung und content-separierte Publikation erfolgen in `Transactions` beziehungsweise `Cores/payloads/0.3.20`.
+- Unterbrochene Payload-Transaktionen werden beim nächsten Appstart verworfen. Ein vorhandener Kandidat wird vor Wiederverwendung erneut gehasht.
+- Es gibt weiterhin keinen aktiven Core-Pointer und keinen Startpfad: Der Kandidat bleibt `stored-runtime-gated`, bis love.js und sämtliche Geräte-Gates bestanden sind.
+
+Status: **TEILWEISE VERIFIZIERT** — Vertrauens-, Parsing-, Staging- und Aktivierungssperren sind statisch beziehungsweise durch Tests belegt; der Binärdownload und die Ablage benötigen den echten Gerätetest.
+
 
 ## Iteration 0.3.3
 
@@ -62,7 +74,7 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Capability-Probe v2 | dokumentiertes lokales `loadFile` mit relativer JS-Subresource, WASM validate/instantiate, SIMD, WebGL context+Readback, AudioContext-Konstruktion, Worker/SAB/Isolation/OffscreenCanvas, IndexedDB-/Gamepad-/Touch-API, Umgebung | PROBE, keine Runtime-Zertifizierung; konkrete WASM/Data-Subresource ausstehend |
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 24 Tests | VERIFIZIERT lokal |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 27 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund

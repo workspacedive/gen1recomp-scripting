@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.3.3 besitzt jetzt vier native Tabs, eine persistente Library, einen vorgeprüften content-adressierten Mod-Speicher, bekannte Red-/Blue-/Yellow-Erkennung, verifiziertes Import-Staging mit Recovery-Journal, sichtbares Ordnersystem, Backup-fähigen Index, erweiterten Capability-Report und ein explizites Runtime-Gate. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert den konkreten love.js-Boot, lokale Subresources, Audio oder Save-Persistenz nicht; diese Gates müssen zuerst auf echten Geräten bestehen.
+> **Ehrlicher Status:** Die Scripting-App 0.4.0 besitzt jetzt vier native Tabs, eine persistente Library, einen vorgeprüften content-adressierten Mod-Speicher, bekannte Red-/Blue-/Yellow-Erkennung, verifiziertes Import-Staging mit Recovery-Journal, sichtbares Ordnersystem, Backup-fähigen Index, erweiterten Capability-Report und ein explizites Runtime-Gate. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert den konkreten love.js-Boot, lokale Subresources, Audio oder Save-Persistenz nicht; diese Gates müssen zuerst auf echten Geräten bestehen.
 
 ## Warum kein schneller Rewrite?
 
@@ -16,7 +16,7 @@ Gen1Recomp v0.3.18 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 - [`docs/audit/ui-ux.md`](docs/audit/ui-ux.md) — APK-/Launcher-UI-Audit und begründete Scripting-Abbildung.
 - [`docs/architecture/target-architecture.md`](docs/architecture/target-architecture.md) — Zielarchitektur, Datenmodell, Mermaid-Diagramme, Updates, Recovery, Saves, Mods, Sicherheit, Performance, Risiken, Roadmap und Abnahme.
 - [`docs/architecture/component-updates.md`](docs/architecture/component-updates.md) — revisionsgebundene love.js-/Payload-/Mod-Analyse, Trust-Modell, Staging, Health-Checks und Rollback.
-- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md), [`0.3.1`](docs/architecture/conformance-audit-0.3.1.md), [`0.3.2`](docs/architecture/conformance-audit-0.3.2.md) und [`0.3.3`](docs/architecture/conformance-audit-0.3.3.md) — explizite Prüfungen des aktuellen Codes gegen die vereinbarte Architektur.
+- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md), [`0.3.1`](docs/architecture/conformance-audit-0.3.1.md), [`0.3.2`](docs/architecture/conformance-audit-0.3.2.md), [`0.3.3`](docs/architecture/conformance-audit-0.3.3.md) und [`0.4.0`](docs/architecture/conformance-audit-0.4.0.md) — explizite Prüfungen des aktuellen Codes gegen die vereinbarte Architektur.
 - [`docs/architecture/upstream-update-sources.md`](docs/architecture/upstream-update-sources.md) — revisionsgebundene Quellen für Updater, Mods, love.js und Scripting-APIs.
 - [`docs/implementation/status.md`](docs/implementation/status.md) — aktueller App-Stand, Runtime-Gates und nächste implementierbare Stufe.
 - [`AGENT.md`](AGENT.md) und [`SKILLS.md`](SKILLS.md) — verbindlicher Agent-Workflow und wiederverwendbare Prüfskills.
@@ -45,7 +45,7 @@ npm install
 npm run check
 ```
 
-Aktuell: 24 Unit-Tests einschließlich adversarieller ZIP-Preflight-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
+Aktuell: 27 Unit-Tests einschließlich adversarieller ZIP-Preflight-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
 
 ## Free-Tier-Regel
 
