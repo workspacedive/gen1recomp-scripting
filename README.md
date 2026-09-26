@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Library, sichtbares Ordnersystem, transaktionaler Kern, Content-Identifikation, Capability-Probe und Launcher-Shell sind implementiert. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert WASM/WebGL/Audio nicht; ein love.js-Build muss zuerst auf echten Geräten verifiziert werden.
+> **Ehrlicher Status:** Die Scripting-App 0.2.0 besitzt jetzt eine persistente Library, bekannte Red-/Blue-/Yellow-Erkennung, verifiziertes Import-Staging mit Recovery-Journal, sichtbares Ordnersystem, Backup-fähigen Index, erweiterten Capability-Report und ein explizites Runtime-Gate. Die eigentliche LÖVE-Runtime ist noch nicht freigeschaltet. Scripting dokumentiert keine Lua-/LÖVE-Runtime und garantiert den konkreten love.js-Boot, lokale Subresources, Audio oder Save-Persistenz nicht; diese Gates müssen zuerst auf echten Geräten bestehen.
 
 ## Warum kein schneller Rewrite?
 
@@ -15,6 +15,7 @@ Gen1Recomp v0.3.18 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 - [`docs/audit/capability-matrix.md`](docs/audit/capability-matrix.md) — WASM, Grafik, Audio, Storage, Worker, Input und Free/Pro.
 - [`docs/audit/ui-ux.md`](docs/audit/ui-ux.md) — APK-/Launcher-UI-Audit und begründete Scripting-Abbildung.
 - [`docs/architecture/target-architecture.md`](docs/architecture/target-architecture.md) — Zielarchitektur, Datenmodell, Mermaid-Diagramme, Updates, Recovery, Saves, Mods, Sicherheit, Performance, Risiken, Roadmap und Abnahme.
+- [`docs/implementation/status.md`](docs/implementation/status.md) — aktueller App-Stand, Runtime-Gates und nächste implementierbare Stufe.
 - [`AGENT.md`](AGENT.md) und [`SKILLS.md`](SKILLS.md) — verbindlicher Agent-Workflow und wiederverwendbare Prüfskills.
 - [`scripting/Gen1Recomp`](scripting/Gen1Recomp) — importierbare Scripting-App-Shell ohne Pro-API.
 - `src/` — hostunabhängige Domain-/Application-Basis.
@@ -36,7 +37,7 @@ npm install
 npm run check
 ```
 
-Aktuell: 9 Unit-Tests. Die Scripting-TSX-Dateien werden wegen der nur in der App verfügbaren `scripting`-Typen nicht vom Node-Typecheck erfasst; ihre APIs wurden gegen die offizielle App-Store-Dokumentations-ZIP geprüft. Ein echter Scripting-Gerätetest bleibt ein Release-Gate.
+Aktuell: 10 Unit-Tests. Zusätzlich bündelt `npm run check:scripting` den vollständigen Scripting-Importgraphen mit `scripting` als externer Host-API und erkennt Syntax-/Importfehler. Die TSX-API selbst wird wegen der nur in der App verfügbaren `scripting`-Typen nicht als Node-Typvertrag ausgegeben; ihre verwendeten APIs wurden gegen die offizielle App-Store-Dokumentations-ZIP geprüft. Ein echter Scripting-Gerätetest bleibt ein Release-Gate.
 
 ## Free-Tier-Regel
 

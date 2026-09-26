@@ -6,10 +6,12 @@
   "scripts": {
     "test": "node --import tsx --test tests/**/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test"
+    "check:scripting": "node tools/check-scripting.mjs",
+    "check": "npm run typecheck && npm run check:scripting && npm test"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
+    "esbuild": "^0.28.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

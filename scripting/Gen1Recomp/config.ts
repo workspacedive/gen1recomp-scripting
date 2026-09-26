@@ -1,0 +1,17 @@
+export const APP = {
+  version: '0.2.0',
+  storageSchema: 1,
+  librarySchema: 1,
+  capabilitySchema: 2,
+  defaultLocale: 'de' as const,
+  maxImportBytes: 64 * 1024 * 1024,
+  runtimeEnabled: false,
+  requiredCoreHostContract: 1,
+}
+
+export const THEME = {
+  red: '#c13034',
+  blue: '#2864a8',
+  yellow: '#d6a313',
+  game: { red: '#c13034', blue: '#2864a8', yellow: '#d6a313', unknown: '#6b7280' },
+} as const
