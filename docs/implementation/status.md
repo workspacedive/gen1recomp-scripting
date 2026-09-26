@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.9.0`
+Stand: 2026-09-26 · App-Version `0.10.0`
+
+## Iteration 0.10.0
+
+- **VERIFIZIERT (automatisiert):** Runtime `lovejs-11.5-r5` ersetzt nur die gebridgte Normalisierungsressource durch einen separat gehashten Host-Adapter. Upstream love.js, WASM, Player, Normalisierung und Gen1Recomp bleiben unverändert.
+- **VERIFIZIERT (automatisiert):** Die reine-Lua-Implementierung erfüllt die von Gen1Recomp verwendeten Bitoperationen; unverändertes upstream `StreamMD5.lua` besteht drei bekannte MD5-Vektoren.
+- **VERIFIZIERT (statisch):** Ein experimenteller Spielstart revalidiert genau einen erkannten Library-ROM nach Länge, SHA-256 und SHA-1, überträgt ihn schreibgeschützt und aktiviert ausschließlich Gen1Recomps offiziellen `POKEPORT_IMPORT_ROM`-Pfad.
+- **NICHT VERIFIZIERT:** Launcher r5, ROM-Import, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den echten Gerätetest. Die App bezeichnet diesen Weg ausdrücklich als experimentell.
+- Detailprüfung: [`conformance-audit-0.10.0.md`](../architecture/conformance-audit-0.10.0.md).
 
 ## Iteration 0.9.0
 

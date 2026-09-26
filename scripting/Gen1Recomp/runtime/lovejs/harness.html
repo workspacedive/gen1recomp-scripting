@@ -111,8 +111,20 @@
   }).then(function (results) {
     bridge.send('resources.ready', 'All boot packages transferred through host bridge', { resources: results });
     var script = document.createElement('script');
-    script.src = 'player.js?g=' + encodeURIComponent(gamePath) + '&v=11.5&n=1';
-    script.onload = function () { bridge.send('player.loaded', 'player.js returned from initial execution'); };
+    script.src = 'player.js?g=norun&v=11.5&n=1';
+    script.onload = function () {
+      var originalRequestPkgs = Player.requestPkgs;
+      Player.requestPkgs = function (uri) {
+        return originalRequestPkgs(uri).then(function (cache) {
+          bridgedPaths.forEach(function (path) {
+            if (resourceCache[path]) cache[path] = resourceCache[path];
+          });
+          return cache;
+        });
+      };
+      bridge.send('player.loaded', 'Official player loaded; host resources attached before start');
+      Player.start(gamePath, []);
+    };
     script.onerror = function () { bridge.terminal('runtime.error', 'player.js failed to load'); };
     document.body.appendChild(script);
   }).catch(function (error) {

@@ -19,7 +19,7 @@ import {
 } from "./mod-store"
 import {
   installRuntimeCandidate, loadRuntimeCandidate, recoverRuntimeTransaction,
-  presentGen1PayloadPreview, runGen1PayloadBootProbe, runLoveJsBootProbe, type RuntimeCandidate,
+  presentGen1Gameplay, presentGen1PayloadPreview, runGen1PayloadBootProbe, runLoveJsBootProbe, type RuntimeCandidate,
 } from "./runtime-store"
 
 function errorMessage(error: unknown): string {
@@ -34,6 +34,7 @@ function GamesView(props: {
   notice: string
   refresh: () => Promise<void>
   importGame: () => Promise<void>
+  launchGame: (row: LibraryRow) => Promise<void>
 }) {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Spiele" navigationBarTitleDisplayMode="large">
@@ -46,6 +47,10 @@ function GamesView(props: {
               <Text>{row.displayName}</Text>
               <Text>{`${row.game} · ${row.region} · ${row.language}`}</Text>
               <Text>{`${row.byteLength} Bytes · ${row.status}`}</Text>
+              {row.status === "runtime-unverified"
+                ? <Button title="Experimentell starten" systemImage="play.fill" disabled={props.busy}
+                    action={() => props.launchGame(row)} />
+                : null}
             </VStack>)}
       </Section>
       <Section header={<Text>Aktionen</Text>}>
@@ -55,9 +60,9 @@ function GamesView(props: {
         {props.notice ? <Text>{props.notice}</Text> : null}
       </Section>
       <Section header={<Text>Laufzeitstatus</Text>} footer={<Text>
-        Start bleibt gesperrt, bis love.js, lokale WASM-Ressourcen, Grafik, Audio, Persistenz und Wiederherstellung auf einem echten Gerät bestanden haben.
+        Der experimentelle Start übergibt genau diese erneut verifizierte ROM schreibgeschützt an den unveränderten offiziellen Importpfad. Gameplay, Audio, Eingabe, Saves und Lifecycle bleiben bis zum Gerätetest ungeprüft.
       </Text>}>
-        <Text>{APP.runtimeEnabled ? "Laufzeit freigegeben" : "Laufzeit absichtlich deaktiviert"}</Text>
+        <Text>{APP.runtimeEnabled ? "Laufzeit freigegeben" : "Nur expliziter experimenteller Gerätetest"}</Text>
       </Section>
     </List>
   </NavigationStack>
@@ -339,6 +344,21 @@ function App() {
     finally { setBusy(false) }
   }
 
+  async function launchGame(row: LibraryRow): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    setGameNotice(`${row.displayName}: ROM und Runtime werden vor dem experimentellen Start erneut geprüft …`)
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      const report = await presentGen1Gameplay(row)
+      setGameNotice(report.status === "ready"
+        ? `${row.displayName}: Laufzeitfenster geschlossen. Bitte sichtbares Gameplay, Eingabe, Audio und Save-Verhalten berichten.`
+        : `Spielstart ${report.status} · Phase ${report.stage}: ${report.detail}`)
+    } catch (error) { setGameNotice(`Experimenteller Start fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
   async function checkUpdates(): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -388,7 +408,7 @@ function App() {
 
   return <TabView tabIndex={tabIndex} onTabIndexChanged={setTabIndex}>
     <GamesView tag={0} tabItem={<Label title="Spiele" systemImage="gamecontroller" />}
-      rows={rows} busy={busy} notice={gameNotice} refresh={refreshGames} importGame={chooseGame} />
+      rows={rows} busy={busy} notice={gameNotice} refresh={refreshGames} importGame={chooseGame} launchGame={launchGame} />
     <ModsView tag={1} tabItem={<Label title="Mods" systemImage="puzzlepiece.extension" />}
       mods={mods} busy={busy} notice={modNotice} refresh={refreshMods} importMod={chooseMod} removeMod={removeMod} />
     <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}

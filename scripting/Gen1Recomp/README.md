@@ -1,4 +1,4 @@
-# Gen1Recomp Scripting Host 0.9.0
+# Gen1Recomp Scripting Host 0.10.0
 
 Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschließlich APIs, die in der geprüften offiziellen App-Store-Dokumentation nicht als Pro markiert sind. Seit 0.2.2 werden `DocumentPicker`, `FileManager`, `Crypto` und `WebViewController` korrekt als von Scripting injizierte Globals verwendet; nur UI-/React-Symbole werden aus `scripting` importiert.
 
@@ -31,8 +31,8 @@ Ein Import verändert die ausgewählte Quelldatei nicht. Die App schreibt zuerst
 
 Die Probe ist keine Runtime-Zertifizierung. Insbesondere testet sie noch nicht:
 
-- Ergebnis des neuen love.js-`nogame`-Boot-Gates auf echter Scripting/iOS-Hardware,
-- love.js-Boot mit dem getrennt gestagten Gen1Recomp-Payload,
+- Launcher-Darstellung mit Runtime r5,
+- ROM-Import und sichtbares Gameplay mit dem getrennt gestagten Gen1Recomp-Payload,
 - Audio-Latenz oder Aussetzer,
 - IndexedDB-Schreib-/Relaunch-Persistenz,
 - sichtbaren Host-Save-Commit und Recovery nach App-/WebContent-Kill.

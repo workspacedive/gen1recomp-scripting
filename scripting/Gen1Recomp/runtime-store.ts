@@ -1,10 +1,10 @@
 import { Script } from "scripting"
-import { PATHS } from "./host"
+import { PATHS, readVerifiedLibraryRom, type LibraryRow } from "./host"
 import { LOVEJS_RUNTIME } from "./runtime-manifest"
 import { parseRuntimeBridgeMessage } from "./runtime-bridge"
 import {
-  GEN1_PAYLOAD_BRIDGE_PATH, NOGAME_BRIDGE_PATH, RUNTIME_SUPPORT_PATHS,
-  parseRuntimeResourceRequest, type BridgedRuntimePath,
+  GEN1_PAYLOAD_BRIDGE_PATH, GEN1_ROM_BRIDGE_PATH, NOGAME_BRIDGE_PATH, RUNTIME_SUPPORT_PATHS,
+  parseRuntimeResourceRequest, runtimeCandidatePath, type BridgedRuntimePath,
 } from "./runtime-resource"
 import { readVerifiedStagedPayload } from "./component-store"
 
@@ -30,7 +30,7 @@ export interface LoveJsBootReport {
   schemaVersion: 2
   testedAt: string
   runtimeId: string
-  probe: "nogame" | "gen1recomp-payload"
+  probe: "nogame" | "gen1recomp-payload" | "gen1recomp-gameplay"
   payloadVersion?: string
   status: "ready" | "error" | "timeout"
   stage: "load-file" | "wait-for-load" | "bridge-handshake" | "resource-preflight" | "player-load" | "runtime-ready" | "complete"
@@ -51,6 +51,11 @@ async function removeIfExists(path: string): Promise<void> {
   if (await exists(path)) await FileManager.remove(path)
 }
 function parent(path: string): string { return path.slice(0, path.lastIndexOf("/")) }
+function bundledRuntimePath(path: string): string {
+  return path.startsWith("adapter/")
+    ? `${Script.directory}/runtime/adapter/${path.slice("adapter/".length)}`
+    : `${Script.directory}/runtime/lovejs/${path}`
+}
 
 async function digest(path: string): Promise<string> {
   return Crypto.sha256(await FileManager.readAsData(path)).toHexString().toLowerCase()
@@ -107,7 +112,7 @@ export async function installRuntimeCandidate(): Promise<RuntimeCandidate> {
   await ensureDirectory(TRANSACTION)
   try {
     for (const file of LOVEJS_RUNTIME.files) {
-      const source = `${Script.directory}/runtime/lovejs/${file.path}`
+      const source = bundledRuntimePath(file.path)
       if (!(await exists(source)) || await digest(source) !== file.sha256) {
         throw new Error(`Mitgelieferte Runtime-Datei fehlt oder ist verändert: ${file.path}`)
       }
@@ -157,7 +162,9 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   const resources = new Map<BridgedRuntimePath, ScriptingData>(options.extraResources)
   const resourceOffsets = new Map<BridgedRuntimePath, number>()
   for (const path of options.resourcePaths) {
-    if (!resources.has(path)) resources.set(path, await FileManager.readAsData(`${DESTINATION}/${path}`))
+    if (!resources.has(path)) {
+      resources.set(path, await FileManager.readAsData(`${DESTINATION}/${runtimeCandidatePath(path)}`))
+    }
     resourceOffsets.set(path, 0)
   }
   await ensureDirectory(PATHS.diagnostics)
@@ -347,6 +354,25 @@ export async function presentGen1PayloadPreview(): Promise<LoveJsBootReport> {
     hostTimeoutMs: 105_000,
     finalName: "gen1recomp-preview.v1.json",
     progressName: "gen1recomp-preview-progress.v1.json",
+    presentOnReady: true,
+  })
+}
+
+export async function presentGen1Gameplay(row: LibraryRow): Promise<LoveJsBootReport> {
+  const [payload, rom] = await Promise.all([readVerifiedStagedPayload(), readVerifiedLibraryRom(row)])
+  return runBootProbe({
+    probe: "gen1recomp-gameplay",
+    gamePath: GEN1_PAYLOAD_BRIDGE_PATH,
+    resourcePaths: [GEN1_PAYLOAD_BRIDGE_PATH, GEN1_ROM_BRIDGE_PATH, ...RUNTIME_SUPPORT_PATHS],
+    extraResources: new Map<BridgedRuntimePath, ScriptingData>([
+      [GEN1_PAYLOAD_BRIDGE_PATH, payload.data],
+      [GEN1_ROM_BRIDGE_PATH, rom],
+    ]),
+    payloadVersion: payload.metadata.version,
+    runtimeTimeoutMs: 180_000,
+    hostTimeoutMs: 195_000,
+    finalName: "gen1recomp-gameplay.v1.json",
+    progressName: "gen1recomp-gameplay-progress.v1.json",
     presentOnReady: true,
   })
 }

@@ -2,14 +2,16 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseRuntimeBridgeMessage } from '../scripting/Gen1Recomp/runtime-bridge.js'
 import {
-  BRIDGED_RUNTIME_PATHS, RUNTIME_RESOURCE_CHUNK_BYTES, parseRuntimeResourceRequest,
+  BRIDGED_RUNTIME_PATHS, RUNTIME_RESOURCE_CHUNK_BYTES, parseRuntimeResourceRequest, runtimeCandidatePath,
 } from '../scripting/Gen1Recomp/runtime-resource.js'
 
 test('resource bridge is allowlisted and range-bounded', () => {
   assert.deepEqual(BRIDGED_RUNTIME_PATHS, [
     'nogame.love', 'lua/normalize1.lua', 'lua/normalize2.lua', '11.5/love.wasm',
-    'payload/gen1recomp-0.3.20.love',
+    'payload/gen1recomp-0.3.20.love', 'rom/import.gb',
   ])
+  assert.equal(runtimeCandidatePath('lua/normalize1.lua'), 'adapter/normalize1.lua')
+  assert.equal(runtimeCandidatePath('11.5/love.wasm'), '11.5/love.wasm')
   const valid = parseRuntimeBridgeMessage({
     protocolVersion: 1,
     type: 'resource.read',

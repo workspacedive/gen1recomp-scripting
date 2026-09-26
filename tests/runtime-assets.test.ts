@@ -9,13 +9,14 @@ const root = new URL('../scripting/Gen1Recomp/runtime/lovejs/', import.meta.url)
 test('vendored love.js candidate exactly matches the pinned inventory', async () => {
   assert.equal(LOVEJS_RUNTIME.sourceRevision, '9355186de22db13bd88bf2a0db75d2925647d036')
   assert.equal(LOVEJS_RUNTIME.loveVersion, '11.5')
-  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r4')
-  assert.equal(LOVEJS_RUNTIME.adapterVersion, 4)
+  assert.equal(LOVEJS_RUNTIME.id, 'lovejs-11.5-r5')
+  assert.equal(LOVEJS_RUNTIME.adapterVersion, 5)
   assert.equal(LOVEJS_RUNTIME.bridgeProtocol, 1)
   assert.equal(LOVEJS_RUNTIME.updatePolicy, 'reviewed-side-by-side-candidate')
   assert.equal(new Set(LOVEJS_RUNTIME.files.map((file) => file.path)).size, LOVEJS_RUNTIME.files.length)
   for (const file of LOVEJS_RUNTIME.files) {
-    const bytes = await readFile(new URL(file.path, root))
+    const source = file.path.startsWith('adapter/') ? new URL(`../${file.path}`, root) : new URL(file.path, root)
+    const bytes = await readFile(source)
     assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256, file.path)
   }
 })
@@ -26,7 +27,9 @@ test('runtime adapter keeps the upstream player and runtime as opaque pinned fil
   assert.match(player, /Player\.script\(Player\.version\+'\/love\.js'/)
   const harness = await readFile(new URL('harness.html', root), 'utf8')
   assert.match(harness, /window\.webkit\.messageHandlers\.gen1HostBridge\.postMessage/)
-  assert.match(harness, /player\.js\?g=' \+ encodeURIComponent\(gamePath\)/)
+  assert.match(harness, /player\.js\?g=norun&v=11\.5&n=1/)
+  assert.match(harness, /Player\.start\(gamePath, \[\]\)/)
+  assert.match(harness, /cache\[path\] = resourceCache\[path\]/)
   assert.match(harness, /bridge\.send\('session\.config'/)
   assert.match(harness, /bridge\.send\('bridge\.ready'/)
   assert.match(harness, /bridge\.send\('resources\.ready'/)
@@ -34,6 +37,19 @@ test('runtime adapter keeps the upstream player and runtime as opaque pinned fil
   assert.match(harness, /transport: 'gen1HostBridge'/)
   assert.match(harness, /playerUri: window\.Player/)
   assert.doesNotMatch(harness, /WebAssembly\.(?:Module|Instance|validate|instantiate)/)
+})
+
+test('host normalization overlay preserves upstream bytes and supplies reviewed compatibility hooks', async () => {
+  const upstream = await readFile(new URL('lua/normalize1.lua', root), 'utf8')
+  const adapter = await readFile(new URL('../adapter/normalize1.lua', root), 'utf8')
+  assert.ok(adapter.startsWith(upstream))
+  for (const operation of ['band', 'bor', 'bxor', 'bnot', 'lshift', 'rshift', 'arshift', 'rol', 'tobit']) {
+    assert.match(adapter, new RegExp(`function (?:unsigned|signed)\\.${operation}\\b`), operation)
+  }
+  assert.match(adapter, /package\.loaded\.bit32, package\.loaded\.bit = unsigned, signed/)
+  assert.match(adapter, /name == "POKEPORT_IMPORT_ROM"/)
+  assert.match(adapter, /name == "POKEPORT_FORCE_IMPORT"/)
+  assert.match(adapter, /\/usr\/local\/share\/lua\/5\.1\/import\.gb/)
 })
 
 test('capability probe does not instantiate or inspect WASM directly', async () => {

@@ -34,7 +34,7 @@ unzip -tqq "$EXPECTED"
 cmp "$SOURCE/script.json" <(unzip -p "$EXPECTED" script.json)
 for required in \
   runtime/lovejs/harness.html runtime/lovejs/player.js runtime/lovejs/nogame.love \
-  runtime/lovejs/lua/normalize1.lua runtime/lovejs/lua/normalize2.lua \
+  runtime/lovejs/lua/normalize1.lua runtime/lovejs/lua/normalize2.lua runtime/adapter/normalize1.lua \
   runtime/lovejs/11.5/love.js runtime/lovejs/11.5/love.wasm runtime/lovejs/11.5/license.txt; do
   unzip -Z1 "$EXPECTED" | grep -Fqx "$required" || {
     echo "runtime asset missing from package: $required" >&2

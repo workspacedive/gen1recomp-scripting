@@ -262,6 +262,24 @@ export async function importContent(sourcePath: string): Promise<LibraryRow> {
   return row
 }
 
+export async function readVerifiedLibraryRom(row: LibraryRow): Promise<ScriptingData> {
+  const known = identifyGame(row.upstreamSha1)
+  if (row.status !== 'runtime-unverified' || !known || row.game !== known.id
+    || row.region !== known.region || row.language !== known.language || row.revision !== known.revision) {
+    throw new Error('Only a recognized, runtime-gated library ROM can be bridged')
+  }
+  const sha256 = segment(row.sha256)
+  const path = `${PATHS.content}/${sha256}/original.gb`
+  if (!(await FileManager.exists(path))) throw new Error('The stored ROM original is missing')
+  const data = await FileManager.readAsData(path)
+  if (data.size !== row.byteLength
+    || Crypto.sha256(data).toHexString().toLowerCase() !== row.sha256
+    || Crypto.sha1(data).toHexString().toLowerCase() !== row.upstreamSha1) {
+    throw new Error('The stored ROM failed size/SHA-256/SHA-1 revalidation')
+  }
+  return data
+}
+
 export async function saveCapabilityReport(report: unknown): Promise<string> {
   const path = `${PATHS.diagnostics}/capabilities.v3.json`
   const temp = `${path}.tmp`
