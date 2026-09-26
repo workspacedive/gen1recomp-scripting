@@ -2,7 +2,11 @@ import { Script } from "scripting"
 import { PATHS } from "./host"
 import { LOVEJS_RUNTIME } from "./runtime-manifest"
 import { parseRuntimeBridgeMessage } from "./runtime-bridge"
-import { BRIDGED_RUNTIME_PATHS, parseRuntimeResourceRequest, type BridgedRuntimePath } from "./runtime-resource"
+import {
+  GEN1_PAYLOAD_BRIDGE_PATH, NOGAME_BRIDGE_PATH, RUNTIME_SUPPORT_PATHS,
+  parseRuntimeResourceRequest, type BridgedRuntimePath,
+} from "./runtime-resource"
+import { readVerifiedStagedPayload } from "./component-store"
 
 const RUNTIMES_ROOT = `${PATHS.cores}/runtimes`
 const DESTINATION = `${RUNTIMES_ROOT}/${LOVEJS_RUNTIME.id}`
@@ -23,9 +27,11 @@ export interface RuntimeCandidate {
 }
 
 export interface LoveJsBootReport {
-  schemaVersion: 1
+  schemaVersion: 2
   testedAt: string
   runtimeId: string
+  probe: "nogame" | "gen1recomp-payload"
+  payloadVersion?: string
   status: "ready" | "error" | "timeout"
   stage: "load-file" | "wait-for-load" | "bridge-handshake" | "resource-preflight" | "player-load" | "runtime-ready" | "complete"
   detail: string
@@ -133,17 +139,29 @@ export async function installRuntimeCandidate(): Promise<RuntimeCandidate> {
   }
 }
 
-export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
+interface BootProbeOptions {
+  probe: LoveJsBootReport["probe"]
+  gamePath: BridgedRuntimePath
+  resourcePaths: BridgedRuntimePath[]
+  extraResources?: Map<BridgedRuntimePath, ScriptingData>
+  payloadVersion?: string
+  runtimeTimeoutMs: number
+  hostTimeoutMs: number
+  finalName: string
+  progressName: string
+}
+
+async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport> {
   await verifyRuntimeCandidate()
-  const resources = new Map<BridgedRuntimePath, ScriptingData>()
+  const resources = new Map<BridgedRuntimePath, ScriptingData>(options.extraResources)
   const resourceOffsets = new Map<BridgedRuntimePath, number>()
-  for (const path of BRIDGED_RUNTIME_PATHS) {
-    resources.set(path, await FileManager.readAsData(`${DESTINATION}/${path}`))
+  for (const path of options.resourcePaths) {
+    if (!resources.has(path)) resources.set(path, await FileManager.readAsData(`${DESTINATION}/${path}`))
     resourceOffsets.set(path, 0)
   }
   await ensureDirectory(PATHS.diagnostics)
-  const finalPath = `${PATHS.diagnostics}/lovejs-boot.v1.json`
-  const progressPath = `${PATHS.diagnostics}/lovejs-boot-progress.v1.json`
+  const finalPath = `${PATHS.diagnostics}/${options.finalName}`
+  const progressPath = `${PATHS.diagnostics}/${options.progressName}`
   const startedAt = new Date().toISOString()
   const controller = new WebViewController({ ephemeral: true })
   const milestones: string[] = []
@@ -159,7 +177,8 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
   const event = new Promise<LoveJsBootReport>((resolve) => { resolveEvent = resolve })
   const writeProgress = async (): Promise<void> => {
     await FileManager.writeAsString(progressPath, JSON.stringify({
-      schemaVersion: 1, runtimeId: LOVEJS_RUNTIME.id, startedAt, stage, milestones,
+      schemaVersion: 2, runtimeId: LOVEJS_RUNTIME.id, probe: options.probe,
+      payloadVersion: options.payloadVersion, startedAt, stage, milestones,
     }, null, 2))
   }
   let progressWrites = Promise.resolve()
@@ -169,9 +188,11 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
     return next
   }
   const failed = (status: "error" | "timeout", detail: string): LoveJsBootReport => ({
-    schemaVersion: 1,
+    schemaVersion: 2,
     testedAt: new Date().toISOString(),
     runtimeId: LOVEJS_RUNTIME.id,
+    probe: options.probe,
+    payloadVersion: options.payloadVersion,
     status,
     stage,
     detail,
@@ -187,6 +208,14 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
     await controller.addScriptMessageHandler("gen1HostBridge", (raw?: unknown) => {
       const message = parseRuntimeBridgeMessage(raw)
       if (!message) return { accepted: false }
+      if (message.type === "session.config") {
+        return {
+          ok: true,
+          gamePath: options.gamePath,
+          resourcePaths: options.resourcePaths,
+          timeoutMs: options.runtimeTimeoutMs,
+        }
+      }
       if (message.type === "resource.read") {
         const request = parseRuntimeResourceRequest(message)
         if (!request) return { accepted: false, error: "invalid-resource-request" }
@@ -217,10 +246,16 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
         resolveEvent?.(failed("timeout", message.detail))
       } else if (message.type === "runtime.ready") {
         const data = message.data
+        if (data.playerUri !== options.gamePath) {
+          resolveEvent?.(failed("error", "Runtime meldete postrun für ein unerwartetes Fallback-Paket."))
+          return { accepted: true }
+        }
         resolveEvent?.({
-          schemaVersion: 1,
+          schemaVersion: 2,
           testedAt: new Date().toISOString(),
           runtimeId: LOVEJS_RUNTIME.id,
+          probe: options.probe,
+          payloadVersion: options.payloadVersion,
           status: "ready",
           stage: "complete",
           detail: message.detail,
@@ -249,8 +284,8 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
     })()
     const hostTimeout = new Promise<LoveJsBootReport>((resolve) => {
       timer = setTimeout(() => resolve(failed(
-        "timeout", `Host-Timeout nach 40 Sekunden in Phase ${stage}.`,
-      )), 40000)
+        "timeout", `Host-Timeout nach ${Math.round(options.hostTimeoutMs / 1000)} Sekunden in Phase ${stage}.`,
+      )), options.hostTimeoutMs)
     })
     let report: LoveJsBootReport
     try {
@@ -267,4 +302,31 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
     if (timer != null) clearTimeout(timer)
     controller.dispose()
   }
+}
+
+export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
+  return runBootProbe({
+    probe: "nogame",
+    gamePath: NOGAME_BRIDGE_PATH,
+    resourcePaths: [NOGAME_BRIDGE_PATH, ...RUNTIME_SUPPORT_PATHS],
+    runtimeTimeoutMs: 30_000,
+    hostTimeoutMs: 40_000,
+    finalName: "lovejs-boot.v2.json",
+    progressName: "lovejs-boot-progress.v2.json",
+  })
+}
+
+export async function runGen1PayloadBootProbe(): Promise<LoveJsBootReport> {
+  const payload = await readVerifiedStagedPayload()
+  return runBootProbe({
+    probe: "gen1recomp-payload",
+    gamePath: GEN1_PAYLOAD_BRIDGE_PATH,
+    resourcePaths: [GEN1_PAYLOAD_BRIDGE_PATH, ...RUNTIME_SUPPORT_PATHS],
+    extraResources: new Map([[GEN1_PAYLOAD_BRIDGE_PATH, payload.data]]),
+    payloadVersion: payload.metadata.version,
+    runtimeTimeoutMs: 90_000,
+    hostTimeoutMs: 105_000,
+    finalName: "gen1recomp-payload-boot.v1.json",
+    progressName: "gen1recomp-payload-boot-progress.v1.json",
+  })
 }

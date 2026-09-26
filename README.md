@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.7.0 besitzt vier native Tabs, persistente Library/Mod-/Payload-Speicher und ein explizites Runtime-Gate. Der offizielle, bytegenau gepinnte love.js-/LÖVE-11.5-Bestand wird durch den updatefähigen Adapter r3 über `gen1HostBridge` v1 diagnostiziert und in streng allowlisteten Chunks bereitgestellt. Dieser Diagnosepfad ist **EXPERIMENTELL** und muss auf dem echten Gerät bestätigt werden. Der Gen1Recomp-Payload bleibt getrennt und inaktiv; Gameplay, Audio, Saves und Lifecycle sind nicht freigeschaltet.
+> **Ehrlicher Status:** Die Scripting-App 0.8.0 besitzt vier native Tabs, persistente Library/Mod-/Payload-Speicher und ein explizites Runtime-Gate. love.js/LÖVE 11.5 samt Bridge-Ressourcentransport und `nogame`-Boot ist auf dem echten Gerät **VERIFIZIERT**. Adapter r4 ergänzt ein getrenntes, weiterhin **EXPERIMENTELLES** Boot-Gate für den unveränderten Gen1Recomp-0.3.20-Payload. Der Gen1Recomp-Payload bleibt getrennt und inaktiv; Gameplay, Audio, Saves und Lifecycle sind nicht freigeschaltet.
 
 ## Warum kein schneller Rewrite?
 
@@ -16,7 +16,7 @@ Gen1Recomp v0.3.20 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 - [`docs/audit/ui-ux.md`](docs/audit/ui-ux.md) — APK-/Launcher-UI-Audit und begründete Scripting-Abbildung.
 - [`docs/architecture/target-architecture.md`](docs/architecture/target-architecture.md) — Zielarchitektur, Datenmodell, Mermaid-Diagramme, Updates, Recovery, Saves, Mods, Sicherheit, Performance, Risiken, Roadmap und Abnahme.
 - [`docs/architecture/component-updates.md`](docs/architecture/component-updates.md) — revisionsgebundene love.js-/Payload-/Mod-Analyse, Trust-Modell, Staging, Health-Checks und Rollback.
-- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md) bis [`0.7.0`](docs/architecture/conformance-audit-0.7.0.md) — explizite Prüfungen jeder Iteration gegen die vereinbarte Architektur.
+- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md) bis [`0.8.0`](docs/architecture/conformance-audit-0.8.0.md) — explizite Prüfungen jeder Iteration gegen die vereinbarte Architektur.
 - [`docs/architecture/upstream-update-sources.md`](docs/architecture/upstream-update-sources.md) — revisionsgebundene Quellen für Updater, Mods, love.js und Scripting-APIs.
 - [`docs/implementation/status.md`](docs/implementation/status.md) — aktueller App-Stand, Runtime-Gates und nächste implementierbare Stufe.
 - [`AGENT.md`](AGENT.md) und [`SKILLS.md`](SKILLS.md) — verbindlicher Agent-Workflow und wiederverwendbare Prüfskills.
@@ -34,10 +34,11 @@ Gen1Recomp v0.3.20 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 2. App starten; der Root `Documents/Gen1Recomp` wird angelegt und ist über die Dateien-App sichtbar.
 3. Eine eigene kanonische Red-/Blue-/Yellow-ROM auswählen. Die Datei wird lokal SHA-1/SHA-256-geprüft und content-addressed gespeichert. Dieses Repository enthält keine ROM.
 4. Im Tab „Diagnose“ zuerst die Geräteprüfung ausführen. Der Bericht landet unter `Diagnostics/capabilities.v3.json`.
-5. Dort „Runtime installieren und Boot testen“ antippen. Der gepinnte Kandidat wird vollständig gehasht und startet ausschließlich `nogame.love`; das Ergebnis landet unter `Diagnostics/lovejs-boot.v1.json`.
-6. Optional im Tab „Mods“ ein eigenes Gen1Recomp-Mod-ZIP prüfen und inaktiv speichern; Mod-Ausführung bleibt bis zum Runtime-Gate gesperrt.
+5. Dort „Runtime installieren und Boot testen“ antippen. Der gepinnte Kandidat wird vollständig gehasht und startet ausschließlich `nogame.love`; das Ergebnis landet unter `Diagnostics/lovejs-boot.v2.json`.
+6. Nach sicherem Payload-Staging unter „Einstellungen“ kann „Gen1Recomp-Payload Boot testen“ ausschließlich dessen Initialisierung ohne ROM/Mods/Saves prüfen; Bericht: `Diagnostics/gen1recomp-payload-boot.v1.json`.
+7. Optional im Tab „Mods“ ein eigenes Gen1Recomp-Mod-ZIP prüfen und inaktiv speichern; Mod-Ausführung bleibt bis zum Runtime-Gate gesperrt.
 
-Auch ein erfolgreicher `nogame`-Test ist keine vollständige Spieltauglichkeit und startet bewusst noch keinen Gen1Recomp-Payload.
+Auch erfolgreiche Boot-Gates sind noch keine vollständige Spieltauglichkeit und aktivieren keinen Core.
 
 ## Entwicklung
 

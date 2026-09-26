@@ -1,6 +1,17 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.7.0`
+Stand: 2026-09-26 · App-Version `0.8.0`
+
+## Iteration 0.8.0
+
+- **Gerätebefund 0.7.0:** Kandidat `lovejs-11.5-r3` übertrug sämtliche Runtimepakete über `gen1HostBridge` und erreichte mit `nogame.love` eindeutig `Module.postrun`. Meilensteine `bridge.ready → resources.ready → player.loaded → runtime.ready`, Canvas 300×150, WASM- und IndexedDB-Präsenz wurden gemeldet. Das love.js-`nogame`-Boot-Gate ist damit **VERIFIZIERT** auf dem realen Gerät; es beweist weiterhin kein Gameplay.
+- Adapter r4 fordert seine Bootkonfiguration über `session.config` an. Derselbe gehashte Harness kann dadurch entweder das verifizierte `nogame`-Gate oder ein strikt getrenntes Gen1Recomp-Payload-Gate ausführen, ohne upstream Player oder Payload zu verändern.
+- Der bereits gespeicherte Payload 0.3.20 wird vor jedem Test erneut auf Bytezahl und SHA-256 geprüft und anschließend als opake Ressource `payload/gen1recomp-0.3.20.love` über die allowlistete 128-KiB-Bridge transportiert.
+- Das neue Diagnose-Gate mountet keine ROM, Mods oder Saves und erzeugt keinen aktiven Runtime-/Payloadpointer. Es prüft ausschließlich, ob der unveränderte Payload ohne Nutzerdaten bis `Module.postrun` initialisiert.
+- Wegen 24.908.860 Payloadbytes gelten getrennte 90-/105-Sekunden Runtime-/Host-Watchdogs. Der Bericht landet in `Diagnostics/gen1recomp-payload-boot.v1.json` und kennzeichnet `probe`, `payloadVersion`, Phase und Meilensteine.
+- Kandidat `lovejs-11.5-r4` wird seitlich neben r1–r3 installiert. Die updategebundene Runtime und der separat versionierte Payload bleiben unabhängig austauschbar und inaktiv.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — love.js-Boot und Resource-Bridge sind geräteverifiziert. Der erste unveränderte Gen1Recomp-Payload-Boot über die Bridge steht aus.
 
 ## Iteration 0.7.0
 
@@ -118,7 +129,7 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
 | Gepinnter love.js-Kandidat | offizieller LÖVE-11.5-Bestand, acht SHA-256-gebundene Dateien, transaktionale Installation und vollständige Revalidierung vor Boot | TEILWEISE VERIFIZIERT; Geräte-Boot ausstehend |
-| Runtime-Bridge | `gen1HostBridge` v1 mit Meilensteinen und allowlistetem 128-KiB-Ressourcentransport; upstream Runtime und Gen1Recomp bleiben unverändert | EXPERIMENTELL; r3-Gerätetest ausstehend |
+| Runtime-Bridge | `gen1HostBridge` v1 mit Meilensteinen, Sessionkonfiguration und allowlistetem 128-KiB-Ressourcentransport; upstream Runtime und Gen1Recomp bleiben unverändert | love.js/nogame VERIFIZIERT; Payload-Gate EXPERIMENTELL |
 | Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 33 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
@@ -145,4 +156,4 @@ Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tes
 
 ## Nächster implementierbarer Schritt
 
-0.7.0 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** mit Kandidat `lovejs-11.5-r3` ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.
+0.8.0 muss auf einem echten Gerät über **Diagnose → Gen1Recomp-Payload Boot testen** mit Kandidat `lovejs-11.5-r4` und dem bereits geprüften Payload 0.3.20 ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.

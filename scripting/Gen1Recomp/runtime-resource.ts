@@ -2,11 +2,19 @@ import type { RuntimeBridgeMessage } from "./runtime-bridge.js"
 
 export const RUNTIME_RESOURCE_CHUNK_BYTES = 128 * 1024
 
-export const BRIDGED_RUNTIME_PATHS = Object.freeze([
-  "nogame.love",
+export const RUNTIME_SUPPORT_PATHS = Object.freeze([
   "lua/normalize1.lua",
   "lua/normalize2.lua",
   "11.5/love.wasm",
+] as const)
+
+export const NOGAME_BRIDGE_PATH = "nogame.love" as const
+export const GEN1_PAYLOAD_BRIDGE_PATH = "payload/gen1recomp-0.3.20.love" as const
+
+export const BRIDGED_RUNTIME_PATHS = Object.freeze([
+  NOGAME_BRIDGE_PATH,
+  ...RUNTIME_SUPPORT_PATHS,
+  GEN1_PAYLOAD_BRIDGE_PATH,
 ] as const)
 
 export type BridgedRuntimePath = typeof BRIDGED_RUNTIME_PATHS[number]

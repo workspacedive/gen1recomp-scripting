@@ -8,6 +8,7 @@ import {
 test('resource bridge is allowlisted and range-bounded', () => {
   assert.deepEqual(BRIDGED_RUNTIME_PATHS, [
     'nogame.love', 'lua/normalize1.lua', 'lua/normalize2.lua', '11.5/love.wasm',
+    'payload/gen1recomp-0.3.20.love',
   ])
   const valid = parseRuntimeBridgeMessage({
     protocolVersion: 1,

@@ -18,8 +18,8 @@ import {
   type InstalledMod,
 } from "./mod-store"
 import {
-  installRuntimeCandidate, loadRuntimeCandidate, recoverRuntimeTransaction, runLoveJsBootProbe,
-  type RuntimeCandidate,
+  installRuntimeCandidate, loadRuntimeCandidate, recoverRuntimeTransaction,
+  runGen1PayloadBootProbe, runLoveJsBootProbe, type RuntimeCandidate,
 } from "./runtime-store"
 
 function errorMessage(error: unknown): string {
@@ -103,9 +103,12 @@ function DiagnosticsView(props: {
   summary: string
   details: string[]
   runtime: RuntimeCandidate | null
+  stagedPayload: StagedPayload | null
   runtimeStatus: string
+  payloadBootStatus: string
   run: () => Promise<void>
   runRuntime: () => Promise<void>
+  runPayload: () => Promise<void>
 }) {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Diagnose" navigationBarTitleDisplayMode="large">
@@ -124,8 +127,18 @@ function DiagnosticsView(props: {
         <Button title="Runtime installieren und Boot testen" systemImage="play.square.stack" disabled={props.busy} action={props.runRuntime} />
         {props.runtimeStatus ? <Text>{props.runtimeStatus}</Text> : null}
       </Section>
+      <Section header={<Text>Gen1Recomp Payload-Gate · EXPERIMENTELL</Text>} footer={<Text>
+        Überträgt nur den erneut gehashten Payload 0.3.20 über dieselbe API-Bridge und prüft Module.postrun. ROMs, Mods und Saves werden nicht gemountet; es entsteht kein aktiver Core-Pointer.
+      </Text>}>
+        <Text>{props.stagedPayload
+          ? `Payload ${props.stagedPayload.version} bereit · ${props.stagedPayload.sha256.slice(0, 12)}…`
+          : "Payload muss zuerst unter Einstellungen sicher gespeichert werden."}</Text>
+        <Button title="Gen1Recomp-Payload Boot testen" systemImage="testtube.2"
+          disabled={props.busy || props.stagedPayload == null} action={props.runPayload} />
+        {props.payloadBootStatus ? <Text>{props.payloadBootStatus}</Text> : null}
+      </Section>
       <Section header={<Text>Interpretation</Text>}>
-        <Text>Die Geräteprüfung belegt einzelne Host-APIs. Ein erfolgreiches Boot-Gate belegt zusätzlich nur, dass der unveränderte love.js-Player mit seinem „nogame“-Paket postrun erreicht – nicht Gameplay, Audio, Saves oder Gen1Recomp-Kompatibilität.</Text>
+        <Text>„nogame“ belegt die Runtime. Das Payload-Gate belegt höchstens Initialisierung bis postrun ohne ROM, Mods oder Save-Bridge. Erst spätere sichtbare Paritäts-, Audio-, Persistenz- und Lifecycle-Tests können Gameplay freigeben.</Text>
       </Section>
     </List>
   </NavigationStack>
@@ -189,6 +202,7 @@ function App() {
   const [diagnosticDetails, setDiagnosticDetails] = useState<string[]>([])
   const [runtime, setRuntime] = useState<RuntimeCandidate | null>(null)
   const [runtimeStatus, setRuntimeStatus] = useState("")
+  const [payloadBootStatus, setPayloadBootStatus] = useState("")
   const [update, setUpdate] = useState<UpstreamReleaseStatus | null>(null)
   const [stagedPayload, setStagedPayload] = useState<StagedPayload | null>(null)
   const [settingsNotice, setSettingsNotice] = useState("")
@@ -292,6 +306,21 @@ function App() {
     finally { setBusy(false) }
   }
 
+  async function testGen1Payload(): Promise<void> {
+    if (busy || stagedPayload == null) return
+    setBusy(true)
+    setPayloadBootStatus("Payload und Runtime werden erneut gehasht; Bridge-Transfer kann bis zu 105 Sekunden dauern …")
+    try {
+      const candidate = await installRuntimeCandidate()
+      setRuntime(candidate)
+      const report = await runGen1PayloadBootProbe()
+      setPayloadBootStatus(report.status === "ready"
+        ? `Payload-Gate bestanden: ${report.detail} · Canvas ${report.canvasWidth}×${report.canvasHeight}. Dies beweist noch kein Gameplay und aktiviert nichts.`
+        : `Payload-Gate ${report.status} · Phase ${report.stage}: ${report.detail} · Meilensteine: ${report.milestones.join(" → ") || "keine"}.`)
+    } catch (error) { setPayloadBootStatus(`Payload-Test fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
   async function checkUpdates(): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -343,8 +372,9 @@ function App() {
     <ModsView tag={1} tabItem={<Label title="Mods" systemImage="puzzlepiece.extension" />}
       mods={mods} busy={busy} notice={modNotice} refresh={refreshMods} importMod={chooseMod} removeMod={removeMod} />
     <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}
-      busy={busy} summary={diagnosticSummary} details={diagnosticDetails} runtime={runtime} runtimeStatus={runtimeStatus}
-      run={runDiagnostics} runRuntime={testLoveJsRuntime} />
+      busy={busy} summary={diagnosticSummary} details={diagnosticDetails} runtime={runtime} stagedPayload={stagedPayload}
+      runtimeStatus={runtimeStatus} payloadBootStatus={payloadBootStatus}
+      run={runDiagnostics} runRuntime={testLoveJsRuntime} runPayload={testGen1Payload} />
     <SettingsView tag={3} tabItem={<Label title="Einstellungen" systemImage="gearshape" />}
       busy={busy} update={update} stagedPayload={stagedPayload} notice={settingsNotice}
       checkUpdates={checkUpdates} stagePayload={stagePayload} />

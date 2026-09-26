@@ -1,4 +1,4 @@
-# Gen1Recomp Scripting Host 0.7.0
+# Gen1Recomp Scripting Host 0.8.0
 
 Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschließlich APIs, die in der geprüften offiziellen App-Store-Dokumentation nicht als Pro markiert sind. Seit 0.2.2 werden `DocumentPicker`, `FileManager`, `Crypto` und `WebViewController` korrekt als von Scripting injizierte Globals verwendet; nur UI-/React-Symbole werden aus `scripting` importiert.
 
@@ -16,7 +16,8 @@ Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschli
 - opt-in Payload-Staging für den fest gepinnten Gen1Recomp-0.3.20-Kandidaten mit URL-/Host-/Größen-/SHA-256-/ZIP-/Version-Gates und weiterhin gesperrter Aktivierung,
 - fest gepinnter offizieller love.js-/LÖVE-11.5-Kandidat aus Commit `9355186…`, dessen acht Dateien vor und nach der transaktionalen Installation vollständig per SHA-256 geprüft werden,
 - separater, enger WebView-Bridge-Harness: Er startet ausschließlich upstream `nogame.love`, meldet versionierte Meilensteine/Fehler/Timeout über `gen1HostBridge` und schreibt das Ergebnis nach `Diagnostics/lovejs-boot.v1.json`,
-- allowlisteter Resource-Bridge-Transport in maximal 128-KiB-Chunks für die vier vom Player benötigten Paketdateien; WASM bleibt opak und wird ausschließlich vom unveränderten love.js/Emscripten intern instanziiert,
+- allowlisteter Resource-Bridge-Transport in maximal 128-KiB-Chunks; WASM bleibt opak und wird ausschließlich vom unveränderten love.js/Emscripten intern instanziiert,
+- getrenntes Payload-Gate für den erneut größen-/SHA-256-geprüften Gen1Recomp-0.3.20-Kandidaten, ohne ROM-, Mod- oder Save-Mount und ohne Aktivierung,
 - vorhandene deutsche/englische Textbasis; die neuen Tabtexte sind noch deutsch und als offene Lokalisierungsarbeit dokumentiert,
 - bewusst **kein** Gen1Recomp-Spielstart, solange der love.js-Boot und anschließend persistente VFS-Saves, Audio, Lifecycle sowie Gameplay-Parität auf echten Geräten nicht verifiziert sind.
 

@@ -2,6 +2,7 @@ export const RUNTIME_BRIDGE_PROTOCOL = 1 as const
 
 export type RuntimeBridgeType =
   | "bridge.ready"
+  | "session.config"
   | "resource.read"
   | "resources.ready"
   | "resources.error"
@@ -18,7 +19,7 @@ export interface RuntimeBridgeMessage {
 }
 
 const TYPES = new Set<RuntimeBridgeType>([
-  "bridge.ready", "resource.read", "resources.ready", "resources.error", "player.loaded",
+  "bridge.ready", "session.config", "resource.read", "resources.ready", "resources.error", "player.loaded",
   "runtime.ready", "runtime.error", "runtime.timeout",
 ])
 

@@ -15,9 +15,9 @@
 <script>
 (function () {
   var terminal = false;
-  var bridgedPaths = [
-    'nogame.love', 'lua/normalize1.lua', 'lua/normalize2.lua', '11.5/love.wasm'
-  ];
+  var bridgedPaths = [];
+  var gamePath = '';
+  var runtimeTimeoutMs = 30000;
   var resourceCache = {};
   var bridge = {
     send: function (type, detail, data) {
@@ -79,7 +79,8 @@
       canvasWidth: canvas.width,
       canvasHeight: canvas.height,
       indexedDB: typeof indexedDB !== 'undefined',
-      webAssembly: typeof WebAssembly !== 'undefined'
+      webAssembly: typeof WebAssembly !== 'undefined',
+      playerUri: window.Player && typeof window.Player.uri === 'string' ? window.Player.uri : ''
     });
     if (spinner.className === 'error') bridge.terminal('runtime.error', 'player error state');
   }).observe(spinner, { attributes: true, attributeFilter: ['class'] });
@@ -89,26 +90,33 @@
     webAssembly: typeof WebAssembly !== 'undefined'
   });
 
-  Promise.all(bridgedPaths.map(function (path) {
-    return fetch(path, { cache: 'no-store' }).then(function (response) {
-      return response.arrayBuffer().then(function (bytes) {
-        if (!response.ok || bytes.byteLength === 0) throw new Error(path + ': empty response');
-        return { path: path, bytes: bytes.byteLength, transport: 'gen1HostBridge' };
+  bridge.send('session.config', 'Request boot session configuration').then(function (config) {
+    if (!config || config.ok !== true || !Array.isArray(config.resourcePaths)
+      || typeof config.gamePath !== 'string' || typeof config.timeoutMs !== 'number')
+      throw new Error('Invalid host session configuration');
+    bridgedPaths = config.resourcePaths.slice();
+    gamePath = config.gamePath;
+    runtimeTimeoutMs = config.timeoutMs;
+    setTimeout(function () {
+      bridge.terminal('runtime.timeout', 'No Module.postrun milestone within ' + runtimeTimeoutMs + ' milliseconds');
+    }, runtimeTimeoutMs);
+    return Promise.all(bridgedPaths.map(function (path) {
+      return fetch(path, { cache: 'no-store' }).then(function (response) {
+        return response.arrayBuffer().then(function (bytes) {
+          if (!response.ok || bytes.byteLength === 0) throw new Error(path + ': empty response');
+          return { path: path, bytes: bytes.byteLength, transport: 'gen1HostBridge' };
+        });
       });
-    });
-  })).then(function (results) {
-    bridge.send('resources.ready', 'All runtime packages transferred through host bridge', { resources: results });
+    }));
+  }).then(function (results) {
+    bridge.send('resources.ready', 'All boot packages transferred through host bridge', { resources: results });
     var script = document.createElement('script');
-    script.src = 'player.js?g=nogame.love&v=11.5&n=1';
+    script.src = 'player.js?g=' + encodeURIComponent(gamePath) + '&v=11.5&n=1';
     script.onload = function () { bridge.send('player.loaded', 'player.js returned from initial execution'); };
     script.onerror = function () { bridge.terminal('runtime.error', 'player.js failed to load'); };
     document.body.appendChild(script);
   }).catch(function (error) {
     bridge.terminal('resources.error', String(error));
   });
-
-  setTimeout(function () {
-    bridge.terminal('runtime.timeout', 'No Module.postrun milestone within 30 seconds');
-  }, 30000);
 }());
 </script>

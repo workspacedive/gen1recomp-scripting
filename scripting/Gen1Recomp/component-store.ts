@@ -80,6 +80,17 @@ export async function loadStagedPayload(): Promise<StagedPayload | null> {
   } catch { return null }
 }
 
+export async function readVerifiedStagedPayload(): Promise<{ metadata: StagedPayload, data: ScriptingData }> {
+  const metadata = await loadStagedPayload()
+  if (!metadata) throw new Error("Der geprüfte Gen1Recomp-Payload ist nicht gespeichert.")
+  const data = await FileManager.readAsData(`${DESTINATION}/game.love`)
+  if (data.size !== metadata.byteLength
+    || Crypto.sha256(data).toHexString().toLowerCase() !== metadata.sha256) {
+    throw new Error("Der gespeicherte Gen1Recomp-Payload hat die erneute Größen-/SHA-256-Prüfung nicht bestanden.")
+  }
+  return { metadata, data }
+}
+
 export async function stageApprovedPayload(status: UpstreamReleaseStatus): Promise<StagedPayload> {
   assertReleaseApproval(status)
   const existing = await loadStagedPayload()
