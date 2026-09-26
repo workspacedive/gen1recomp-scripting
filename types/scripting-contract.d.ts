@@ -10,11 +10,23 @@ declare module 'scripting' {
   export const List: any
   export const Navigation: any
   export const NavigationStack: any
+  export const ProgressView: any
   export const Script: any
   export const Section: any
   export const Spacer: any
+  export const TabView: any
   export const Text: any
   export const VStack: any
+  export function fetch(input: string, init?: {
+    headers?: Record<string, string>
+    timeout?: number
+    debugLabel?: string
+  }): Promise<{
+    ok: boolean
+    status: number
+    expectedContentLength?: number
+    text(): Promise<string>
+  }>
   export function useEffect(effect: () => void | (() => void), dependencies: unknown[]): void
   export function useState<T>(initial: T): [T, (value: T | ((previous: T) => T)) => void]
 }
@@ -31,6 +43,22 @@ interface ScriptingData {
   toHexString(): string
 }
 
+declare const Archive: {
+  openForMode(path: string, mode: 'read', options?: { pathEncoding?: string }): {
+    entries(): Array<{
+      path: string
+      type: 'file' | 'directory' | 'symlink'
+      compressedSize: number
+      uncompressedSize: number
+      isEncrypted?: boolean
+    }>
+    extractTo(path: string, destination: string, options?: {
+      bufferSize?: number
+      allowUncontainedSymlinks?: boolean
+    }): Promise<void>
+  }
+}
+
 declare const Crypto: {
   sha1(data: ScriptingData): ScriptingData
   sha256(data: ScriptingData): ScriptingData
@@ -41,6 +69,7 @@ declare const FileManager: {
   createDirectory(path: string, recursive?: boolean): Promise<void>
   exists(path: string): Promise<boolean>
   readAsData(path: string): Promise<ScriptingData>
+  readAsBytes(path: string): Promise<Uint8Array>
   readAsString(path: string): Promise<string>
   writeAsData(path: string, data: ScriptingData): Promise<void>
   writeAsString(path: string, data: string): Promise<void>
@@ -48,6 +77,15 @@ declare const FileManager: {
   rename(path: string, newPath: string): Promise<void>
   remove(path: string): Promise<void>
   stat(path: string): Promise<{ size: number; type: string; creationDate: number; modificationDate: number }>
+}
+
+declare const Dialog: {
+  confirm(options: {
+    title?: string
+    message: string
+    cancelLabel?: string
+    confirmLabel?: string
+  }): Promise<boolean>
 }
 
 declare const DocumentPicker: {

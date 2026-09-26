@@ -2,15 +2,15 @@
   "name": "Gen1Recomp",
   "icon": "gamecontroller.fill",
   "color": "rgba(193, 48, 52, 1)",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "entry": "index.tsx",
   "runInApp": true,
-  "description": "Offline-first library host and runtime capability gate for Gen1Recomp.",
+  "description": "Offline-first game and mod manager with diagnostics and a safe runtime gate.",
   "author": { "name": "gen1recomp-scripting contributors" },
   "permissions": null,
   "localizedNames": { "de": "Gen1Recomp", "en": "Gen1Recomp" },
   "localizedDescriptions": {
-    "de": "Verwaltet Spiele, Saves, Cores und Diagnose sichtbar in Dateien. Keine Pro-API.",
-    "en": "Manages games, saves, cores and diagnostics visibly in Files. No Pro API."
+    "de": "Verwaltet Spiele, Mods, Komponenten und Diagnose sicher und sichtbar in Dateien. Keine Pro-API.",
+    "en": "Safely manages games, mods, components, and diagnostics visibly in Files. No Pro API."
   }
 }

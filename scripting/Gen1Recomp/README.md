@@ -1,4 +1,4 @@
-# Gen1Recomp Scripting Host 0.2.2
+# Gen1Recomp Scripting Host 0.3.0
 
 Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschließlich APIs, die in der geprüften offiziellen App-Store-Dokumentation nicht als Pro markiert sind. Seit 0.2.2 werden `DocumentPicker`, `FileManager`, `Crypto` und `WebViewController` korrekt als von Scripting injizierte Globals verwendet; nur UI-/React-Symbole werden aus `scripting` importiert.
 
@@ -11,7 +11,7 @@ Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschli
 - Library-Index mit Temp-/Backup-Recovery und verlustfreier Migration des 0.1-Index durch erneutes Hashen des bereits gespeicherten Originals,
 - erweiterte WebView-Probe, die per dokumentiertem `loadFile(..., allowingReadAccessTo)` eine lokale HTML-Datei samt relativer JS-Subresource lädt und außerdem WASM-Validierung/Instanziierung, WebGL-Clear/Readback, AudioContext, Worker, SharedArrayBuffer, IndexedDB-API, Touch und Gamepad-API prüft,
 - explizites Runtime-Gate mit maschinenlesbaren Blockiergründen,
-- deutsche/englische Texttrennung,
+- vorhandene deutsche/englische Textbasis; die neuen 0.3.0-Tabtexte sind noch deutsch und als offene Lokalisierungsarbeit dokumentiert,
 - bewusst **kein** Runtime-Start, solange ein konkreter love.js-Build, lokale Subresources, persistente VFS-Saves, Audio und Kill-Recovery auf echten Geräten nicht verifiziert sind.
 
 ## Datenintegrität
