@@ -18,11 +18,14 @@ export const COMPONENTS = Object.freeze({
   },
   lovejs: {
     id: "lovejs-runtime",
+    runtimeId: "lovejs-11.5-r2",
     loveVersion: "11.5",
+    adapterVersion: 2,
+    bridgeProtocol: 1,
     sourceRevision: "9355186de22db13bd88bf2a0db75d2925647d036",
     javascriptSha256: "34b300f06ecb44d92edb1183c11a38c1cc324ba10a9f7af96b8efa1d1df15147",
     wasmSha256: "304f195f36d163f3bb2127e7c232fd1fd0791ee2ab61ba003d47096003b53bf1",
-    updateMode: "full-runtime-bundle",
+    updateMode: "reviewed-side-by-side-runtime",
   },
 })
 

@@ -9,7 +9,7 @@ export interface RuntimeGate {
 export function evaluateRuntimeGate(report: ProbeReport | null): RuntimeGate {
   if (!report) return { status: 'probe-required', reasons: ['capability-probe.required', 'core.missing'] }
   const reasons: string[] = []
-  if (!report.wasm.instantiates) reasons.push('host.wasm.unavailable')
+  if (!report.wasm.apiPresent) reasons.push('host.wasm.unavailable')
   if (!report.graphics.webgl1 || !report.graphics.clearReadback) reasons.push('host.webgl.unavailable')
   if (!report.audio.contextConstructed) reasons.push('host.audio.unavailable')
   if (!report.storage.indexedDbApiPresent) reasons.push('host.indexeddb.unavailable')

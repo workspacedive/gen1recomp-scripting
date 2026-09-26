@@ -1,6 +1,7 @@
 import { Script } from "scripting"
 import { PATHS } from "./host"
 import { LOVEJS_RUNTIME } from "./runtime-manifest"
+import { parseRuntimeBridgeMessage } from "./runtime-bridge"
 
 const RUNTIMES_ROOT = `${PATHS.cores}/runtimes`
 const DESTINATION = `${RUNTIMES_ROOT}/${LOVEJS_RUNTIME.id}`
@@ -11,7 +12,10 @@ export interface RuntimeCandidate {
   schemaVersion: 1
   id: string
   loveVersion: string
+  adapterVersion: number
+  bridgeProtocol: number
   sourceRevision: string
+  updatePolicy: string
   installedAt: string
   state: "candidate"
   files: Array<{ path: string, sha256: string }>
@@ -22,8 +26,9 @@ export interface LoveJsBootReport {
   testedAt: string
   runtimeId: string
   status: "ready" | "error" | "timeout"
-  stage: "load-file" | "wait-for-load" | "runtime-event" | "complete"
+  stage: "load-file" | "wait-for-load" | "bridge-handshake" | "resource-preflight" | "player-load" | "runtime-ready" | "complete"
   detail: string
+  milestones: string[]
   canvasWidth: number
   canvasHeight: number
   indexedDB: boolean
@@ -49,7 +54,10 @@ function isCandidate(value: unknown): value is RuntimeCandidate {
   const item = value as Partial<RuntimeCandidate>
   return item.schemaVersion === 1 && item.id === LOVEJS_RUNTIME.id
     && item.loveVersion === LOVEJS_RUNTIME.loveVersion
+    && item.adapterVersion === LOVEJS_RUNTIME.adapterVersion
+    && item.bridgeProtocol === LOVEJS_RUNTIME.bridgeProtocol
     && item.sourceRevision === LOVEJS_RUNTIME.sourceRevision
+    && item.updatePolicy === LOVEJS_RUNTIME.updatePolicy
     && item.state === "candidate" && typeof item.installedAt === "string"
     && Array.isArray(item.files) && item.files.length === LOVEJS_RUNTIME.files.length
 }
@@ -107,7 +115,10 @@ export async function installRuntimeCandidate(): Promise<RuntimeCandidate> {
       schemaVersion: 1,
       id: LOVEJS_RUNTIME.id,
       loveVersion: LOVEJS_RUNTIME.loveVersion,
+      adapterVersion: LOVEJS_RUNTIME.adapterVersion,
+      bridgeProtocol: LOVEJS_RUNTIME.bridgeProtocol,
       sourceRevision: LOVEJS_RUNTIME.sourceRevision,
+      updatePolicy: LOVEJS_RUNTIME.updatePolicy,
       installedAt: new Date().toISOString(),
       state: "candidate",
       files: LOVEJS_RUNTIME.files.map((file) => ({ ...file })),
@@ -128,13 +139,27 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
   const progressPath = `${PATHS.diagnostics}/lovejs-boot-progress.v1.json`
   const startedAt = new Date().toISOString()
   const controller = new WebViewController({ ephemeral: true })
+  const milestones: string[] = []
   let stage: LoveJsBootReport["stage"] = "load-file"
+  const stageOrder: LoveJsBootReport["stage"][] = [
+    "load-file", "wait-for-load", "bridge-handshake", "resource-preflight",
+    "player-load", "runtime-ready", "complete",
+  ]
+  const advanceStage = (next: LoveJsBootReport["stage"]): void => {
+    if (stageOrder.indexOf(next) > stageOrder.indexOf(stage)) stage = next
+  }
   let resolveEvent: ((value: LoveJsBootReport) => void) | null = null
   const event = new Promise<LoveJsBootReport>((resolve) => { resolveEvent = resolve })
   const writeProgress = async (): Promise<void> => {
     await FileManager.writeAsString(progressPath, JSON.stringify({
-      schemaVersion: 1, runtimeId: LOVEJS_RUNTIME.id, startedAt, stage,
+      schemaVersion: 1, runtimeId: LOVEJS_RUNTIME.id, startedAt, stage, milestones,
     }, null, 2))
+  }
+  let progressWrites = Promise.resolve()
+  const queueProgress = (): Promise<void> => {
+    const next = progressWrites.then(writeProgress)
+    progressWrites = next.catch(() => { /* A later final report remains authoritative. */ })
+    return next
   }
   const failed = (status: "error" | "timeout", detail: string): LoveJsBootReport => ({
     schemaVersion: 1,
@@ -143,6 +168,7 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
     status,
     stage,
     detail,
+    milestones: [...milestones],
     canvasWidth: 0,
     canvasHeight: 0,
     indexedDB: false,
@@ -151,36 +177,49 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
   })
   let timer: ReturnType<typeof setTimeout> | null = null
   try {
-    await controller.addScriptMessageHandler("runtimeEvent", (raw?: unknown) => {
-      const value = raw && typeof raw === "object" ? raw as Record<string, unknown> : {}
-      const kind = value.kind === "ready" || value.kind === "timeout" ? value.kind : "error"
-      const report: LoveJsBootReport = {
-        schemaVersion: 1,
-        testedAt: new Date().toISOString(),
-        runtimeId: LOVEJS_RUNTIME.id,
-        status: kind,
-        stage: "complete",
-        detail: typeof value.detail === "string" ? value.detail : "Unknown WebView event",
-        canvasWidth: typeof value.canvasWidth === "number" ? value.canvasWidth : 0,
-        canvasHeight: typeof value.canvasHeight === "number" ? value.canvasHeight : 0,
-        indexedDB: value.indexedDB === true,
-        webAssembly: value.webAssembly === true,
-        provesGameplay: false,
+    await controller.addScriptMessageHandler("gen1HostBridge", (raw?: unknown) => {
+      const message = parseRuntimeBridgeMessage(raw)
+      if (!message) return { accepted: false }
+      milestones.push(message.type)
+      if (message.type === "bridge.ready") advanceStage("resource-preflight")
+      if (message.type === "resources.ready") advanceStage("player-load")
+      if (message.type === "player.loaded") advanceStage("runtime-ready")
+      queueProgress().catch(() => { /* The final report still records in-memory milestones. */ })
+
+      if (message.type === "resources.error" || message.type === "runtime.error") {
+        resolveEvent?.(failed("error", message.detail))
+      } else if (message.type === "runtime.timeout") {
+        resolveEvent?.(failed("timeout", message.detail))
+      } else if (message.type === "runtime.ready") {
+        const data = message.data
+        resolveEvent?.({
+          schemaVersion: 1,
+          testedAt: new Date().toISOString(),
+          runtimeId: LOVEJS_RUNTIME.id,
+          status: "ready",
+          stage: "complete",
+          detail: message.detail,
+          milestones: [...milestones],
+          canvasWidth: typeof data.canvasWidth === "number" ? data.canvasWidth : 0,
+          canvasHeight: typeof data.canvasHeight === "number" ? data.canvasHeight : 0,
+          indexedDB: data.indexedDB === true,
+          webAssembly: data.webAssembly === true,
+          provesGameplay: false,
+        })
       }
-      resolveEvent?.(report)
       return { accepted: true }
     })
 
     const execution = (async (): Promise<LoveJsBootReport> => {
-      await writeProgress()
+      await queueProgress()
       const entry = `${DESTINATION}/harness.html`
       const loaded = await controller.loadFile(entry, DESTINATION)
       if (!loaded) throw new Error("loadFile meldete false.")
-      stage = "wait-for-load"
-      await writeProgress()
+      advanceStage("wait-for-load")
+      await queueProgress()
       if (!(await controller.waitForLoad())) throw new Error("waitForLoad meldete false.")
-      stage = "runtime-event"
-      await writeProgress()
+      advanceStage("bridge-handshake")
+      await queueProgress()
       return event
     })()
     const hostTimeout = new Promise<LoveJsBootReport>((resolve) => {
@@ -195,6 +234,7 @@ export async function runLoveJsBootProbe(): Promise<LoveJsBootReport> {
       report = failed("error", error instanceof Error ? error.message : String(error))
     }
     if (timer != null) clearTimeout(timer)
+    await progressWrites
     await FileManager.writeAsString(finalPath, JSON.stringify(report, null, 2))
     try { await removeIfExists(progressPath) } catch { /* Final report is authoritative. */ }
     return report

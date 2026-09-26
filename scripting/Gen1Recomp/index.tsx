@@ -110,7 +110,7 @@ function DiagnosticsView(props: {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Diagnose" navigationBarTitleDisplayMode="large">
       <Section header={<Text>Geräteprüfung</Text>} footer={<Text>
-        Der Bericht wird in Documents/Gen1Recomp/Diagnostics/capabilities.v2.json gespeichert.
+        Der Bericht wird in Documents/Gen1Recomp/Diagnostics/capabilities.v3.json gespeichert.
       </Text>}>
         <Button title="Prüfung ausführen" systemImage="stethoscope" disabled={props.busy} action={props.run} />
         {props.busy ? <ProgressView /> : null}
@@ -153,7 +153,8 @@ function SettingsView(props: {
       </Text>}>
         <Text>{`Scripting-Projekt ${COMPONENTS.hostProject.version}`}</Text>
         <Text>{`Gen1Recomp Audit-Pin ${COMPONENTS.gen1recomp.version}`}</Text>
-        <Text>{`love.js / LÖVE ${COMPONENTS.lovejs.loveVersion}`}</Text>
+        <Text>{`love.js / LÖVE ${COMPONENTS.lovejs.loveVersion} · Adapter r${COMPONENTS.lovejs.adapterVersion} · Bridge v${COMPONENTS.lovejs.bridgeProtocol}`}</Text>
+        <Text>Runtime-Updates werden als geprüfte Kandidaten seitlich installiert; vorhandene Versionen werden nicht überschrieben.</Text>
         <Text>{updateText}</Text>
         <Button title="Gen1Recomp-Release prüfen" systemImage="arrow.triangle.2.circlepath" disabled={props.busy} action={props.checkUpdates} />
         <Text>{props.stagedPayload
@@ -266,7 +267,8 @@ function App() {
       const gate = evaluateRuntimeGate(report)
       setDiagnosticSummary(gate.status === "candidate" ? "Kandidat – weitere Laufzeittests nötig" : "Laufzeitgate blockiert")
       setDiagnosticDetails([
-        `WASM ${report.wasm.instantiates ? "✓" : "✗"} · WebGL ${report.graphics.clearReadback ? "✓" : "✗"} · Audio ${report.audio.contextConstructed ? "✓" : "✗"}`,
+        `WASM-API ${report.wasm.apiPresent ? "✓" : "✗"} · WebGL ${report.graphics.clearReadback ? "✓" : "✗"} · Audio ${report.audio.contextConstructed ? "✓" : "✗"}`,
+        "Direkte WASM-Probe gemäß Bridge-Richtlinie nicht ausgeführt.",
         `Lokales JS ${report.runtime.localScriptSubresource ? "✓" : "✗"} · IndexedDB ${report.storage.indexedDbApiPresent ? "✓" : "✗"}`,
         ...gate.reasons,
       ])
@@ -285,7 +287,7 @@ function App() {
       const report = await runLoveJsBootProbe()
       setRuntimeStatus(report.status === "ready"
         ? `Boot-Gate bestanden: ${report.detail} · Canvas ${report.canvasWidth}×${report.canvasHeight} · WASM ${report.webAssembly ? "✓" : "✗"} · IndexedDB ${report.indexedDB ? "✓" : "✗"}. Gameplay bleibt gesperrt.`
-        : `Boot-Gate ${report.status}: ${report.detail}. Bericht wurde gespeichert.`)
+        : `Boot-Gate ${report.status} · Phase ${report.stage}: ${report.detail} · Meilensteine: ${report.milestones.join(" → ") || "keine"}. Bericht wurde gespeichert.`)
     } catch (error) { setRuntimeStatus(`love.js-Test fehlgeschlagen: ${errorMessage(error)}`) }
     finally { setBusy(false) }
   }

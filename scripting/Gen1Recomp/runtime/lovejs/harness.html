@@ -14,27 +14,64 @@
 <div id="spinner" class="pending"></div>
 <script>
 (function () {
-  var sent = false;
-  function post(kind, detail) {
-    if (sent) return;
-    sent = true;
-    window.webkit.messageHandlers.runtimeEvent.postMessage({
-      kind: kind,
-      detail: String(detail || ''),
-      at: new Date().toISOString(),
-      canvasWidth: document.getElementById('canvas').width,
-      canvasHeight: document.getElementById('canvas').height,
+  var terminal = false;
+  var bridge = {
+    send: function (type, detail, data) {
+      return window.webkit.messageHandlers.gen1HostBridge.postMessage({
+        protocolVersion: 1,
+        type: type,
+        detail: String(detail || ''),
+        data: data || {}
+      });
+    },
+    terminal: function (type, detail, data) {
+      if (terminal) return;
+      terminal = true;
+      bridge.send(type, detail, data);
+    }
+  };
+  window.__gen1Bridge = bridge;
+
+  var canvas = document.getElementById('canvas');
+  var spinner = document.getElementById('spinner');
+  new MutationObserver(function () {
+    if (spinner.className === '') bridge.terminal('runtime.ready', 'Module.postrun reached', {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
       indexedDB: typeof indexedDB !== 'undefined',
       webAssembly: typeof WebAssembly !== 'undefined'
     });
-  }
-  window.__gen1recompRuntimePost = post;
-  var spinner = document.getElementById('spinner');
-  new MutationObserver(function () {
-    if (spinner.className === '') post('ready', 'Module.postrun reached');
-    if (spinner.className === 'error') post('error', 'player error state');
+    if (spinner.className === 'error') bridge.terminal('runtime.error', 'player error state');
   }).observe(spinner, { attributes: true, attributeFilter: ['class'] });
-  setTimeout(function () { post('timeout', 'No postrun milestone within 30 seconds'); }, 30000);
+
+  bridge.send('bridge.ready', 'Host bridge reachable', {
+    indexedDB: typeof indexedDB !== 'undefined',
+    webAssembly: typeof WebAssembly !== 'undefined'
+  });
+
+  var resources = [
+    'nogame.love', 'lua/normalize1.lua', 'lua/normalize2.lua', '11.5/love.js'
+  ];
+  Promise.all(resources.map(function (path) {
+    return fetch(path, { cache: 'no-store' }).then(function (response) {
+      return response.arrayBuffer().then(function (bytes) {
+        if (bytes.byteLength === 0) throw new Error(path + ': empty response');
+        return { path: path, bytes: bytes.byteLength, status: response.status };
+      });
+    });
+  })).then(function (results) {
+    bridge.send('resources.ready', 'Adapter resources are readable; WASM remains runtime-owned', { resources: results });
+    var script = document.createElement('script');
+    script.src = 'player.js?g=nogame.love&v=11.5&n=1';
+    script.onload = function () { bridge.send('player.loaded', 'player.js returned from initial execution'); };
+    script.onerror = function () { bridge.terminal('runtime.error', 'player.js failed to load'); };
+    document.body.appendChild(script);
+  }).catch(function (error) {
+    bridge.terminal('resources.error', String(error));
+  });
+
+  setTimeout(function () {
+    bridge.terminal('runtime.timeout', 'No Module.postrun milestone within 30 seconds');
+  }, 30000);
 }());
 </script>
-<script src="player.js?g=nogame.love&v=11.5&n=1" onerror="window.__gen1recompRuntimePost('error','player.js failed to load')"></script>

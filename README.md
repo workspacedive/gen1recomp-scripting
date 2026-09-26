@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.5.0 besitzt vier native Tabs, persistente Library/Mod-/Payload-Speicher und ein explizites Runtime-Gate. Erstmals ist der offizielle, bytegenau gepinnte love.js-/LÖVE-11.5-Kandidat samt isoliertem `nogame`-Boot-Harness enthalten. Dieser Diagnosepfad ist **EXPERIMENTELL** und muss auf dem echten Gerät bestätigt werden. Der Gen1Recomp-Payload bleibt getrennt und inaktiv; Gameplay, Audio, Saves und Lifecycle sind nicht freigeschaltet.
+> **Ehrlicher Status:** Die Scripting-App 0.6.0 besitzt vier native Tabs, persistente Library/Mod-/Payload-Speicher und ein explizites Runtime-Gate. Der offizielle, bytegenau gepinnte love.js-/LÖVE-11.5-Bestand wird durch den updatefähigen Adapter r2 ausschließlich über `gen1HostBridge` v1 diagnostiziert. Dieser Diagnosepfad ist **EXPERIMENTELL** und muss auf dem echten Gerät bestätigt werden. Der Gen1Recomp-Payload bleibt getrennt und inaktiv; Gameplay, Audio, Saves und Lifecycle sind nicht freigeschaltet.
 
 ## Warum kein schneller Rewrite?
 
@@ -16,7 +16,7 @@ Gen1Recomp v0.3.20 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 - [`docs/audit/ui-ux.md`](docs/audit/ui-ux.md) — APK-/Launcher-UI-Audit und begründete Scripting-Abbildung.
 - [`docs/architecture/target-architecture.md`](docs/architecture/target-architecture.md) — Zielarchitektur, Datenmodell, Mermaid-Diagramme, Updates, Recovery, Saves, Mods, Sicherheit, Performance, Risiken, Roadmap und Abnahme.
 - [`docs/architecture/component-updates.md`](docs/architecture/component-updates.md) — revisionsgebundene love.js-/Payload-/Mod-Analyse, Trust-Modell, Staging, Health-Checks und Rollback.
-- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md) bis [`0.5.0`](docs/architecture/conformance-audit-0.5.0.md) — explizite Prüfungen jeder Iteration gegen die vereinbarte Architektur.
+- [`docs/architecture/conformance-audit-0.3.0.md`](docs/architecture/conformance-audit-0.3.0.md) bis [`0.6.0`](docs/architecture/conformance-audit-0.6.0.md) — explizite Prüfungen jeder Iteration gegen die vereinbarte Architektur.
 - [`docs/architecture/upstream-update-sources.md`](docs/architecture/upstream-update-sources.md) — revisionsgebundene Quellen für Updater, Mods, love.js und Scripting-APIs.
 - [`docs/implementation/status.md`](docs/implementation/status.md) — aktueller App-Stand, Runtime-Gates und nächste implementierbare Stufe.
 - [`AGENT.md`](AGENT.md) und [`SKILLS.md`](SKILLS.md) — verbindlicher Agent-Workflow und wiederverwendbare Prüfskills.
@@ -33,7 +33,7 @@ Gen1Recomp v0.3.20 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 1. `artifacts/Gen1Recomp.scripting` auf das iPhone übertragen und mit Scripting öffnen/importieren.
 2. App starten; der Root `Documents/Gen1Recomp` wird angelegt und ist über die Dateien-App sichtbar.
 3. Eine eigene kanonische Red-/Blue-/Yellow-ROM auswählen. Die Datei wird lokal SHA-1/SHA-256-geprüft und content-addressed gespeichert. Dieses Repository enthält keine ROM.
-4. Im Tab „Diagnose“ zuerst die Geräteprüfung ausführen. Der Bericht landet unter `Diagnostics/capabilities.v2.json`.
+4. Im Tab „Diagnose“ zuerst die Geräteprüfung ausführen. Der Bericht landet unter `Diagnostics/capabilities.v3.json`.
 5. Dort „Runtime installieren und Boot testen“ antippen. Der gepinnte Kandidat wird vollständig gehasht und startet ausschließlich `nogame.love`; das Ergebnis landet unter `Diagnostics/lovejs-boot.v1.json`.
 6. Optional im Tab „Mods“ ein eigenes Gen1Recomp-Mod-ZIP prüfen und inaktiv speichern; Mod-Ausführung bleibt bis zum Runtime-Gate gesperrt.
 
@@ -46,7 +46,7 @@ npm install
 npm run check
 ```
 
-Aktuell: 30 Unit-Tests einschließlich adversarieller ZIP-Preflight-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
+Aktuell: 32 Unit-Tests einschließlich adversarieller ZIP-Preflight-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
 
 ## Free-Tier-Regel
 

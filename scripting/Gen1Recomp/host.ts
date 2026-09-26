@@ -263,7 +263,7 @@ export async function importContent(sourcePath: string): Promise<LibraryRow> {
 }
 
 export async function saveCapabilityReport(report: unknown): Promise<string> {
-  const path = `${PATHS.diagnostics}/capabilities.v2.json`
+  const path = `${PATHS.diagnostics}/capabilities.v3.json`
   const temp = `${path}.tmp`
   await FileManager.writeAsString(temp, JSON.stringify(report, null, 2))
   if (await FileManager.exists(path)) await FileManager.remove(path)

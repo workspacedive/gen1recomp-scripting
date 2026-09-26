@@ -1,6 +1,17 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.5.1`
+Stand: 2026-09-26 · App-Version `0.6.0`
+
+## Iteration 0.6.0
+
+- **Gerätebefund 0.5.1:** `loadFile` und `waitForLoad` wurden abgeschlossen; der 40-Sekunden-Watchdog endete in `runtime-event`. Es kam kein einziges altes Terminalereignis an. Damit ist der Fehler auf die undifferenzierte WebView-/Playerstrecke eingegrenzt, aber noch nicht auf Ressourcenladen, Bridge oder Runtimeinitialisierung.
+- Der Adapter r2 verwendet jetzt das explizit versionierte Protokoll `gen1HostBridge` v1. Er sendet getrennte Meilensteine für Bridge-Handshake, lesbare Adapterressourcen, zurückgekehrtes `player.js` und `Module.postrun`; Fehler und Timeouts bleiben terminal.
+- Der Harness prüft `.love`, Normalizer und `love.js` vorab, greift aber gemäß der neuen Richtlinie **nicht** auf `love.wasm` zu. Ausschließlich der unveränderte upstream love.js-/Emscripten-Loader lädt und instanziiert sein eigenes WASM. Der Scripting-Host ruft keine Exporte auf, inspiziert keinen WASM-Speicher und patcht keine Runtimebytes.
+- Capability-Probe v3 prüft nur noch die Präsenz der Browser-WASM-API. Die frühere synthetische direkte Validierung/Instanziierung und SIMD-Probe ist entfernt und als historischer Gerätebefund dokumentiert, nicht als Aktivierungsgate.
+- Runtime `lovejs-11.5-r2` wird seitlich neben r1 installiert. Manifest und UI führen Adapterversion, Bridgeprotokoll, Vorgänger und die Richtlinie `reviewed-side-by-side-candidate`; vorhandene Runtimeversionen werden weder überschrieben noch automatisch aktiviert.
+- Der Endbericht enthält die erreichten `milestones` und eine feinere `stage`. Gen1Recomp, Saves, Mods und Nutzerdaten bleiben unberührt; `runtimeEnabled` bleibt `false`.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — Bridgevertrag, Bytepins, Update-Trennung und das Verbot direkter Host-WASM-Interaktion sind statisch getestet. Der r2-Gerätelauf steht aus.
 
 ## Iteration 0.5.1
 
@@ -92,12 +103,12 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Content-Identität | kanonische US-Hashes für Red, Blue, Yellow aus upstream v0.3.18; unbekannter Inhalt wird nicht als kompatibel markiert | VERIFIZIERT / Unit-Test |
 | Content Store | `Library/content/<sha256>/original.gb|original.bin` plus `content.json` | implementiert |
 | Library-Index | validiertes Schema, `.tmp`, `.bak`, Restore bei beschädigtem/fehlendem Primärindex; 0.1-Einträge werden aus dem gespeicherten Original neu erkannt und verlustfrei ergänzt | implementiert |
-| Capability-Probe v2 | dokumentiertes lokales `loadFile` mit relativer JS-Subresource, WASM validate/instantiate, SIMD, WebGL context+Readback, AudioContext-Konstruktion, Worker/SAB/Isolation/OffscreenCanvas, IndexedDB-/Gamepad-/Touch-API, Umgebung | PROBE, keine Runtime-Zertifizierung; konkrete WASM/Data-Subresource ausstehend |
+| Capability-Probe v3 | lokales `loadFile` mit relativer JS-Subresource, reine WASM-API-Präsenz ohne direkte Validierung/Instanziierung, WebGL-Readback, AudioContext-Konstruktion, Worker/SAB/Isolation/OffscreenCanvas, IndexedDB-/Gamepad-/Touch-API | BRIDGE-RICHTLINIE VERIFIZIERT; keine Runtime-Zertifizierung |
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
 | Gepinnter love.js-Kandidat | offizieller LÖVE-11.5-Bestand, acht SHA-256-gebundene Dateien, transaktionale Installation und vollständige Revalidierung vor Boot | TEILWEISE VERIFIZIERT; Geräte-Boot ausstehend |
-| Runtime-Bridge | separater lokaler HTML-Harness + ein dokumentierter `runtimeEvent`-Handler; upstream Runtime und Gen1Recomp bleiben unverändert | EXPERIMENTELL; Geräte-Boot ausstehend |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 30 Tests | VERIFIZIERT lokal |
+| Runtime-Bridge | versioniertes `gen1HostBridge`-Protokoll v1 mit Meilensteinen; upstream Runtime und Gen1Recomp bleiben unverändert | EXPERIMENTELL; r2-Gerätetest ausstehend |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 32 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund
@@ -123,4 +134,4 @@ Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tes
 
 ## Nächster implementierbarer Schritt
 
-0.5.1 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** erneut ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.
+0.6.0 muss auf einem echten Gerät über **Diagnose → Runtime installieren und Boot testen** mit Kandidat `lovejs-11.5-r2` ausgeführt werden. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.
