@@ -1,6 +1,16 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.3.2`
+Stand: 2026-09-26 · App-Version `0.3.3`
+
+## Iteration 0.3.3
+
+- **Gerätebefund:** Die vollständig Free-Tier-kompatible Eigenextraktion erreichte die Manifestprüfung; die alte Sammelmeldung konnte dort entweder ein fehlendes ZIP-Record oder die zusätzliche Host-`stat().type === "file"`-Annahme für `main.lua` bedeuten. Die Quellprüfung identifizierte diese Host-Typannahme als unnötige Abweichung vom upstream Vertrag.
+- Der Check folgt jetzt wieder dem upstream Gen1Recomp-Vertrag: `entry` muss im Manifest ausdrücklich vorhanden und ein sicherer relativer Pfad sein. Das dazugehörige, bereits zentral/lokal/CRC-geprüfte ZIP-Record muss eine Datei sein und das geschriebene Transaktionsziel muss existieren.
+- Damit hängt die Freigabe nicht mehr von einer möglicherweise hostversionsabhängigen `FileStat.type`-Zeichenfolge ab. Fehlermeldungen unterscheiden nun „fehlt im ZIP/ist Ordner“ von „geprüft, aber nicht geschrieben“.
+- Der zuvor erfundene Fallback auf `main.lua` bei fehlendem `entry` wurde entfernt; offizielles Gen1Recomp verlangt `manifest.entry`.
+
+Status: **TEILWEISE VERIFIZIERT** — der Gerätebefund ist lokalisiert und der Check an upstream angepasst; der konkrete Import benötigt die erneute Gerätebestätigung.
+
 
 ## Iteration 0.3.2
 

@@ -117,10 +117,10 @@ function validateManifest(raw: RawManifest): ValidManifest {
     throw new Error("manifest.json: version muss SemVer sein.")
   }
   if (raw.api !== 1 && raw.api !== 2) throw new Error("manifest.json: nur Mod-API 1 oder 2 wird erkannt.")
-  const entry = raw.entry == null ? "main.lua" : raw.entry
-  if (typeof entry !== "string" || entry.startsWith("/") || entry.includes("\\") ||
+  const entry = raw.entry
+  if (typeof entry !== "string" || !entry || entry.startsWith("/") || entry.includes("\\") ||
       entry.split("/").some((part) => !part || part === "." || part === "..")) {
-    throw new Error("manifest.json: entry ist kein sicherer relativer Pfad.")
+    throw new Error("manifest.json: entry fehlt oder ist kein sicherer relativer Pfad.")
   }
   const profile = raw.profile == null ? "content" : raw.profile
   if (profile !== "content" && profile !== "overhaul" && profile !== "total_conversion") {
@@ -196,8 +196,21 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
     catch { throw new Error("manifest.json ist kein gültiges JSON.") }
     const manifest = validateManifest(raw)
     const entryPath = safeJoin(root, manifest.entry)
-    if (!(await exists(entryPath)) || (await FileManager.stat(entryPath)).type !== "file") {
-      throw new Error(`Der Mod-Einstieg ${manifest.entry} fehlt oder ist keine Datei.`)
+    const archiveEntryPath = preflight.rootPrefix
+      ? `${preflight.rootPrefix}/${manifest.entry}` : manifest.entry
+    const entryRecord = preflight.records.find((entry) => entry.path === archiveEntryPath)
+    if (!entryRecord || entryRecord.isDirectory) {
+      const target = manifest.entry.toLowerCase()
+      const alternatives = preflight.records
+        .filter((entry) => !entry.isDirectory && (entry.path.toLowerCase() === target
+          || entry.path.toLowerCase().endsWith(`/${target}`)))
+        .slice(0, 3)
+        .map((entry) => entry.path)
+      const hint = alternatives.length > 0 ? ` Ähnliche Pfade: ${alternatives.join(", ")}.` : ""
+      throw new Error(`Der in manifest.json angegebene Einstieg ${archiveEntryPath} fehlt im ZIP oder ist ein Ordner.${hint}`)
+    }
+    if (!(await exists(entryPath))) {
+      throw new Error(`Der geprüfte Mod-Einstieg ${manifest.entry} wurde nicht in den Transaktionsordner geschrieben.`)
     }
 
     phase = "publish-package"

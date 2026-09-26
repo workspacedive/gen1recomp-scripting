@@ -86,6 +86,8 @@ test("accepts a single-folder Gen1Recomp mod package", () => {
   ]))
   assert.equal(result.rootPrefix, "my-mod")
   assert.equal(result.manifestPath, "my-mod/manifest.json")
+  assert.equal(result.records[1]?.path, "my-mod/main.lua")
+  assert.equal(result.records[1]?.isDirectory, false)
   assert.equal(result.expandedBytes, 700)
 })
 
