@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.1`
+Stand: 2026-09-26 · App-Version `0.10.2`
+
+## Iteration 0.10.2
+
+- **VERIFIZIERT (Gerät):** Der erhaltene Root Cause ist `Data.lua:271`: Gen1Recomp benötigt Lua 5.2s `load(string, name, mode, env)`, während love.js 11.5 Lua 5.1s Reader-only-`load` bereitstellt.
+- Adapter r7 ergänzt String-/Reader-Chunks, Modusprüfung und isolierte Environments über Lua 5.1 `loadstring`/`setfenv`, ohne Payload oder Runtime-Upstreams zu verändern.
+- **VERIFIZIERT (automatisiert):** isolierter Text-Chunk, Reader-Chunk und geschlossene Modusabwehr sowie alle bisherigen Bit-/MD5-/Diagnosetests.
+- **NICHT VERIFIZIERT:** Der neue Kompatibilitätspfad, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- Detailprüfung: [`conformance-audit-0.10.2.md`](../architecture/conformance-audit-0.10.2.md).
 
 ## Iteration 0.10.1
 

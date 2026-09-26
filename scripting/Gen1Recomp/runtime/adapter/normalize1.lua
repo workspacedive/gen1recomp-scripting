@@ -99,6 +99,55 @@ if reg then
   end
 end
 
+-- Gen1Recomp host adapter: love.js embeds Lua 5.1, while the payload uses
+-- Lua 5.2+'s load(string, chunkname, mode, environment) contract for generated
+-- ROM data and sandboxed modules. Preserve native reader behavior when no
+-- compatibility arguments are requested; otherwise compile text/binary only
+-- when the requested mode permits it and apply the explicit environment.
+do
+  local nativeLoad, nativeLoadString, nativeSetfenv = load, loadstring, setfenv
+  if nativeLoadString and nativeSetfenv then
+    local function compile(source, chunkname, mode, environment)
+      mode = mode or "bt"
+      if mode ~= "b" and mode ~= "t" and mode ~= "bt" then
+        error("bad argument #3 to 'load' (invalid mode)", 3)
+      end
+      local binary = source:byte(1) == 27
+      if binary and not mode:find("b", 1, true) then
+        return nil, "attempt to load a binary chunk (mode is '" .. mode .. "')"
+      end
+      if not binary and not mode:find("t", 1, true) then
+        return nil, "attempt to load a text chunk (mode is '" .. mode .. "')"
+      end
+      local fn, message = nativeLoadString(source, chunkname)
+      if fn and environment ~= nil then nativeSetfenv(fn, environment) end
+      return fn, message
+    end
+
+    load = function(chunk, chunkname, mode, environment)
+      if type(chunk) == "string" then
+        return compile(chunk, chunkname, mode, environment)
+      end
+      if type(chunk) == "function" and mode == nil and environment == nil then
+        return nativeLoad(chunk, chunkname)
+      end
+      if type(chunk) ~= "function" then
+        error("bad argument #1 to 'load' (function or string expected)", 2)
+      end
+      local pieces = {}
+      while true do
+        local piece = chunk()
+        if piece == nil then break end
+        if type(piece) ~= "string" then
+          error("reader function must return a string", 2)
+        end
+        pieces[#pieces + 1] = piece
+      end
+      return compile(table.concat(pieces), chunkname, mode, environment)
+    end
+  end
+end
+
 -- Gen1Recomp host adapter: love.js 11.5 provides neither LuaJIT's bit module
 -- nor Lua 5.2's bit32 module. Keep this compatibility layer outside the game
 -- payload and expose the operations used by the reviewed upstream payload.

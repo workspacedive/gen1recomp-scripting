@@ -12,6 +12,18 @@ test('pure-Lua bit adapter satisfies StreamMD5 and shift semantics', async () =>
   const marker = '-- Gen1Recomp host adapter:'
   const shim = adapter.slice(adapter.indexOf(marker))
   const script = `local nativeRequire = require
+local nativeModernLoad = load
+loadstring = function(source, chunkname) return nativeModernLoad(source, chunkname) end
+setfenv = function(fn, environment)
+  local index = 1
+  while true do
+    local name = debug.getupvalue(fn, index)
+    if name == nil then break end
+    if name == "_ENV" then debug.setupvalue(fn, index, environment); break end
+    index = index + 1
+  end
+  return fn
+end
 local diagnosticGame = {
   load = function() error("preserved root cause") end,
   draw = function() error("secondary draw failure") end,
@@ -21,6 +33,17 @@ require = function(name)
   return nativeRequire(name)
 end
 ${shim}\nlocal MD5 = (function()\n${streamMd5}\nend)()\n
+local generated = assert(load("return answer", "@generated.lua", "t", { answer = 42 }))
+assert(generated() == 42)
+local deniedText, deniedMessage = load("return 1", "@generated.lua", "b", {})
+assert(deniedText == nil and deniedMessage:match("text chunk"))
+local pieces = { "return ", "value" }
+local pieceIndex = 0
+local fromReader = assert(load(function()
+  pieceIndex = pieceIndex + 1
+  return pieces[pieceIndex]
+end, "@reader.lua", "t", { value = 73 }))
+assert(fromReader() == 73)
 local vectors = {
   {"", "d41d8cd98f00b204e9800998ecf8427e"},
   {"abc", "900150983cd24fb0d6963f7d28e17f72"},
