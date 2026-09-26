@@ -68,7 +68,7 @@ function ModsView(props: {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Mods" navigationBarTitleDisplayMode="large">
       <Section header={<Text>Lokale Pakete</Text>} footer={<Text>
-        Pakete werden vor dem Entpacken auf Pfade, Symlinks, Kompression und Größen geprüft. Aktivierung folgt erst mit der verifizierten Spiellaufzeit.
+        Pakete werden vor dem Entpacken auf Pfade, Symlinks, Kompression und Größen geprüft. Fehlerdetails landen in Diagnostics/mod-import-last-failure.v1.json. Aktivierung folgt erst mit der verifizierten Spiellaufzeit.
       </Text>}>
         {props.mods.length === 0 ? <Text>Keine Mod-Pakete gespeichert.</Text> : props.mods.map((mod) =>
           <VStack key={`${mod.id}-${mod.version}-${mod.sha256}`} alignment="leading" spacing={4}>

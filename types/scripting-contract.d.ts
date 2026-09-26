@@ -41,6 +41,7 @@ declare namespace JSX {
 
 interface ScriptingData {
   toHexString(): string
+  toUint8Array(): Uint8Array | null
 }
 
 declare const Archive: {
@@ -69,7 +70,6 @@ declare const FileManager: {
   createDirectory(path: string, recursive?: boolean): Promise<void>
   exists(path: string): Promise<boolean>
   readAsData(path: string): Promise<ScriptingData>
-  readAsBytes(path: string): Promise<Uint8Array>
   readAsString(path: string): Promise<string>
   writeAsData(path: string, data: ScriptingData): Promise<void>
   writeAsString(path: string, data: string): Promise<void>

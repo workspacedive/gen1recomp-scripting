@@ -1,5 +1,5 @@
 import { PATHS } from "./host"
-import { preflightModZip } from "./zip-preflight"
+import { MOD_ARCHIVE_LIMITS, preflightModZip } from "./zip-preflight"
 
 const MODS_ROOT = PATHS.mods
 const INDEX_PATH = `${MODS_ROOT}/index.v1.json`
@@ -144,6 +144,7 @@ export async function listInstalledMods(): Promise<InstalledMod[]> {
 }
 
 export async function importModZip(sourcePath: string): Promise<InstalledMod> {
+  let phase = "prepare"
   await ensureDirectory(PATHS.transactions)
   await ensureDirectory(MODS_ROOT)
   await recoverPendingModImport()
@@ -151,21 +152,26 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
   const archive = `${TRANSACTION}/package.zip`
   const extracted = `${TRANSACTION}/extracted`
   try {
+    phase = "copy-source"
     await FileManager.copyFile(sourcePath, archive)
     const info = await FileManager.stat(archive)
-    if (info.type === "directory" || info.size <= 0 || info.size > 64 * 1024 * 1024) {
-      throw new Error("Das Mod-ZIP muss zwischen 1 Byte und 64 MiB groß sein.")
+    if (info.type === "directory" || info.size <= 0 || info.size > MOD_ARCHIVE_LIMITS.archiveBytes) {
+      throw new Error(`Das Mod-ZIP muss zwischen 1 Byte und ${MOD_ARCHIVE_LIMITS.archiveBytes / 1024 / 1024} MiB groß sein.`)
     }
-    const bytes = await FileManager.readAsBytes(archive)
+    phase = "zip-preflight"
+    const archiveData = await FileManager.readAsData(archive)
+    const bytes = archiveData.toUint8Array()
+    if (bytes == null) throw new Error("Das Mod-ZIP konnte nicht als Binärdaten gelesen werden.")
     const preflight = preflightModZip(bytes)
     const baseromsPrefix = `${preflight.rootPrefix ? `${preflight.rootPrefix}/` : ""}baseroms/`.toLowerCase()
     if (preflight.entries.some((path) => !path.endsWith("/") && path.toLowerCase().startsWith(baseromsPrefix))) {
       throw new Error("Mod-Archive dürfen keine benutzereigenen baseroms-Dateien enthalten.")
     }
-    const sha256 = Crypto.sha256(await FileManager.readAsData(archive)).toHexString().toLowerCase()
+    const sha256 = Crypto.sha256(archiveData).toHexString().toLowerCase()
 
     // Use the documented Archive API to extract each already-approved entry to
     // an explicit destination. This avoids trusting bulk-unzip path handling.
+    phase = "archive-crosscheck"
     const reader = Archive.openForMode(archive, "read", { pathEncoding: "utf-8" })
     const hostEntries = reader.entries()
     if (hostEntries.length !== preflight.entries.length) {
@@ -173,22 +179,26 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
     }
     const expected = new Map(preflight.entries.map((path) =>
       [path.endsWith("/") ? path.slice(0, -1) : path, path]))
+    let hostCompressedBytes = 0
     let hostExpandedBytes = 0
     for (const entry of hostEntries) {
       const approved = expected.get(entry.path.endsWith("/") ? entry.path.slice(0, -1) : entry.path)
       if (!approved || entry.type === "symlink" || entry.isEncrypted === true ||
-          entry.uncompressedSize < 0 || entry.uncompressedSize > 128 * 1024 * 1024) {
+          entry.uncompressedSize < 0 || entry.uncompressedSize > MOD_ARCHIVE_LIMITS.entryBytes) {
         throw new Error("Das Host-Archiv enthält einen nicht freigegebenen Eintrag.")
       }
+      hostCompressedBytes += entry.compressedSize
       hostExpandedBytes += entry.uncompressedSize
     }
-    if (hostExpandedBytes !== preflight.expandedBytes) {
+    if (hostCompressedBytes !== preflight.compressedBytes ||
+        hostExpandedBytes !== preflight.expandedBytes) {
       throw new Error("ZIP-Größen und Host-Archivansicht stimmen nicht überein.")
     }
     const manifestEntry = hostEntries.find((entry) => entry.path === preflight.manifestPath)
     if (!manifestEntry || manifestEntry.type !== "file" || manifestEntry.uncompressedSize > 1024 * 1024) {
       throw new Error("manifest.json fehlt, ist kein Datei-Eintrag oder ist zu groß.")
     }
+    phase = "extract-approved-entries"
     await ensureDirectory(extracted)
     for (const entry of hostEntries) {
       const relative = entry.path.endsWith("/") ? entry.path.slice(0, -1) : entry.path
@@ -202,6 +212,7 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
       }
     }
 
+    phase = "validate-manifest"
     const root = preflight.rootPrefix ? safeJoin(extracted, preflight.rootPrefix) : extracted
     const manifestPath = safeJoin(extracted, preflight.manifestPath)
     if (!(await exists(manifestPath))) throw new Error("manifest.json fehlt nach dem Entpacken.")
@@ -214,6 +225,7 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
       throw new Error(`Der Mod-Einstieg ${manifest.entry} fehlt oder ist keine Datei.`)
     }
 
+    phase = "publish-package"
     const relativePath = `${manifest.id}/${manifest.version}/${sha256}`
     const destination = safeJoin(MODS_ROOT, relativePath)
     await ensureDirectory(`${MODS_ROOT}/${manifest.id}/${manifest.version}`)
@@ -229,11 +241,21 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
       !(item.id === row.id && item.version === row.version && item.sha256 === row.sha256))
     index.mods.push(row)
     await saveIndex(index)
-    await removeIfExists(TRANSACTION)
+    try { await removeIfExists(TRANSACTION) } catch { /* Startup recovery will retry cleanup. */ }
     return row
   } catch (error) {
-    await removeIfExists(TRANSACTION)
-    throw error
+    const message = error instanceof Error ? error.message : String(error)
+    try { await removeIfExists(TRANSACTION) } catch { /* Preserve the original failure. */ }
+    try {
+      await ensureDirectory(PATHS.diagnostics)
+      await FileManager.writeAsString(`${PATHS.diagnostics}/mod-import-last-failure.v1.json`, JSON.stringify({
+        schemaVersion: 1,
+        failedAt: new Date().toISOString(),
+        phase,
+        message,
+      }, null, 2))
+    } catch { /* Diagnostics must never replace the actionable import error. */ }
+    throw new Error(`${message} (Phase: ${phase})`)
   }
 }
 

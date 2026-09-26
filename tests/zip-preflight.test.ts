@@ -2,7 +2,14 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { preflightModZip } from "../scripting/Gen1Recomp/zip-preflight.js"
 
-interface Entry { path: string; size?: number; madeBy?: number; external?: number }
+interface Entry {
+  path: string
+  size?: number
+  compressedSize?: number
+  method?: number
+  madeBy?: number
+  external?: number
+}
 
 function put16(output: number[], value: number): void {
   output.push(value & 255, (value >>> 8) & 255)
@@ -18,9 +25,9 @@ function centralZip(entries: Entry[]): Uint8Array {
     const name = [...encoder.encode(entry.path)]
     put32(central, 0x02014b50)
     put16(central, entry.madeBy ?? 20)
-    put16(central, 20); put16(central, 0); put16(central, 0)
+    put16(central, 20); put16(central, 0); put16(central, entry.method ?? 0)
     put16(central, 0); put16(central, 0); put32(central, 0)
-    put32(central, 0); put32(central, entry.size ?? 0)
+    put32(central, entry.compressedSize ?? entry.size ?? 0); put32(central, entry.size ?? 0)
     put16(central, name.length); put16(central, 0); put16(central, 0)
     put16(central, 0); put16(central, 0); put32(central, entry.external ?? 0)
     put32(central, 0); central.push(...name)
@@ -46,6 +53,14 @@ test("accepts a manifest at archive root", () => {
   assert.equal(preflightModZip(centralZip([
     { path: "manifest.json" }, { path: "main.lua" },
   ])).rootPrefix, "")
+})
+
+test("accepts asset-heavy mods beyond the former 4096-entry limit", () => {
+  const entries: Entry[] = [{ path: "manifest.json" }, { path: "main.lua" }]
+  for (let index = 0; index < 5000; index += 1) {
+    entries.push({ path: `assets/frame-${index}.png` })
+  }
+  assert.equal(preflightModZip(centralZip(entries)).entries.length, 5002)
 })
 
 test("rejects traversal and absolute paths before extraction", () => {
@@ -77,4 +92,11 @@ test("rejects oversized expanded entries", () => {
   assert.throws(() => preflightModZip(centralZip([
     { path: "manifest.json", size: 129 * 1024 * 1024 },
   ])), /zu groß/)
+})
+
+test("rejects archive-wide decompression bombs", () => {
+  assert.throws(() => preflightModZip(centralZip([
+    { path: "manifest.json" },
+    { path: "main.lua", method: 8, compressedSize: 1024, size: 2 * 1024 * 1024 },
+  ])), /Entpackverhältnis/)
 })

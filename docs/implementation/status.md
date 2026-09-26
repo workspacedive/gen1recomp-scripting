@@ -1,6 +1,19 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.3.0`
+Stand: 2026-09-26 · App-Version `0.3.1`
+
+## Iteration 0.3.1
+
+- Reagiert auf den auf dem echten Gerät bestätigten Mod-Import-Abbruch: Die bisher zusammengefasste Meldung deutete entweder auf das zu knappe 4.096-Eintragslimit oder beschädigte Verzeichnisgrenzen. Das sichere Limit steigt auf 32.768; beide Ursachen haben jetzt getrennte Meldungen.
+- Trennt die Fehlermeldungen für Eintragslimit und beschädigte Zentralverzeichnisgrenzen, damit weitere Gerätebefunde eindeutig sind.
+- Liest ein Modarchiv nur noch einmal als `Data` und verwendet dieselben Bytes für SHA-256 und ZIP-Preflight; dadurch entfällt eine zweite vollständige Dateilesung.
+- Ergänzt ein 200:1-Entpackverhältnis-Limit und gleicht komprimierte wie entpackte Größen zusätzlich mit Scripting `Archive.entries()` ab.
+- Regressionstests decken mehr als 4.096 Einträge und Dekompressionsbomben ab.
+- Mod-Importfehler nennen jetzt die genaue Phase und schreiben einen datensparsamen Bericht nach `Diagnostics/mod-import-last-failure.v1.json`; Diagnosefehler können den ursprünglichen Importfehler nicht mehr verdecken.
+- Nach erfolgreicher Index-Publikation gilt fehlgeschlagene temporäre Bereinigung nicht mehr fälschlich als fehlgeschlagene Installation; die Start-Recovery übernimmt den Rest.
+
+Status: **TEILWEISE VERIFIZIERT** — der ursprüngliche Fehler ist durch Gerätefeedback belegt; der frühere Grenzwert und die neue Annahme von mehr als 4.096 Einträgen sind reproduzierbar getestet. Ob genau dieser Grenzwert das konkrete ZIP blockierte, zeigt erst der erneute Geräteimport beziehungsweise die nun eindeutige Meldung.
+
 
 ## Iteration 0.3.0
 
@@ -10,7 +23,7 @@ Stand: 2026-09-26 · App-Version `0.3.0`
 - Update- und Rollback-Architektur sowie eine explizite Konformitätsprüfung liegen unter `docs/architecture/`.
 - Runtime und Netzwerk-Aktivierung bleiben deaktiviert, bis die dokumentierten Geräte-Gates bestanden sind.
 
-Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden; Bottom-Tabs und ZIP-Import benötigen noch einen echten Scripting-Gerätetest.
+Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-Tabs starten auf dem echten Gerät; der erste Mod-ZIP-Test meldete den inzwischen getrennt behandelten Eintragslimit-/Zentralverzeichnisfehler.
 
 
 ## Implementiert
@@ -26,7 +39,7 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden; Bottom-Tabs und
 | Capability-Probe v2 | dokumentiertes lokales `loadFile` mit relativer JS-Subresource, WASM validate/instantiate, SIMD, WebGL context+Readback, AudioContext-Konstruktion, Worker/SAB/Isolation/OffscreenCanvas, IndexedDB-/Gamepad-/Touch-API, Umgebung | PROBE, keine Runtime-Zertifizierung; konkrete WASM/Data-Subresource ausstehend |
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 17 Tests | VERIFIZIERT lokal |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 19 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund

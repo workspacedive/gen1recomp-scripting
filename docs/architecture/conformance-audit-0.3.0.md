@@ -24,7 +24,7 @@ Overall status: **TEILWEISE VERIFIZIERT — conformant control plane, incomplete
 | Atomic index replacement | temporary file is parsed, old index is backed up, failed rename restores backup | **VERIFIZIERT** by test |
 | Runtime truthfulness | `APP.runtimeEnabled` is false and UI states missing device gates | **VERIFIZIERT** |
 | No Pro-only dependency | repository regression scan and no known Pro API in product code | **VERIFIZIERT** by test |
-| Compatible tab navigation | documented state-based `TabView` API; independent `NavigationStack` per tab | **VERIFIZIERT** against official docs; **VORAUSSETZUNG** device test |
+| Compatible tab navigation | documented state-based `TabView` API; independent `NavigationStack` per tab | **VERIFIZIERT** against official docs and subsequent 0.3.0 real-device feedback |
 | Mod archive transport safety | central-directory preflight, cross-check against documented `Archive.entries()`, explicit per-entry safe destinations, post-extraction manifest/entry check and immutable publication | **VERIFIZIERT** by parser unit tests; Archive extraction still needs adversarial device testing |
 | Original mod semantics retained | local shell labels package “stored”; activation is reserved for original loader | **VERIFIZIERT** architectural boundary; activation **NICHT VERIFIZIERT** |
 | Component update safety | inventory and metadata-only check exist; activation protocol documented but disabled | **TEILWEISE VERIFIZIERT** |

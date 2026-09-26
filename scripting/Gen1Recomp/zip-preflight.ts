@@ -2,11 +2,13 @@ export const MOD_ARCHIVE_LIMITS = Object.freeze({
   archiveBytes: 64 * 1024 * 1024,
   expandedBytes: 512 * 1024 * 1024,
   entryBytes: 128 * 1024 * 1024,
-  entries: 4096,
+  entries: 32_768,
+  expansionRatio: 200,
 })
 
 export interface ZipPreflight {
   entries: string[]
+  compressedBytes: number
   expandedBytes: number
   rootPrefix: string
   manifestPath: string
@@ -94,13 +96,17 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
       centralOffset === 0xffffffff) {
     throw new Error("Leere oder ZIP64-Modpakete werden nicht unterstützt.")
   }
-  if (totalEntries > MOD_ARCHIVE_LIMITS.entries || centralOffset + centralSize > eocd) {
-    throw new Error("Das ZIP hat zu viele Einträge oder ein beschädigtes Verzeichnis.")
+  if (totalEntries > MOD_ARCHIVE_LIMITS.entries) {
+    throw new Error(`Das ZIP enthält ${totalEntries} Einträge; erlaubt sind höchstens ${MOD_ARCHIVE_LIMITS.entries}.`)
+  }
+  if (centralOffset + centralSize > eocd) {
+    throw new Error("Das ZIP-Zentralverzeichnis liegt außerhalb seiner gültigen Grenzen.")
   }
 
   const decoder = new TextDecoder("utf-8", { fatal: true })
   const entries: string[] = []
   const seen = new Set<string>()
+  let compressedBytes = 0
   let expandedBytes = 0
   let cursor = centralOffset
   for (let index = 0; index < totalEntries; index += 1) {
@@ -128,6 +134,9 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
         expanded > MOD_ARCHIVE_LIMITS.entryBytes) {
       throw new Error("Ein ZIP-Eintrag ist zu groß oder verwendet ZIP64.")
     }
+    if (method === 0 && compressed !== expanded) {
+      throw new Error("Ein unkomprimierter ZIP-Eintrag meldet widersprüchliche Größen.")
+    }
     const unixHost = (madeBy >>> 8) === 3
     const unixMode = external >>> 16
     if (unixHost && (unixMode & 0xf000) === 0xa000) {
@@ -144,6 +153,7 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
     if (seen.has(canonical)) throw new Error("Das ZIP enthält doppelte Dateipfade.")
     seen.add(canonical)
     entries.push(path)
+    compressedBytes += compressed
     expandedBytes += expanded
     if (expandedBytes > MOD_ARCHIVE_LIMITS.expandedBytes) {
       throw new Error("Das entpackte Modpaket wäre zu groß (maximal 512 MiB).")
@@ -153,6 +163,10 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
   if (cursor !== centralOffset + centralSize) {
     throw new Error("Das ZIP-Zentralverzeichnis hat unerwartete Zusatzdaten.")
   }
+  if (expandedBytes > 1024 * 1024 &&
+      expandedBytes > Math.max(1, compressedBytes) * MOD_ARCHIVE_LIMITS.expansionRatio) {
+    throw new Error(`Das ZIP überschreitet das erlaubte Entpackverhältnis von ${MOD_ARCHIVE_LIMITS.expansionRatio}:1.`)
+  }
   const root = locateRoot(entries.filter((path) => !path.endsWith("/")))
-  return { entries, expandedBytes, ...root }
+  return { entries, compressedBytes, expandedBytes, ...root }
 }
