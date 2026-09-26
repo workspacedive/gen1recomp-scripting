@@ -1,19 +1,23 @@
 # Evidenzprotokoll
 
-Stand: 2026-09-25. Dieses Dokument trennt beobachtete Fakten von Annahmen.
+Stand: 2026-09-26. Dieses Dokument trennt beobachtete Fakten von Annahmen. Die vollständige binäre Nachweiskette steht in [`apk-static-analysis.md`](apk-static-analysis.md).
 
 ## Untersuchte Artefakte
 
 | Artefakt | Revision / Digest | Status | Bemerkung |
 |---|---|---|---|
 | Gen1Recomp Source | Tag `v0.3.18`, Commit `b83f805a7c7b6043370b783ea7a4b65fd8c93ef4` | VERIFIZIERT | Tag lokal ausgecheckt und Quellcode untersucht. |
-| Android Release | `gen1recomp-0.3.18-android.apk`, 40,036,414 Bytes, publizierter SHA-256 `1314d5a7dccc6aed29b5a9e27d356fa81eb9014f5c5eb7522fdc70293e02fd88` | TEILWEISE VERIFIZIERT | GitHub Release API und exakter Tag verifiziert. Der Binärdownload brach in der Sandbox am Release-CDN wiederholt mit TLS/EOF ab; daher keine unabhängige Dekompilierung. Buildquellen und Android-Paketpipeline derselben Revision wurden analysiert. |
+| Android Release | `gen1recomp-0.3.18-android.apk`, 40.036.414 Bytes, SHA-256 `1314d5a7dccc6aed29b5a9e27d356fa81eb9014f5c5eb7522fdc70293e02fd88` | VERIFIZIERT | Aus Nutzer-Multipart-Upload verlustfrei rekonstruiert; Hash und Größe sind exakt gleich den offiziellen Release-Metadaten. Manifest, DEX, Signatur, ELF-Bibliotheken und eingebettete `game.love` wurden statisch untersucht, ohne APK-Code auszuführen. |
 | iOS Release | `gen1recomp++-0.3.18-ios.ipa`, publizierter SHA-256 `df9f92498ba2db887ff60087c8549e878d39889f6285212fb42e23c57d80f62e` | VERIFIZIERT (Metadaten) | Belegt, dass ein nativer LÖVE-iOS-Port existiert; er ist nicht dasselbe wie eine Scripting-App. |
 | Scripting offizielle Dokumentation | Repository `ScriptingApp/scriptingapp.github.io`, Commit `381a7a623cecac4f6a51fdff958c8c0c00e3c911`, App-Store-Dokumentations-ZIP | VERIFIZIERT | ZIP und `doc.json` lokal analysiert. Dokumentation enthält Changelog bis 3.2.0. |
 | Scripting Beispiele/Doku-Spiegel | `Honye/scripting-scripts`, Commit `41f3d2387c9a9dae4dfc9596b2fdd040cae55b11` | TEILWEISE VERIFIZIERT | Ergänzende Quelle, nicht als Host-Primärbeleg verwendet. |
 
 ## Gen1Recomp – verifizierte Fakten
 
+- **VERIFIZIERT:** Die hochgeladene APK ist bytegleich zum offiziellen v0.3.18-Release. Ihre `game.love` enthält 1.150 Dateien; alle 1.150 Pfade existieren im offiziellen Tag, davon sind 1.149 byteidentisch. Nur `src/core/Version.lua` unterscheidet sich durch den im offiziellen Packskript vorgesehenen Stamp von `0.0.0-dev` auf `0.3.18`.
+- **VERIFIZIERT:** Manifest: Paket `com.theboisclub.pokemonred`, Version/Code `0.3.18`/`3018`, min/target/compile SDK 19/36/36. Nur die Haupt-Activity ist exportiert; sie akzeptiert `gen1recomp++://launch` und USB-Attach. Provider und Secondary Activity sind nicht exportiert.
+- **VERIFIZIERT:** Das Release ist mit APK-v1 und -v2, nicht v3, und einem selbstsignierten Zertifikat `CN=Android Debug, O=Android, C=US` signiert (Zertifikat-SHA-256 `533ca935ab53dd87a1575dc53e744fdda8c8b68ede803d97d764ee4f3f01fa27`). Das schützt Paketintegrität, ist aber kein geeigneter Publisher-Trust-Anchor und ein Update-/Distributionsrisiko.
+- **VERIFIZIERT:** Die APK enthält ARM64- und ARMv7-Versionen von LÖVE, librashader bridge, OpenAL, mpg123 und libc++. Eine DEX mit 1.097 Klassen enthält die nativen Picker-, HTTPS-, Raw-TLS-, Update-, Schritt-, Secondary-Display- und Lifecycle-Bridges.
 - **VERIFIZIERT:** v0.3.18 ist keine APK-spezifische Java-App, sondern eine eingebettete LÖVE-Anwendung. `scripts/build_android.sh` packt `game.love`; `mobile/android` vendort love-android 11.5a, SDL2 und LuaJIT. Android ergänzt SAF-Dateiauswahl, HTTPS-Download, Schritte und Paketinstallation über native Bridges.
 - **VERIFIZIERT:** Der aktuelle iOS-Port verwendet LÖVE 12.0 und native Swift/Objective-C-Bridges. `UIFileSharingEnabled` und `LSSupportsOpeningDocumentsInPlace` machen den Documents-Root in Dateien sichtbar.
 - **VERIFIZIERT:** Der Core ist Lua/LÖVE, nicht `lua.wasm`. Es gibt in v0.3.18 kein mitgeliefertes `.wasm`-Core-Artefakt.

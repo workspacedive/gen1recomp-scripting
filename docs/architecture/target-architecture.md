@@ -9,6 +9,8 @@ Die Architektur verwendet **zwei Prozessebenen**:
 
 Dies ist die einzige derzeit plausible Route, die den Originalcore, dessen Mod-/Hook-API und Gameplay-Semantik nicht in TypeScript dupliziert. Sie ist trotzdem **EXPERIMENTELL und durch Device-Gates blockiert**. Die vorhandene native Gen1Recomp-iOS-App ist technisch sicherer und leistungsfähiger, erfüllt aber nicht die Anforderung „innerhalb Scripting“.
 
+Der inzwischen vollständig extrahierte offizielle Android-Payload bestätigt diese Grenze: Alle 1.150 `game.love`-Pfade entsprechen Tag v0.3.18; 1.149 sind byteidentisch, die einzige Differenz ist der vorgesehene Versionsstamp. Android bindet denselben Core an native Picker-, Netzwerk-, Update-, Schritt-, Audio- und Display-Bridges. Die Zielarchitektur erhält daher den Core und ersetzt diese Hostkante gezielt, statt Android-Java oder 1.072 Lua-Dateien neu zu implementieren. Siehe [`../audit/apk-static-analysis.md`](../audit/apk-static-analysis.md).
+
 ### Entscheidung
 
 - **P0 jetzt:** Host-Library, Dateisystem, Identitäten, Profile, Transaktionen, Diagnose und Capability-Probe.
@@ -212,6 +214,8 @@ stateDiagram-v2
 - Retention: active + LKG + protected + optional ein vorheriges; nie während aktiver Session löschen.
 - Signaturen sind **VORAUSSETZUNG** für „Verified/Signed“. Solange upstream nur SHA-256 bereitstellt, belegt Hash Integrität gegen das abgerufene Manifest, nicht autonome Herkunft bei kompromittiertem Repository.
 - Repository Provider: `GitHubReleaseProvider`, `LocalFileProvider`, später `HttpManifestProvider`; Download und Aktivierung bleiben getrennt.
+- **APK-Befund, VERIFIZIERT:** Das offizielle Android-Artefakt ist trotz v1/v2-Paketsignatur mit einer selbstsignierten Android-Debug-Identität signiert. Diese Identität wird nicht übernommen und gilt nicht als Vertrauensanker. APK-Installation und `REQUEST_INSTALL_PACKAGES` haben im Scripting-Host keine Entsprechung; aktualisiert werden nur Core-Payloads.
+- **VORAUSSETZUNG:** Ein Scripting-Core darf erst „Signed“ heißen, wenn Manifest und Artifact durch eine separate, dokumentierte Release-Key-Policy inklusive Rotation/Revocation authentisiert sind. Bis dahin lautet der Trust-Level höchstens `Verified Hash/Provenance`.
 
 ## 10. Save und Migration
 
@@ -300,6 +304,21 @@ Benchmarks (Median/P95, mindestens 30 Läufe soweit praktikabel): Cold/Warm Star
 - **Input:** Touch overlay P0; Focus Loss löscht gehaltene Eingaben. Gamepad bleibt capability-gated. Priorität: System/modal UI → Host overlay → Mods (observe/consume nach Vertrag) → Game.
 - **Haptik:** optionaler freier Basisadapter, niemals Gameplay-Abhängigkeit.
 
+### Binär bestätigte Android-Hostkante → Scripting-Port
+
+| APK-/Core-Vertrag | Binäre Evidenz | Scripting-Entscheidung | Status |
+|---|---|---|---|
+| File pick/create/export | DEX-Methoden und Picker-Stagingdateien vorhanden | `DocumentPicker` + transaktionaler File Adapter; Core-Aufruf erhalten | FREE / implementierbar, Contract-Test nötig |
+| `httpDownload/httpPost/httpRequest` | DEX-Signaturen, HTTPS-only-/Limit-Literale vorhanden | begrenzter Network Port; Auth/Redirect/Size Policy im Host, offline nie blockieren | NUR MIT HOST-UNTERSTÜTZUNG |
+| Raw TLS | `tlsOpen/Send/Receive/Status/Close` vorhanden | nicht in P0 freigeben; keine undokumentierte Socket-API behaupten | NICHT VERIFIZIERT |
+| APK-Install/Restart | `installApk`, Provider und Install-Permission vorhanden | nicht portieren; Core Store Stage/Verify/Activate/LKG statt App-Selbstupdate | bewusst unsupported |
+| Steps | `syncHealthSteps`, Permission und Pending-Datei vorhanden | optional; ohne dokumentierte freie Health-API Capability-Fehler, Gameplay bleibt unabhängig | NICHT VERIFIZIERT |
+| Secondary Display | Activity und Frame-/Touchmethoden vorhanden | nicht P0; Single Display als Baseline | NICHT VERIFIZIERT |
+| Vibration | Permission und Bridge vorhanden | optionaler Haptics Adapter, niemals harte Abhängigkeit | TEILWEISE VERIFIZIERT |
+| Gamepad/USB | optionale Manifest-Features und LÖVE/SDL-Pfade | Touch zuerst; Controller nur nach Device-Probe | BENCHMARK/PROBE ERFORDERLICH |
+
+Damit bleibt die API-Richtung original: Der Core fragt Fähigkeiten an; der Host implementiert oder verweigert sie explizit. Eine zweite, konkurrierende Game-/Mod-API entsteht nicht.
+
 ## 15. Mods, Hooks, Dependencies und Capabilities
 
 ```mermaid
@@ -328,7 +347,7 @@ Ziel-Capabilities werden zunächst auf upstream Permissions abgebildet. Feinere 
 
 | Bedrohung | Kontrolle | Rest-Risiko |
 |---|---|---|
-| Manipulierter Core/Download | HTTPS, Manifest, SHA-256, immutable staging, LKG | Repository+Manifest gemeinsam kompromittiert; Signatur fehlt. |
+| Manipulierter Core/Download | HTTPS, Manifest, SHA-256, immutable staging, LKG | Repository+Manifest gemeinsam kompromittiert; unabhängige Core-Signatur fehlt. Androids verifizierte Debug-Zertifikatsidentität ist ausdrücklich kein Trust Anchor. |
 | Zip Slip/Bomb/Symlink | Preflight, normalisierte Ziele, Limits, no symlink | Scripting unzip-Verhalten unbekannt; untrusted Archive bis Probe blockieren. |
 | Fake Manifest/Downgrade | striktes Schema, source pin, monotone Policy, Nutzerbestätigung | legitimer Rollback muss explizit erlaubt werden. |
 | Memory/Disk Exhaustion | declared size, quotas, bounded reads, cleanup reservation | iOS kann Prozess jederzeit beenden. |

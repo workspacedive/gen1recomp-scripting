@@ -11,6 +11,7 @@ Gen1Recomp v0.3.18 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 ## Enthalten
 
 - [`docs/audit/evidence.md`](docs/audit/evidence.md) — revisionsgebundener Gen1Recomp-/APK-/Scripting-Audit mit Verifikationsstatus.
+- [`docs/audit/apk-static-analysis.md`](docs/audit/apk-static-analysis.md) — reproduzierbare Multipart-Rekonstruktion, APK-Identität, Manifest, Signatur, DEX, native Libraries und vollständiger `game.love`-Source-Abgleich.
 - [`docs/audit/capability-matrix.md`](docs/audit/capability-matrix.md) — WASM, Grafik, Audio, Storage, Worker, Input und Free/Pro.
 - [`docs/audit/ui-ux.md`](docs/audit/ui-ux.md) — APK-/Launcher-UI-Audit und begründete Scripting-Abbildung.
 - [`docs/architecture/target-architecture.md`](docs/architecture/target-architecture.md) — Zielarchitektur, Datenmodell, Mermaid-Diagramme, Updates, Recovery, Saves, Mods, Sicherheit, Performance, Risiken, Roadmap und Abnahme.
