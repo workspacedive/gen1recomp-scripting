@@ -13,12 +13,22 @@ test('pure-Lua bit adapter satisfies StreamMD5 and shift semantics', async () =>
   const shim = adapter.slice(adapter.indexOf(marker))
   const script = `local nativeRequire = require
 local clockValues, clockIndex = { 0 / 0, 4, 3, 5 }, 0
+local audioMode = "secondary-source"
+local queueableSource = {
+  setVolume = function() end,
+  queue = function() end,
+  getFreeBufferCount = function() return 1 end,
+}
 love = {
   timer = { getTime = function()
     clockIndex = clockIndex + 1
     return clockValues[clockIndex]
   end },
   graphics = { setColor = function() end, rectangle = function() end },
+  audio = { newQueueableSource = function()
+    if audioMode == "secondary-source" then return function() end, queueableSource end
+    return function() end
+  end },
 }
 local nativeModernLoad = load
 loadstring = function(source, chunkname) return nativeModernLoad(source, chunkname) end
@@ -52,6 +62,10 @@ assert(firstTime == firstTime and firstTime ~= math.huge and firstTime ~= -math.
 assert(love.timer.getTime() == 4)
 assert(love.timer.getTime() == 4)
 assert(love.timer.getTime() == 5)
+assert(love.audio.newQueueableSource(44100, 16, 2, 32) == queueableSource)
+audioMode = "invalid"
+local validAudio, audioError = pcall(love.audio.newQueueableSource, 44100, 16, 2, 32)
+assert(not validAudio and audioError:match("returned %[function%] instead of Source"))
 local generated = assert(load("return answer", "@generated.lua", "t", { answer = 42 }))
 assert(generated() == 42)
 local deniedText, deniedMessage = load("return 1", "@generated.lua", "b", {})

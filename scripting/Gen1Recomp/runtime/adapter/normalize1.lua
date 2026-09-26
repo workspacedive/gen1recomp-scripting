@@ -175,6 +175,45 @@ do
   end
 end
 
+-- Gen1Recomp streams synthesized music through QueueableSource. On the
+-- device-observed love.js path this constructor returned a Lua function in the
+-- first result slot instead of an indexable Source. Inspect all returned
+-- values at this API boundary: recover a real Source when one is present, and
+-- otherwise raise a contract error where ChipAudio's existing pcall can
+-- degrade cleanly instead of carrying the invalid value into Music.
+do
+  local audio = love and love.audio
+  local nativeNewQueueableSource = audio and audio.newQueueableSource
+  if type(nativeNewQueueableSource) == "function" then
+    local unpackValues = table.unpack or unpack
+    local function pack(...)
+      return { n = select("#", ...), ... }
+    end
+    local function isSource(value)
+      local kind = type(value)
+      if kind ~= "userdata" and kind ~= "table" then return false end
+      local ok, setVolume, queue, getFreeBufferCount = pcall(function()
+        return value.setVolume, value.queue, value.getFreeBufferCount
+      end)
+      return ok and type(setVolume) == "function" and type(queue) == "function"
+        and type(getFreeBufferCount) == "function"
+    end
+    audio.newQueueableSource = function(...)
+      local results = pack(nativeNewQueueableSource(...))
+      if isSource(results[1]) then
+        return unpackValues(results, 1, results.n)
+      end
+      for index = 2, results.n do
+        if isSource(results[index]) then return results[index] end
+      end
+      local kinds = {}
+      for index = 1, results.n do kinds[index] = type(results[index]) end
+      error("love.js audio contract: newQueueableSource returned ["
+        .. table.concat(kinds, ",") .. "] instead of Source", 2)
+    end
+  end
+end
+
 -- Gen1Recomp host adapter: love.js 11.5 provides neither LuaJIT's bit module
 -- nor Lua 5.2's bit32 module. Keep this compatibility layer outside the game
 -- payload and expose the operations used by the reviewed upstream payload.

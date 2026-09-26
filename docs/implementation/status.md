@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.10.5`
+Stand: 2026-09-26 · App-Version `0.10.6`
+
+## Iteration 0.10.6
+
+- **VERIFIZIERT (Gerät):** 0.10.5 startet Gen1Recomp; der Gameplay-Controller erscheint und funktioniert. Der frühere Theme-Rail-Fehler blockiert den Start nicht mehr.
+- **TEILWEISE VERIFIZIERT (Gerät):** Ein neuer Spielstand erreicht den Overworld-Kartenaufbau.
+- **VERIFIZIERT (Gerät/Quellprüfung):** Der nächste Blocker ist ein Audio-Typbruch: `ChipAudio.playMusic` erhält von `love.audio.newQueueableSource` einen Lua-Funktionswert statt der dokumentierten Source und reicht ihn an `Music.applyVolume` weiter.
+- Adapter r11 prüft die Konstruktor-Rückgabewerte an der LÖVE-Grenze, übernimmt einen tatsächlich vorhandenen Source-Wert aus einer späteren Rückgabeposition und weist andernfalls den ungültigen Runtimewert kontrolliert zurück. Payload und Runtimebytes bleiben unverändert.
+- **NICHT VERIFIZIERT:** Musik/SFX, weiterer Spielfortschritt, Saves, Lifecycle und Langzeitspiel benötigen den Gerätetest mit r11.
+- Detailprüfung: [`conformance-audit-0.10.6.md`](../architecture/conformance-audit-0.10.6.md).
 
 ## Iteration 0.10.5
 
@@ -8,7 +17,8 @@ Stand: 2026-09-26 · App-Version `0.10.5`
 - Runtime r10 stellt den synchronen Handler wieder her; späte Fehler werden fire-and-forget mit eigener Fehlerbehandlung persistiert. Ein Regressionstest sperrt den asynchronen Handler.
 - Der ROM-/Gameplay-Modus besitzt nun einen hosteigenen Multitouch-Controller für D-Pad, A, B, START und SELECT über die unveränderten Gen1Recomp-Standardtasten.
 - `nogame`, Payload-Gate und Launcher-Vorschau aktivieren den Controller nicht.
-- **NICHT VERIFIZIERT:** r10, Controllerereignisse, Rail-Fix, Gameplay, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- **VERIFIZIERT (Gerät):** r10 startet das Spiel; Controllerereignisse funktionieren und der Rail-Fix passiert die frühere Fehlerstelle.
+- **TEILWEISE VERIFIZIERT (Gerät):** Gameplay erreicht den Overworld-Kartenaufbau; Audio scheitert dort am in 0.10.6 adressierten Source-Typbruch. Saves und Lifecycle bleiben **NICHT VERIFIZIERT**.
 - Detailprüfung: [`conformance-audit-0.10.5.md`](../architecture/conformance-audit-0.10.5.md).
 
 ## Iteration 0.10.4
