@@ -324,31 +324,32 @@ do
           local source, message = originalPlayMusic(...)
           if source ~= nil then
             local kind = type(source)
-            -- love.js' queueable proxy omits Source modifiers that are either
-            -- meaningless (looping is performed by ChipSynth) or optional
-            -- (filter/pitch). Upstream tries these under pcall, but indexing a
-            -- missing method happens before pcall. Add no-op methods only to a
-            -- mutable table proxy so the intended graceful degradation works.
-            if kind == "table" then
-              for _, method in ipairs({ "setLooping", "setFilter", "setPitch" }) do
-                if type(source[method]) ~= "function" then
-                  pcall(function() source[method] = function() return false end end)
-                end
-              end
-            end
-            local valid = false
+            local methods
             if kind == "userdata" or kind == "table" then
-              local ok, setVolume, queue, getFreeBufferCount, play, stop,
-                pause, isPlaying = pcall(function()
-                  return source.setVolume, source.queue, source.getFreeBufferCount,
-                    source.play, source.stop, source.pause, source.isPlaying
-                end)
-              valid = ok and type(setVolume) == "function"
-                and type(queue) == "function"
-                and type(getFreeBufferCount) == "function"
-                and type(play) == "function" and type(stop) == "function"
-                and type(pause) == "function" and type(isPlaying) == "function"
+              local ok, values = pcall(function()
+                return {
+                  setVolume = source.setVolume,
+                  queue = source.queue,
+                  getFreeBufferCount = source.getFreeBufferCount,
+                  play = source.play,
+                  stop = source.stop,
+                  pause = source.pause,
+                  isPlaying = source.isPlaying,
+                  setLooping = source.setLooping,
+                  setFilter = source.setFilter,
+                  setPitch = source.setPitch,
+                }
+              end)
+              if ok then methods = values end
             end
+            local valid = methods
+              and type(methods.setVolume) == "function"
+              and type(methods.queue) == "function"
+              and type(methods.getFreeBufferCount) == "function"
+              and type(methods.play) == "function"
+              and type(methods.stop) == "function"
+              and type(methods.pause) == "function"
+              and type(methods.isPlaying) == "function"
             if not valid then
               local origin = ""
               if kind == "function" and debug and debug.getinfo then
@@ -362,6 +363,32 @@ do
               error("ChipAudio.playMusic returned " .. kind
                 .. " instead of Source" .. origin, 0)
             end
+
+            -- The love.js QueueableSource is userdata on the device and omits
+            -- some optional Source methods. It cannot be mutated. Return a Lua
+            -- facade that forwards every real operation to the native object
+            -- and supplies no-ops only for unsupported modifiers. ChipAudio
+            -- keeps and feeds the original source internally.
+            local nativeSource = source
+            local facade = { __hostNativeSource = nativeSource }
+            for _, method in ipairs({ "setVolume", "queue", "getFreeBufferCount",
+                "play", "stop", "pause", "isPlaying" }) do
+              local nativeMethod = methods[method]
+              facade[method] = function(_, ...)
+                return nativeMethod(nativeSource, ...)
+              end
+            end
+            for _, method in ipairs({ "setLooping", "setFilter", "setPitch" }) do
+              local nativeMethod = methods[method]
+              if type(nativeMethod) == "function" then
+                facade[method] = function(_, ...)
+                  return nativeMethod(nativeSource, ...)
+                end
+              else
+                facade[method] = function() return false end
+              end
+            end
+            source = facade
           end
           return source, message
         end

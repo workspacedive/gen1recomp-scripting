@@ -99,16 +99,25 @@ local chipAudio = require("src.core.ChipAudio")
 assert(chipAudio.__hostSourceContract == true)
 local audioOk, audioError = pcall(chipAudio.playMusic)
 assert(not audioOk and audioError:match("ChipAudio%.playMusic returned function instead of Source"))
+local forwarded = {}
 chipResult = {
-  setVolume = function() end, queue = function() end,
-  getFreeBufferCount = function() return 1 end,
-  play = function() end, stop = function() end, pause = function() end,
-  isPlaying = function() return false end,
+  setVolume = function(self) assert(self == chipResult); forwarded.setVolume = true end,
+  queue = function(self) assert(self == chipResult); forwarded.queue = true end,
+  getFreeBufferCount = function(self) assert(self == chipResult); return 1 end,
+  play = function(self) assert(self == chipResult); forwarded.play = true end,
+  stop = function(self) assert(self == chipResult); forwarded.stop = true end,
+  pause = function(self) assert(self == chipResult); forwarded.pause = true end,
+  isPlaying = function(self) assert(self == chipResult); return false end,
 }
-assert(chipAudio.playMusic() == chipResult)
-assert(type(chipResult.setLooping) == "function" and chipResult:setLooping() == false)
-assert(type(chipResult.setFilter) == "function" and chipResult:setFilter() == false)
-assert(type(chipResult.setPitch) == "function" and chipResult:setPitch() == false)
+local facade = chipAudio.playMusic()
+assert(facade ~= chipResult and facade.__hostNativeSource == chipResult)
+facade:setVolume(0.5); facade:queue({}); facade:play(); facade:stop(); facade:pause()
+assert(forwarded.setVolume and forwarded.queue and forwarded.play
+  and forwarded.stop and forwarded.pause)
+assert(facade:getFreeBufferCount() == 1 and facade:isPlaying() == false)
+assert(type(facade.setLooping) == "function" and facade:setLooping() == false)
+assert(type(facade.setFilter) == "function" and facade:setFilter() == false)
+assert(type(facade.setPitch) == "function" and facade:setPitch() == false)
 local theme = require("src.ui.kit.Theme")
 assert(theme.__hostRailCompatibility == true)
 assert(pcall(theme.versionRail, 0, 0, 4, 1))

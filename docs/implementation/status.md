@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.11.1`
+Stand: 2026-09-26 · App-Version `0.11.2`
+
+## Iteration 0.11.2
+
+- **VERIFIZIERT (Gerät):** r15 reproduziert exakt den nil-Aufruf an `Music.lua:308`; das Source-Objekt lässt sich auf diesem Pfad nicht durch Feldzuweisung erweitern.
+- Adapter r16 mutiert das Runtimeobjekt nicht mehr. Er gibt Music eine eigene Lua-Fassade, die alle sieben nativen Kernoperationen mit korrektem originalem `self` weiterleitet.
+- Vorhandene optionale Modifikatoren werden weitergeleitet; nur fehlende `setLooping`, `setFilter` und `setPitch` degradieren als No-op. ChipAudio behält und befüllt weiterhin das originale native Objekt.
+- Der ausführbare Test verifiziert native Identität, Self-Bindung, Kernweiterleitungen, Rückgaben und optionale Fallbacks.
+- **NICHT VERIFIZIERT:** Kartenstart, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.2.md`](../architecture/conformance-audit-0.11.2.md).
 
 ## Iteration 0.11.1
 
