@@ -324,14 +324,30 @@ do
           local source, message = originalPlayMusic(...)
           if source ~= nil then
             local kind = type(source)
+            -- love.js' queueable proxy omits Source modifiers that are either
+            -- meaningless (looping is performed by ChipSynth) or optional
+            -- (filter/pitch). Upstream tries these under pcall, but indexing a
+            -- missing method happens before pcall. Add no-op methods only to a
+            -- mutable table proxy so the intended graceful degradation works.
+            if kind == "table" then
+              for _, method in ipairs({ "setLooping", "setFilter", "setPitch" }) do
+                if type(source[method]) ~= "function" then
+                  pcall(function() source[method] = function() return false end end)
+                end
+              end
+            end
             local valid = false
             if kind == "userdata" or kind == "table" then
-              local ok, setVolume, queue, getFreeBufferCount = pcall(function()
-                return source.setVolume, source.queue, source.getFreeBufferCount
-              end)
+              local ok, setVolume, queue, getFreeBufferCount, play, stop,
+                pause, isPlaying = pcall(function()
+                  return source.setVolume, source.queue, source.getFreeBufferCount,
+                    source.play, source.stop, source.pause, source.isPlaying
+                end)
               valid = ok and type(setVolume) == "function"
                 and type(queue) == "function"
                 and type(getFreeBufferCount) == "function"
+                and type(play) == "function" and type(stop) == "function"
+                and type(pause) == "function" and type(isPlaying) == "function"
             end
             if not valid then
               local origin = ""

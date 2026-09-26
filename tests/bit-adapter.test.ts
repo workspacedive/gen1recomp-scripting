@@ -36,8 +36,9 @@ local diagnosticGame = {
   load = function() error("preserved root cause") end,
   draw = function() error("secondary draw failure") end,
 }
+local chipResult = function() end
 local diagnosticChipAudio = {
-  playMusic = function() return function() end end,
+  playMusic = function() return chipResult end,
 }
 local diagnosticTheme = { PAL = {} }
 for _, name in ipairs({ "railRed", "railBlue", "railGold", "railAmber",
@@ -98,6 +99,16 @@ local chipAudio = require("src.core.ChipAudio")
 assert(chipAudio.__hostSourceContract == true)
 local audioOk, audioError = pcall(chipAudio.playMusic)
 assert(not audioOk and audioError:match("ChipAudio%.playMusic returned function instead of Source"))
+chipResult = {
+  setVolume = function() end, queue = function() end,
+  getFreeBufferCount = function() return 1 end,
+  play = function() end, stop = function() end, pause = function() end,
+  isPlaying = function() return false end,
+}
+assert(chipAudio.playMusic() == chipResult)
+assert(type(chipResult.setLooping) == "function" and chipResult:setLooping() == false)
+assert(type(chipResult.setFilter) == "function" and chipResult:setFilter() == false)
+assert(type(chipResult.setPitch) == "function" and chipResult:setPitch() == false)
 local theme = require("src.ui.kit.Theme")
 assert(theme.__hostRailCompatibility == true)
 assert(pcall(theme.versionRail, 0, 0, 4, 1))

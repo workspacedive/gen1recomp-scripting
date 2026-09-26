@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.11.0`
+Stand: 2026-09-26 · App-Version `0.11.1`
+
+## Iteration 0.11.1
+
+- **VERIFIZIERT (Gerät):** r14 verhindert den früheren Funktionszugriff. Der nächste Fehler entsteht nun in `Music.lua:308`, weil der tabellenförmige love.js-QueueableSource-Proxy keine Methode `setLooping` besitzt.
+- **VERIFIZIERT (Quellprüfung):** Das Argument `src.setLooping` wird vor `pcall` ausgewertet; eine fehlende Methode kann daher nicht durch den upstream Schutz abgefangen werden.
+- Adapter r15 ergänzt bei einem mutierbaren Tabellenproxy nur die optionalen Modifikatoren `setLooping`, `setFilter` und `setPitch` als No-op. Looping wird bei Chip-Musik bereits von ChipSynth verarbeitet; Filter ist upstream ausdrücklich optional.
+- Kernmethoden für Queue, Wiedergabe und Zustand bleiben zwingend und werden nicht simuliert.
+- **NICHT VERIFIZIERT:** Kartenstart, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.1.md`](../architecture/conformance-audit-0.11.1.md).
 
 ## Iteration 0.11.0
 
