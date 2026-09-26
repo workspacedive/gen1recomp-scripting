@@ -44,22 +44,6 @@ interface ScriptingData {
   toUint8Array(): Uint8Array | null
 }
 
-declare const Archive: {
-  openForMode(path: string, mode: 'read', options?: { pathEncoding?: string }): {
-    entries(): Array<{
-      path: string
-      type: 'file' | 'directory' | 'symlink'
-      compressedSize: number
-      uncompressedSize: number
-      isEncrypted?: boolean
-    }>
-    extractTo(path: string, destination: string, options?: {
-      bufferSize?: number
-      allowUncontainedSymlinks?: boolean
-    }): Promise<void>
-  }
-}
-
 declare const Crypto: {
   sha1(data: ScriptingData): ScriptingData
   sha256(data: ScriptingData): ScriptingData
@@ -72,6 +56,7 @@ declare const FileManager: {
   readAsData(path: string): Promise<ScriptingData>
   readAsString(path: string): Promise<string>
   writeAsData(path: string, data: ScriptingData): Promise<void>
+  writeAsBytes(path: string, data: Uint8Array): Promise<void>
   writeAsString(path: string, data: string): Promise<void>
   copyFile(path: string, newPath: string): Promise<void>
   rename(path: string, newPath: string): Promise<void>

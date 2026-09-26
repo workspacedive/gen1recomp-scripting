@@ -1,4 +1,5 @@
 import { PATHS } from "./host"
+import { extractZipEntry } from "./zip-extract"
 import { MOD_ARCHIVE_LIMITS, preflightModZip } from "./zip-preflight"
 
 const MODS_ROOT = PATHS.mods
@@ -169,46 +170,20 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
     }
     const sha256 = Crypto.sha256(archiveData).toHexString().toLowerCase()
 
-    // Use the documented Archive API to extract each already-approved entry to
-    // an explicit destination. This avoids trusting bulk-unzip path handling.
-    phase = "archive-crosscheck"
-    const reader = Archive.openForMode(archive, "read", { pathEncoding: "utf-8" })
-    const hostEntries = reader.entries()
-    if (hostEntries.length !== preflight.entries.length) {
-      throw new Error("ZIP-Verzeichnis und Host-Archivansicht stimmen nicht überein.")
-    }
-    const expected = new Map(preflight.entries.map((path) =>
-      [path.endsWith("/") ? path.slice(0, -1) : path, path]))
-    let hostCompressedBytes = 0
-    let hostExpandedBytes = 0
-    for (const entry of hostEntries) {
-      const approved = expected.get(entry.path.endsWith("/") ? entry.path.slice(0, -1) : entry.path)
-      if (!approved || entry.type === "symlink" || entry.isEncrypted === true ||
-          entry.uncompressedSize < 0 || entry.uncompressedSize > MOD_ARCHIVE_LIMITS.entryBytes) {
-        throw new Error("Das Host-Archiv enthält einen nicht freigegebenen Eintrag.")
-      }
-      hostCompressedBytes += entry.compressedSize
-      hostExpandedBytes += entry.uncompressedSize
-    }
-    if (hostCompressedBytes !== preflight.compressedBytes ||
-        hostExpandedBytes !== preflight.expandedBytes) {
-      throw new Error("ZIP-Größen und Host-Archivansicht stimmen nicht überein.")
-    }
-    const manifestEntry = hostEntries.find((entry) => entry.path === preflight.manifestPath)
-    if (!manifestEntry || manifestEntry.type !== "file" || manifestEntry.uncompressedSize > 1024 * 1024) {
-      throw new Error("manifest.json fehlt, ist kein Datei-Eintrag oder ist zu groß.")
-    }
+    // Extract approved entries ourselves. No Archive/ZIP host API is used:
+    // local headers, paths, DEFLATE output sizes and CRC-32 are verified here.
     phase = "extract-approved-entries"
     await ensureDirectory(extracted)
-    for (const entry of hostEntries) {
+    for (const entry of preflight.records) {
       const relative = entry.path.endsWith("/") ? entry.path.slice(0, -1) : entry.path
       const destination = safeJoin(extracted, relative)
-      if (entry.type === "directory") {
+      if (entry.isDirectory) {
         await ensureDirectory(destination)
       } else {
+        const output = extractZipEntry(bytes, entry)
         const slash = destination.lastIndexOf("/")
         await ensureDirectory(destination.slice(0, slash))
-        await reader.extractTo(entry.path, destination, { allowUncontainedSymlinks: false })
+        await FileManager.writeAsBytes(destination, output)
       }
     }
 

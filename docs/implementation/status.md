@@ -1,8 +1,21 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.3.1`
+Stand: 2026-09-26 · App-Version `0.3.2`
+
+## Iteration 0.3.2
+
+- **Gerätebefund:** Scripting klassifiziert die verwendete `Archive`-API als PRO. Diese API und alle `FileManager.zip/unzip`-Wege wurden vollständig aus dem Produktcode und dem Hostvertrag entfernt.
+- ZIP-Lesen und -Entpacken ist jetzt vollständig im Projekt implementiert: EOCD/Zentralverzeichnis, lokale Header, Stored-Einträge, RFC-1951-DEFLATE (ungepackte, feste und dynamische Huffman-Blöcke), Daten-Deskriptoren, Größenprüfung und CRC-32.
+- Zentrale und lokale Dateinamen, Flags, Kompressionsmethoden, Größen und CRC müssen übereinstimmen. Jeder Eintrag wird weiterhin nur an einen vorab normalisierten Zielpfad geschrieben.
+- Der Free-Tier-Regressionstest sperrt nun dauerhaft `Archive.openForMode`, 7z-Archive sowie `FileManager.zip/unzip` zusätzlich zu `BackgroundKeeper`.
+- Standardvektor-CRC, dynamisches/festes/leeres DEFLATE, Stored-/Deflate-/Descriptor-ZIPs und widersprüchliche lokale Header sind getestet.
+
+Status: **TEILWEISE VERIFIZIERT** — die Eigenimplementierung besteht reproduzierbare Tests und benötigt keine bekannte PRO-API; der konkrete Modimport muss erneut auf dem Gerät bestätigt werden.
+
 
 ## Iteration 0.3.1
+
+> Historischer Zwischenstand: Die dort ergänzte `Archive.entries()`-Querprüfung erwies sich auf dem Gerät als PRO-pflichtig und ist in 0.3.2 vollständig entfernt.
 
 - Reagiert auf den auf dem echten Gerät bestätigten Mod-Import-Abbruch: Die bisher zusammengefasste Meldung deutete entweder auf das zu knappe 4.096-Eintragslimit oder beschädigte Verzeichnisgrenzen. Das sichere Limit steigt auf 32.768; beide Ursachen haben jetzt getrennte Meldungen.
 - Trennt die Fehlermeldungen für Eintragslimit und beschädigte Zentralverzeichnisgrenzen, damit weitere Gerätebefunde eindeutig sind.
@@ -39,7 +52,7 @@ Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-T
 | Capability-Probe v2 | dokumentiertes lokales `loadFile` mit relativer JS-Subresource, WASM validate/instantiate, SIMD, WebGL context+Readback, AudioContext-Konstruktion, Worker/SAB/Isolation/OffscreenCanvas, IndexedDB-/Gamepad-/Touch-API, Umgebung | PROBE, keine Runtime-Zertifizierung; konkrete WASM/Data-Subresource ausstehend |
 | Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
 | Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
-| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 19 Tests | VERIFIZIERT lokal |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 24 Tests | VERIFIZIERT lokal |
 | Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
 
 ## Verifizierter Gerätebefund

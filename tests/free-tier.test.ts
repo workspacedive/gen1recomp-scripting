@@ -13,11 +13,17 @@ async function filesBelow(root: string): Promise<string[]> {
   return result
 }
 
-test('product code does not use known Pro-only BackgroundKeeper API', async () => {
+test('product code does not use known Pro-only APIs', async () => {
   const files = [...await filesBelow('src'), ...await filesBelow('scripting')]
   const offenders: string[] = []
+  const forbidden = [
+    /\bBackgroundKeeper\b/,
+    /\bArchive\s*\.\s*(?:openForMode|create7z|extract7z|list7z)\b/,
+    /\bFileManager\s*\.\s*(?:zip|unzip|zipSync|unzipSync)\b/,
+  ]
   for (const file of files.filter(file => /\.(ts|tsx)$/.test(file))) {
-    if ((await readFile(file, 'utf8')).includes('BackgroundKeeper')) offenders.push(file)
+    const source = await readFile(file, 'utf8')
+    if (forbidden.some(pattern => pattern.test(source))) offenders.push(file)
   }
   assert.deepEqual(offenders, [])
 })

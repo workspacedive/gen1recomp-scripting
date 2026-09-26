@@ -348,7 +348,7 @@ Ziel-Capabilities werden zunächst auf upstream Permissions abgebildet. Feinere 
 | Bedrohung | Kontrolle | Rest-Risiko |
 |---|---|---|
 | Manipulierter Core/Download | HTTPS, Manifest, SHA-256, immutable staging, LKG | Repository+Manifest gemeinsam kompromittiert; unabhängige Core-Signatur fehlt. Androids verifizierte Debug-Zertifikatsidentität ist ausdrücklich kein Trust Anchor. |
-| Zip Slip/Bomb/Symlink | Preflight, normalisierte Ziele, Limits, no symlink | Scripting unzip-Verhalten unbekannt; untrusted Archive bis Probe blockieren. |
+| Zip Slip/Bomb/Symlink | Projekt-eigener ZIP-Parser, zentrale/lokale Headerprüfung, normalisierte Ziele, CRC-32, Größen-/Ratio-Limits, keine Symlinks | PRO-pflichtige Scripting-Archive-APIs sind verboten; unbekannte ZIP-Methoden werden abgewiesen. |
 | Fake Manifest/Downgrade | striktes Schema, source pin, monotone Policy, Nutzerbestätigung | legitimer Rollback muss explizit erlaubt werden. |
 | Memory/Disk Exhaustion | declared size, quotas, bounded reads, cleanup reservation | iOS kann Prozess jederzeit beenden. |
 | Malicious Mod | upstream Sandbox/Permissions, time/size limits, safe mode | Lua CPU loops können je nach Runtime blockieren; testen. |

@@ -14,7 +14,7 @@ Captured: 2026-09-26. Repository revisions are pinned so conclusions can be repr
 | LÖVE release | https://github.com/love2d/love/releases/tag/11.5 | upstream LÖVE version reference | **VERIFIZIERT** |
 | Scripting TabView | https://github.com/Honye/scripting-scripts/blob/main/documentation/views/navigation/tab_view/with_badge.tsx | compatible `tabIndex`, `onTabIndexChanged`, child `tag` and `tabItem` pattern | **VERIFIZIERT** against documentation example |
 | Scripting networking | https://github.com/Honye/scripting-scripts/tree/main/documentation/request | module-exported `fetch`, timeout, response metadata and binary/text reads | **VERIFIZIERT** against documentation; real-device update request pending |
-| Scripting Archive | https://github.com/Honye/scripting-scripts/blob/main/documentation/archive/en.md | ZIP entry listing/type/size plus per-entry `extractTo` with uncontained symlinks disabled | **VERIFIZIERT** against documentation; adversarial device test pending |
+| Scripting Archive | https://github.com/Honye/scripting-scripts/blob/main/documentation/archive/en.md | Although documented, the real app presents a Scripting PRO upgrade gate when used | **VERIFIZIERT** by device feedback; **NUR MIT HOST-UNTERSTÜTZUNG**, therefore removed from product code in 0.3.2 |
 | Scripting FileManager | https://github.com/Honye/scripting-scripts/blob/main/documentation/file_manager/en.md | Documents path, read/write/copy/rename/stat and archive methods | **VERIFIZIERT** against documentation |
 
 The `Honye/scripting-scripts` repository is used as a readable mirror of Scripting documentation/examples, not vendored as source code. The narrow local declaration file records only APIs this project actually uses.

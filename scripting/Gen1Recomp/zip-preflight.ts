@@ -6,8 +6,21 @@ export const MOD_ARCHIVE_LIMITS = Object.freeze({
   expansionRatio: 200,
 })
 
+export interface ZipEntry {
+  path: string
+  flags: number
+  method: 0 | 8
+  crc32: number
+  compressedBytes: number
+  expandedBytes: number
+  localOffset: number
+  centralOffset: number
+  isDirectory: boolean
+}
+
 export interface ZipPreflight {
   entries: string[]
+  records: ZipEntry[]
   compressedBytes: number
   expandedBytes: number
   rootPrefix: string
@@ -105,6 +118,7 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
 
   const decoder = new TextDecoder("utf-8", { fatal: true })
   const entries: string[] = []
+  const records: ZipEntry[] = []
   const seen = new Set<string>()
   let compressedBytes = 0
   let expandedBytes = 0
@@ -116,6 +130,7 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
     const madeBy = u16(bytes, cursor + 4)
     const flags = u16(bytes, cursor + 8)
     const method = u16(bytes, cursor + 10)
+    const entryCrc32 = u32(bytes, cursor + 16)
     const compressed = u32(bytes, cursor + 20)
     const expanded = u32(bytes, cursor + 24)
     const nameLength = u16(bytes, cursor + 28)
@@ -123,14 +138,16 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
     const commentLength = u16(bytes, cursor + 32)
     const diskStart = u16(bytes, cursor + 34)
     const external = u32(bytes, cursor + 38)
+    const localOffset = u32(bytes, cursor + 42)
     const end = cursor + 46 + nameLength + extraLength + commentLength
     if (end > centralOffset + centralSize || diskStart !== 0 || nameLength === 0) {
       throw new Error("Ein ZIP-Eintrag ist beschädigt.")
     }
-    if ((flags & 1) !== 0 || (method !== 0 && method !== 8)) {
-      throw new Error("Verschlüsselte oder unbekannt komprimierte ZIP-Einträge sind nicht erlaubt.")
+    const allowedFlags = (1 << 1) | (1 << 2) | (1 << 3) | (1 << 11)
+    if ((flags & ~allowedFlags) !== 0 || (method !== 0 && method !== 8)) {
+      throw new Error("Verschlüsselte, gepatchte oder unbekannt komprimierte ZIP-Einträge sind nicht erlaubt.")
     }
-    if (compressed === 0xffffffff || expanded === 0xffffffff ||
+    if (compressed === 0xffffffff || expanded === 0xffffffff || localOffset === 0xffffffff ||
         expanded > MOD_ARCHIVE_LIMITS.entryBytes) {
       throw new Error("Ein ZIP-Eintrag ist zu groß oder verwendet ZIP64.")
     }
@@ -153,6 +170,17 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
     if (seen.has(canonical)) throw new Error("Das ZIP enthält doppelte Dateipfade.")
     seen.add(canonical)
     entries.push(path)
+    records.push({
+      path,
+      flags,
+      method: method as 0 | 8,
+      crc32: entryCrc32,
+      compressedBytes: compressed,
+      expandedBytes: expanded,
+      localOffset,
+      centralOffset,
+      isDirectory: path.endsWith("/"),
+    })
     compressedBytes += compressed
     expandedBytes += expanded
     if (expandedBytes > MOD_ARCHIVE_LIMITS.expandedBytes) {
@@ -168,5 +196,5 @@ export function preflightModZip(bytes: Uint8Array): ZipPreflight {
     throw new Error(`Das ZIP überschreitet das erlaubte Entpackverhältnis von ${MOD_ARCHIVE_LIMITS.expansionRatio}:1.`)
   }
   const root = locateRoot(entries.filter((path) => !path.endsWith("/")))
-  return { entries, compressedBytes, expandedBytes, ...root }
+  return { entries, records, compressedBytes, expandedBytes, ...root }
 }

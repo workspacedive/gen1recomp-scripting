@@ -177,7 +177,8 @@ No Core update may recursively replace `Documents/Gen1Recomp`. Migrations must b
 - a four-tab shell: Games, Mods, Diagnostics and Settings;
 - explicit pinned component inventory;
 - user-triggered, metadata-only Gen1Recomp release check with response-size and shape limits;
-- pre-extraction ZIP central-directory validation for local mods, cross-check with documented `Archive.entries()`, and per-entry extraction to explicit safe destinations: traversal, absolute paths, backslashes, malformed UTF-8, duplicate/case-colliding paths, encryption, unsupported methods, ZIP64, multi-disk archives, symlinks, per-entry/total/count limits, and packaged `baseroms` user inputs;
+- self-contained ZIP parsing and extraction for local mods without Scripting's PRO-only Archive APIs: central and local header agreement, Stored and RFC-1951 DEFLATE data, data descriptors, CRC-32, traversal/absolute-path/backslash/malformed-UTF-8/duplicate/encryption/ZIP64/multi-disk/symlink rejection, per-entry/total/count/ratio limits, explicit safe destinations, and rejection of packaged `baseroms` user inputs;
 - immutable mod storage by `id/version/SHA-256`, atomic index replacement with backup, interrupted staging cleanup, and removal that publishes the index before deleting payload bytes;
 - no mod activation and no network code activation;
-- since 0.3.1, up to 32,768 archive entries (instead of the too-low initial 4,096), a 200:1 expansion-ratio ceiling, and one shared in-memory read for hashing plus preflight. The higher limit is covered by an asset-heavy regression test and retains all path/type/size gates.
+- since 0.3.1, up to 32,768 archive entries (instead of the too-low initial 4,096), a 200:1 expansion-ratio ceiling, and one shared in-memory read for hashing plus preflight. The higher limit is covered by an asset-heavy regression test and retains all path/type/size gates;
+- since 0.3.2, no Scripting Archive or FileManager ZIP API is referenced. The project-owned reader implements only the required ZIP subset and rejects unsupported methods rather than invoking a gated host feature.

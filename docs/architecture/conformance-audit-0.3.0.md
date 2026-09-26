@@ -3,6 +3,8 @@
 Audit date: 2026-09-26  
 Scope: repository implementation, package process and documented host contract. This is not a real-device runtime certification.
 
+> Historical note: the Archive API assumed free in this audit was proven PRO-gated by later device feedback. Version 0.3.2 removes it completely; see `conformance-audit-0.3.2.md`.
+
 ## Conclusion
 
 The implementation **continues to follow the agreed architecture for the features it currently exposes**: host UI, immutable original game imports, separated user/Core/cache roots, journaled publication, conservative capability reporting, and disabled runtime activation. No reviewed path places a sole copy of critical user data in Cache or allows a Core operation to replace the user-data root.

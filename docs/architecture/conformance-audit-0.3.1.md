@@ -3,6 +3,8 @@
 Audit date: 2026-09-26  
 Scope: delta from the full 0.3.0 audit plus repository-wide regression checks.
 
+> Historical note: this version still used Scripting's PRO-gated Archive API. It is superseded by the self-contained 0.3.2 implementation and audit.
+
 ## Result
 
 Overall status: **TEILWEISE VERIFIZIERT — architecture remains conformant; corrected Mod transport awaits device retest**.
