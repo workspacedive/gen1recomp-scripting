@@ -159,6 +159,9 @@ do
   local loaders = package and (package.loaders or package.searchers)
   local nativeLoadString = loadstring
   local unpackValues = unpack or (table and table.unpack)
+  -- Release builds keep the proven compatibility/pacing adapters but avoid
+  -- timing wrappers and bridge traffic. Set true only in a diagnostic build.
+  local PROFILE_ENABLED = false
 
   local function normalizeHexEscapes(source)
     local changed
@@ -183,6 +186,7 @@ do
   end
 
   local function profile(phase, fields)
+    if not PROFILE_ENABLED then return end
     local parts = { "[gen1-profile]", "phase=" .. phase }
     for key, value in pairs(fields or {}) do
       parts[#parts + 1] = tostring(key) .. "=" .. tostring(value):gsub("%s+", "_")
@@ -216,7 +220,7 @@ do
         module.MUSIC_BUFFER_SAMPLES = 2048
       end
       module.__hostProfiled = true
-    elseif moduleName == "src.battle.BattleState" then
+    elseif moduleName == "src.battle.BattleState" and PROFILE_ENABLED then
       module.__hostProfiled = true
       timedMethod(module, "newWild", "battle.construct", "wild")
       timedMethod(module, "newTrainer", "battle.construct", "trainer")
@@ -236,7 +240,7 @@ do
           return unpackValues(results)
         end
       end
-    elseif moduleName == "src.core.ChipAudio" then
+    elseif moduleName == "src.core.ChipAudio" and PROFILE_ENABLED then
       module.__hostProfiled = true
       local nativePlayMusic = module.playMusic
       if type(nativePlayMusic) == "function" then

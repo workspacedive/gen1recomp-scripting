@@ -355,7 +355,7 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
     await FileManager.writeAsString(finalPath, JSON.stringify(report, null, 2))
     try { await removeIfExists(progressPath) } catch { /* Final report is authoritative. */ }
     if (report.status === "ready" && options.presentOnReady) {
-      await controller.present({ fullscreen: true, navigationTitle: "Gen1Recomp · Experimentell" })
+      await controller.present({ fullscreen: true, navigationTitle: "Gen1Recomp" })
     }
     return report
   } finally {

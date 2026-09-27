@@ -1,4 +1,4 @@
-# Gen1Recomp Scripting Host 0.12.6
+# Gen1Recomp Scripting Host 0.13.0
 
 Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschließlich APIs, die in der geprüften offiziellen App-Store-Dokumentation nicht als Pro markiert sind. Seit 0.2.2 werden `DocumentPicker`, `FileManager`, `Crypto` und `WebViewController` korrekt als von Scripting injizierte Globals verwendet; nur UI-/React-Symbole werden aus `scripting` importiert.
 
@@ -21,7 +21,7 @@ Importiere den Ordner `Gen1Recomp` als Scripting-Projekt. Die App nutzt ausschli
 - getrenntes Payload-Gate für den erneut größen-/SHA-256-geprüften Gen1Recomp-0.3.20-Kandidaten, ohne ROM-, Mod- oder Save-Mount und ohne Aktivierung,
 - sichtbare fullscreen Launcher-Vorschau erst nach erfolgreichem Payload-postrun; beim Schließen wird die experimentelle WebView vollständig entsorgt,
 - vorhandene deutsche/englische Textbasis; die neuen Tabtexte sind noch deutsch und als offene Lokalisierungsarbeit dokumentiert,
-- ein ausdrücklich **experimenteller** Start pro erkanntem Library-ROM über den unveränderten `POKEPORT_IMPORT_ROM`-Pfad sowie ein nur dort aktivierter Multitouch-Controller für D-Pad, A, B, START und SELECT; Start und Eingabe sind geräteverifiziert, während Adapter r24 den beobachteten QueueableSource-Typbruch an der Runtimegrenze abfängt. Audio, Saves, Lifecycle und längeres Gameplay bleiben unbestätigt.
+- regulärer Start pro erkanntem Library-ROM über den unveränderten `POKEPORT_IMPORT_ROM`-Pfad sowie ein nur dort aktivierter Multitouch-Controller für D-Pad, A, B, START und SELECT; Boot, ROM-Import, Gameplay, Eingabe, Audio, persistente Saves, Kampfübergänge und Yellow-Textdarstellung sind mit Adapter r25 auf dem Gerät verifiziert.
 
 ## Datenintegrität
 
@@ -29,12 +29,6 @@ Ein Import verändert die ausgewählte Quelldatei nicht. Die App schreibt zuerst
 
 ## Grenzen der Capability-Probe
 
-Die Probe ist keine Runtime-Zertifizierung. Insbesondere testet sie noch nicht:
+Die Capability-Probe allein ist keine Runtime-Zertifizierung. Die Freigabe beruht zusätzlich auf wiederholten Gerätetests von Launcher, ROM-Import, Gameplay, Audio, Eingabe, IndexedDB-Speicherung und vollständigem Relaunch. Noch offen sind längere Hintergrund-/Vordergrundzyklen, Audio-Unterlaufstests über längere Sitzungen und der bewusst zurückgestellte separate Files-Save-Export.
 
-- Launcher-Darstellung mit Runtime r5,
-- ROM-Import und sichtbares Gameplay mit dem getrennt gestagten Gen1Recomp-Payload,
-- Audio-Latenz oder Aussetzer,
-- IndexedDB-Schreib-/Relaunch-Persistenz,
-- sichtbaren Host-Save-Commit und Recovery nach App-/WebContent-Kill.
-
-Darum bleibt `runtimeEnabled` in `config.ts` auf `false`.
+`runtimeEnabled` ist nach dieser Geräteabnahme aktiviert. Der Start prüft ROM, Payload und Runtime weiterhin vor jeder Ausführung.

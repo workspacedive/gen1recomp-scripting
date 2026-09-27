@@ -56,9 +56,7 @@ local state = transition.new(game, function() end, {})
 now = 0.05
 transition.update(state, 1 / 60)
 assert(state.updates == 3, "wall-clock pacing advances three 60 Hz steps")
-assert(lines[1]:match("phase=battle%.transition"))
-assert(lines[1]:match("style=circle"))
-assert(lines[1]:match("ms=50%.000"))
+assert(#lines == 0, "release adapter does not emit profile traffic")
 `
   const state = lauxlib.luaL_newstate()
   lualib.luaL_openlibs(state)

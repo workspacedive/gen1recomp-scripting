@@ -1,11 +1,11 @@
 export const APP = {
-  version: '0.12.6',
+  version: '0.13.0',
   storageSchema: 1,
   librarySchema: 1,
   capabilitySchema: 3,
   defaultLocale: 'de' as const,
   maxImportBytes: 64 * 1024 * 1024,
-  runtimeEnabled: false,
+  runtimeEnabled: true,
   requiredCoreHostContract: 1,
 } as const
 

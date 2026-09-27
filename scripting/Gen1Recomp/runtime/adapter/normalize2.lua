@@ -158,6 +158,7 @@ end
 -- been initialized. Validate QueueableSource at that exact lifecycle boundary
 -- so a non-Source runtime return cannot reach Music.applyVolume.
 do
+  local PROFILE_ENABLED = false
   local audio = love and love.audio
   local nativeNewQueueableSource = audio and audio.newQueueableSource
   if type(nativeNewQueueableSource) == "function" then
@@ -204,7 +205,7 @@ do
     end
     audio.newQueueableSource = function(...)
       local clock = love and love.timer and love.timer.getTime
-      local started = type(clock) == "function" and clock() or nil
+      local started = PROFILE_ENABLED and type(clock) == "function" and clock() or nil
       local results = pack(nativeNewQueueableSource(...))
       for index = 1, results.n do
         local source = adaptSource(results[index])
@@ -228,11 +229,13 @@ end
 -- from QueueableSource construction. The native Channel receiver and command
 -- payload remain unchanged.
 do
+  local PROFILE_ENABLED = false
   local registry = debug and debug.getregistry and debug.getregistry()
   local channelType = registry and registry.Channel
   local nativePush = channelType and channelType.push
   local unpackValues = unpack or (table and table.unpack)
-  if type(nativePush) == "function" and type(unpackValues) == "function" then
+  if PROFILE_ENABLED and type(nativePush) == "function"
+      and type(unpackValues) == "function" then
     channelType.push = function(channel, value, ...)
       local isMusicPlay = type(value) == "table" and value.cmd == "play"
       local clock = love and love.timer and love.timer.getTime

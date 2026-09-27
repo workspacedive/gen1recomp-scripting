@@ -46,9 +46,9 @@ function GamesView(props: {
           : props.rows.map((row) => <VStack key={row.sha256} alignment="leading" spacing={4}>
               <Text>{row.displayName}</Text>
               <Text>{`${row.game} · ${row.region} · ${row.language}`}</Text>
-              <Text>{`${row.byteLength} Bytes · ${row.status}`}</Text>
+              <Text>{`${row.byteLength} Bytes · ${row.status === "runtime-unverified" ? "Spielbereit" : "Nicht unterstützt"}`}</Text>
               {row.status === "runtime-unverified"
-                ? <Button title="Experimentell starten" systemImage="play.fill" disabled={props.busy}
+                ? <Button title="Spiel starten" systemImage="play.fill" disabled={props.busy}
                     action={() => props.launchGame(row)} />
                 : null}
             </VStack>)}
@@ -60,9 +60,9 @@ function GamesView(props: {
         {props.notice ? <Text>{props.notice}</Text> : null}
       </Section>
       <Section header={<Text>Laufzeitstatus</Text>} footer={<Text>
-        Der experimentelle Start übergibt genau diese erneut verifizierte ROM schreibgeschützt an den unveränderten offiziellen Importpfad. Gameplay, Audio, Eingabe, Saves und Lifecycle bleiben bis zum Gerätetest ungeprüft.
+        Vor jedem Start werden ROM, Runtime und Payload erneut geprüft. Gameplay, Audio, Eingabe, persistente Saves, Kampfübergänge und Textdarstellung sind auf dem Gerät verifiziert.
       </Text>}>
-        <Text>{APP.runtimeEnabled ? "Laufzeit freigegeben" : "Nur expliziter experimenteller Gerätetest"}</Text>
+        <Text>{APP.runtimeEnabled ? "Laufzeit freigegeben" : "Spielstart gesperrt"}</Text>
       </Section>
     </List>
   </NavigationStack>
@@ -287,7 +287,7 @@ function App() {
       await bootstrap()
       const report = await runCapabilityProbe()
       const gate = evaluateRuntimeGate(report)
-      setDiagnosticSummary(gate.status === "candidate" ? "Kandidat – weitere Laufzeittests nötig" : "Laufzeitgate blockiert")
+      setDiagnosticSummary(gate.status === "candidate" ? "Gerät kompatibel · Runtime wird beim Spielstart erneut geprüft" : "Laufzeitgate blockiert")
       setDiagnosticDetails([
         `WASM-API ${report.wasm.apiPresent ? "✓" : "✗"} · WebGL ${report.graphics.clearReadback ? "✓" : "✗"} · Audio ${report.audio.contextConstructed ? "✓" : "✗"}`,
         "Direkte WASM-Probe gemäß Bridge-Richtlinie nicht ausgeführt.",
@@ -347,15 +347,15 @@ function App() {
   async function launchGame(row: LibraryRow): Promise<void> {
     if (busy) return
     setBusy(true)
-    setGameNotice(`${row.displayName}: ROM und Runtime werden vor dem experimentellen Start erneut geprüft …`)
+    setGameNotice(`${row.displayName}: ROM, Runtime und Payload werden vor dem Start erneut geprüft …`)
     try {
       const candidate = await installRuntimeCandidate()
       setRuntime(candidate)
       const report = await presentGen1Gameplay(row)
       setGameNotice(report.status === "ready"
-        ? `${row.displayName}: Laufzeitfenster geschlossen. Bitte sichtbares Gameplay, Eingabe, Audio und Save-Verhalten berichten.`
+        ? `${row.displayName}: Spiel beendet.`
         : `Spielstart ${report.status} · Phase ${report.stage}: ${report.detail}`)
-    } catch (error) { setGameNotice(`Experimenteller Start fehlgeschlagen: ${errorMessage(error)}`) }
+    } catch (error) { setGameNotice(`Spielstart fehlgeschlagen: ${errorMessage(error)}`) }
     finally { setBusy(false) }
   }
 

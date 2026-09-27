@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.12.6`
+Stand: 2026-09-27 · App-Version `0.13.0`
+
+## Iteration 0.13.0 Release Candidate
+
+- **VERIFIZIERT (Gerät):** r24 senkt normale synchrone Musikstarts auf 15–20 ms und den untersuchten Kampfmusikstart von 164 auf 43 ms.
+- **VERIFIZIERT (Gerät):** `spiralin` führt 216/216 Schritte in 3603 ms aus und trifft damit sein 60-Hz-Soll von 3600 ms praktisch exakt.
+- Boot, ROM-Import, Gameplay, Eingabe, Audio, persistente Saves/`CONTINUE`, Yellow-Mengenglyphe sowie Trainer-/Wildkampfstart sind geräteverifiziert.
+- `APP.runtimeEnabled` ist aktiviert. Die UI verwendet nun den regulären „Spiel starten“-Pfad und entfernt experimentelle Beschriftungen; ROM, Runtime und Payload werden weiterhin vor jedem Start geprüft.
+- Die temporäre Profilierung ist im Release standardmäßig deaktiviert. Hex-Escape-, QueueableSource-, IDBFS-, ChipSynth- und Übergangsadapter bleiben aktiv.
+- **NOCH ZU VERIFIZIEREN:** längere Audio-Sitzung ohne Unterlauf sowie wiederholte Hintergrund-/Vordergrund- und Save/Relaunch-Zyklen. Der separate Files-Save-Export bleibt auf Benutzerwunsch zurückgestellt.
 
 ## Iteration 0.12.6
 
