@@ -44,15 +44,15 @@ function GamesView(props: {
       </Text>}>
         {props.rows.length === 0
           ? <VStack spacing={8}><Text>Noch kein Spiel importiert.</Text><Text>Der Import ist dauerhaft und offline nutzbar.</Text></VStack>
-          : props.rows.map((row) => <VStack key={row.sha256} alignment="leading" spacing={4} buttonStyle="borderless">
+          : props.rows.map((row) => <VStack key={row.sha256} alignment="leading" spacing={4}>
               <Text>{row.displayName}</Text>
               <Text>{`${row.game} · ${row.region} · ${row.language}`}</Text>
               <Text>{`${row.byteLength} Bytes · ${row.status === "runtime-unverified" ? "Spielbereit" : "Nicht unterstützt"}`}</Text>
               {row.status === "runtime-unverified"
-                ? <Button title="Spiel starten" systemImage="play.fill" disabled={props.busy}
+                ? <Button title="Spiel starten" systemImage="play.fill" buttonStyle="borderless" disabled={props.busy}
                     action={() => props.launchGame(row)} />
                 : null}
-              <Button title="Aus Bibliothek entfernen" systemImage="trash" disabled={props.busy}
+              <Button title="Aus Bibliothek entfernen" systemImage="trash" buttonStyle="borderless" disabled={props.busy}
                 action={() => props.removeGame(row)} />
             </VStack>)}
       </Section>
@@ -88,7 +88,7 @@ function ModsView(props: {
         Aktivierte Pakete werden vor jedem Start erneut per SHA-256, ZIP-Struktur, CRC-32 und Manifest geprüft und danach über die Ressourcen-Bridge als offizielles mods/&lt;id&gt;/ eingeblendet. Der gespeicherte Gen1Recomp-Payload bleibt unverändert.
       </Text>}>
         {props.mods.length === 0 ? <Text>Keine Mod-Pakete gespeichert.</Text> : props.mods.map((mod) =>
-          <VStack key={`${mod.id}-${mod.version}-${mod.sha256}`} alignment="leading" spacing={4} buttonStyle="borderless">
+          <VStack key={`${mod.id}-${mod.version}-${mod.sha256}`} alignment="leading" spacing={4}>
             <Text>{mod.name}</Text>
             <Text>{`${mod.id} · ${mod.version} · API ${mod.api}`}</Text>
             <Text>{mod.activation === "enabled"
@@ -98,8 +98,9 @@ function ModsView(props: {
               : `Sicher gespeichert · deaktiviert · ${mod.sha256.slice(0, 12)}…`}</Text>
             <Button title={mod.activation === "enabled" ? "Deaktivieren" : "Aktivieren"}
               systemImage={mod.activation === "enabled" ? "pause.circle" : "play.circle"}
-              disabled={props.busy} action={() => props.toggleMod(mod)} />
-            <Button title="Paket entfernen" systemImage="trash" disabled={props.busy} action={() => props.removeMod(mod)} />
+              buttonStyle="borderless" disabled={props.busy} action={() => props.toggleMod(mod)} />
+            <Button title="Paket entfernen" systemImage="trash" buttonStyle="borderless"
+              disabled={props.busy} action={() => props.removeMod(mod)} />
           </VStack>)}
       </Section>
       <Section header={<Text>Installation</Text>}>

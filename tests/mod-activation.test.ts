@@ -16,8 +16,11 @@ test("gameplay exposes only a validated transient mod overlay through the resour
 
 test("multiple actions in each native List row use independent button hit handling", async () => {
   const source = await readFile(new URL("index.tsx", root), "utf8")
-  assert.match(source, /key=\{`\$\{mod\.id\}-\$\{mod\.version\}-\$\{mod\.sha256\}`\}[^>]*buttonStyle="borderless"/)
-  assert.match(source, /key=\{row\.sha256\}[^>]*buttonStyle="borderless"/)
+  for (const title of ["Spiel starten", "Aus Bibliothek entfernen", "Paket entfernen"]) {
+    assert.match(source, new RegExp(`<Button title="${title}"[^>]*buttonStyle="borderless"`))
+  }
+  assert.match(source, /<Button title=\{mod\.activation[^>]*buttonStyle="borderless"/s)
+  assert.doesNotMatch(source, /<VStack[^>]*buttonStyle=/)
 })
 
 test("mod activation revalidates retained package identity before creating mods/id paths", async () => {

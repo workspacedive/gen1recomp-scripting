@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.3`
+Stand: 2026-09-28 · App-Version `0.13.4`
+
+## Iteration 0.13.4
+
+- **VERIFIZIERT (Artefaktprüfung):** Das 0.13.3-Artefakt ist ein vollständiges, CRC-fehlerfreies ZIP mit identischem Inventar und derselben Root-`script.json`-Struktur wie das importierbare 0.13.2-Artefakt. Die Meldung „nicht unterstützte Skriptdatei“ stammt daher nicht von einer nachweisbaren ZIP-/Inventarbeschädigung.
+- **TECHNISCH UNBEKANNT:** 0.13.3 setzte den dokumentierten `buttonStyle` als Hierarchie-Modifikator auf `VStack`. Obwohl die Dokumentation Hierarchievererbung beschreibt, ist nicht belegt, dass der reale Scripting-Importer diese Platzierung akzeptiert; sie ist die einzige neue Quellcodeform vor dem Gerätefehler.
+- 0.13.4 setzt `buttonStyle="borderless"` deshalb direkt auf jeden betroffenen `Button`, exakt wie im offiziellen Scripting-Beispiel. Auf `VStack` verbleibt kein `buttonStyle`.
+- Für die Auslieferung wird zusätzlich ein versionsgebundener Dateiname verwendet, um Browser-/Download-Caching des generischen Artefaktnamens auszuschließen.
+- 44/44 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. SHA-256: `54aaedd77df54f1ac056734d456f61f1e7c84d05c7dc4c2f0fa18f9bd671a861`.
 
 ## Iteration 0.13.3
 
