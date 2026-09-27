@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.12.0`
+Stand: 2026-09-27 · App-Version `0.12.1`
+
+## Iteration 0.12.1
+
+- **VERIFIZIERT (Gerät):** 0.12.0 erhält den Spielstand nach vollständigem Scripting-Neustart; `CONTINUE` funktioniert.
+- Der Benutzer präzisierte Gelbs Eich-Demo-Ausgabe als `POKE BALL xc3x97`. **VERIFIZIERT (Ursache):** Gen1Recomp schreibt das UTF-8-Zeichen `×` als Lua-5.2-Hex-Escapes `\\xc3\\x97`; love.js' Lua-5.1-VM entfernt bei unbekannten Escapes die Backslashes und erzeugt daher wörtlich `xc3x97`.
+- Adapter r19 normalisiert Hex-Byte-Escapes beim Laden von `src.*`-Modulen zu gleichwertigen dreistelligen Lua-5.1-Dezimal-Escapes. Payloaddateien bleiben unverändert.
+- Der bestätigte 750-ms-IDBFS-Polling-Sync aus r18 wird durch einen 500-ms-debounced Sync ausschließlich nach Schreibzugriffen auf `/home/web_user/` ersetzt. Hintergrund-/`pagehide`-Flushes bleiben erhalten. Das entfernt regelmäßige IndexedDB-Scans als mögliche Quelle kleiner Kampf-/Begegnungsruckler.
+- **NICHT VERIFIZIERT (Gerät):** korrigierte `×1`-Darstellung und Rucklerreduktion.
+- Der sichtbare Files-Export bleibt gemäß Benutzervorgabe eine separate Save-/Backup-Funktion und ist nicht mit dem internen Runtime-Speicherpfad gekoppelt.
 
 ## Iteration 0.12.0
 

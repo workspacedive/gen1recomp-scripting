@@ -161,33 +161,56 @@
   var canvas = document.getElementById('canvas');
   var spinner = document.getElementById('spinner');
   var fsSyncBusy = false;
+  var fsSyncDirty = false;
   var fsSyncAgain = false;
   var fsSyncTimer = null;
-  function syncRuntimeFilesystem() {
+  var fsWriteWrapped = false;
+  function syncRuntimeFilesystem(force) {
     var module = window.Module;
     if (!module || !module.FS || typeof module.FS.syncfs !== 'function') return;
+    if (!force && !fsSyncDirty) return;
     if (fsSyncBusy) { fsSyncAgain = true; return; }
+    fsSyncDirty = false;
     fsSyncBusy = true;
     module.FS.syncfs(false, function (error) {
       fsSyncBusy = false;
-      if (error) console.error('IDBFS save sync failed', error);
-      if (fsSyncAgain) {
+      if (error) {
+        fsSyncDirty = true;
+        console.error('IDBFS save sync failed', error);
+      }
+      if (fsSyncAgain || fsSyncDirty) {
         fsSyncAgain = false;
-        syncRuntimeFilesystem();
+        syncRuntimeFilesystem(false);
       }
     });
   }
+  function scheduleRuntimeFilesystemSync() {
+    fsSyncDirty = true;
+    if (fsSyncTimer !== null) clearTimeout(fsSyncTimer);
+    // Coalesce a transactional save's main/tmp/backup writes into one IDBFS
+    // commit instead of scanning IndexedDB continuously during gameplay.
+    fsSyncTimer = setTimeout(function () {
+      fsSyncTimer = null;
+      syncRuntimeFilesystem(false);
+    }, 500);
+  }
   function startRuntimeFilesystemSync() {
-    if (fsSyncTimer !== null) return;
-    // Gen1Recomp confirms the in-memory love.filesystem write immediately.
-    // Flush shortly afterwards so an iOS process kill cannot discard it.
-    fsSyncTimer = setInterval(syncRuntimeFilesystem, 750);
-    syncRuntimeFilesystem();
+    var module = window.Module;
+    var fs = module && module.FS;
+    if (fsWriteWrapped || !fs || typeof fs.write !== 'function') return;
+    var nativeWrite = fs.write;
+    fs.write = function (stream) {
+      var result = nativeWrite.apply(fs, arguments);
+      var path = stream && typeof stream.path === 'string' ? stream.path : '';
+      if (path.indexOf('/home/web_user/') === 0) scheduleRuntimeFilesystemSync();
+      return result;
+    };
+    fsWriteWrapped = true;
   }
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden') syncRuntimeFilesystem();
+    if (document.visibilityState === 'hidden') syncRuntimeFilesystem(true);
   });
-  window.addEventListener('pagehide', syncRuntimeFilesystem);
+  window.addEventListener('pagehide', function () { syncRuntimeFilesystem(true); });
 
   new MutationObserver(function () {
     if (spinner.className === '') {

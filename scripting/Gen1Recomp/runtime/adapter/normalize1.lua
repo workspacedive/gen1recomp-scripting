@@ -148,6 +148,53 @@ do
   end
 end
 
+-- Gen1Recomp source uses Lua 5.2 hexadecimal string escapes (for example the
+-- UTF-8 multiplication sign is written as "\\xc3\\x97"). The Lua 5.1 VM in
+-- this love.js build accepts an unknown escape by dropping the backslash, so
+-- that source becomes the device-observed literal "xc3x97". Install a source
+-- loader ahead of the native loader and translate unescaped hexadecimal byte
+-- escapes to Lua 5.1's equivalent three-digit decimal form before compilation.
+-- This is syntax normalization only; payload files remain byte-for-byte intact.
+do
+  local loaders = package and (package.loaders or package.searchers)
+  local nativeLoadString = loadstring
+
+  local function normalizeHexEscapes(source)
+    local changed
+    repeat
+      source, changed = source:gsub("([^\\])\\x(%x%x)", function(prefix, hex)
+        return prefix .. "\\" .. string.format("%03d", tonumber(hex, 16))
+      end)
+      if source:sub(1, 2) == "\\x" and source:sub(3, 4):match("^%x%x$") then
+        source = "\\" .. string.format("%03d", tonumber(source:sub(3, 4), 16))
+          .. source:sub(5)
+        changed = changed + 1
+      end
+    until changed == 0
+    return source
+  end
+
+  if type(loaders) == "table" and type(nativeLoadString) == "function" then
+    local function gen1SourceLoader(moduleName)
+      if type(moduleName) ~= "string" or not moduleName:match("^src%.") then
+        return "\n\thost hex-escape loader skipped " .. tostring(moduleName)
+      end
+      local path = moduleName:gsub("%.", "/") .. ".lua"
+      if not _lfs_getInfo(path, "file") then
+        return "\n\tno Gen1Recomp source '" .. path .. "'"
+      end
+      local source, readError = _lfs_read(path)
+      if type(source) ~= "string" then
+        return "\n\tunable to read '" .. path .. "': " .. tostring(readError)
+      end
+      local chunk, compileError = nativeLoadString(normalizeHexEscapes(source), "@" .. path)
+      if not chunk then return compileError end
+      return chunk
+    end
+    table.insert(loaders, 2, gen1SourceLoader)
+  end
+end
+
 -- A device-observed Launcher rail failure is reachable with its static,
 -- gap-free palette only when the dynamic phase becomes non-finite. LÖVE
 -- promises a numeric monotonic timer; enforce that contract at the adapter
