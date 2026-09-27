@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.12.3`
+Stand: 2026-09-27 · App-Version `0.12.4`
+
+## Iteration 0.12.4
+
+- **TEILWEISE VERIFIZIERT (Gerät):** Die r21-Übergangskorrektur macht den Kampfantritt spürbar schneller.
+- Der Benutzer grenzt den verbleibenden Hänger auf den Zeitpunkt unmittelbar vor Beginn der Übergangsanimation ein.
+- Der vorhandene Datensatz misst dort 140–150 ms synchronen Kampfmusikstart; Konstruktion und erster Draw sind vernachlässigbar.
+- r22 unterteilt den Musikpfad zusätzlich in `audio.chip_play`, `audio.queueable_constructor` und `audio.worker_push`, um QueueableSource-Erzeugung gegen Worker-/Channel-Übergabe abzugrenzen.
+- Profilberichte werden nicht mehr pro Ereignis geschrieben. Der Host sammelt die Phase-Bursts im Speicher und schreibt erst 2 Sekunden nach dem letzten Ereignis einen Snapshot. Damit kann Diagnose-I/O den gemessenen Kampfbeginn nicht mehr selbst stören.
+- Der noch verbleibende Musik-Unterpfad ist **BENCHMARK ERFORDERLICH**; keine spekulative Pufferverkleinerung oder Thread-Deaktivierung.
 
 ## Iteration 0.12.3
 

@@ -205,16 +205,23 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   }
   const profileEvents: Array<{ recordedAt: string; line: string }> = []
   let profileWrites = Promise.resolve()
+  let profileWriteTimer: ReturnType<typeof setTimeout> | null = null
   const queueProfileWrite = (): void => {
-    const snapshot = profileEvents.slice(-100)
-    const next = profileWrites.then(() => FileManager.writeAsString(profilePath, JSON.stringify({
-      schemaVersion: 1,
-      runtimeId: LOVEJS_RUNTIME.id,
-      payloadVersion: options.payloadVersion,
-      startedAt,
-      events: snapshot,
-    }, null, 2)))
-    profileWrites = next.catch(() => { /* A later event retries the diagnostic snapshot. */ })
+    if (profileWriteTimer) clearTimeout(profileWriteTimer)
+    // Profiling must not become part of the measured battle-start path.
+    // Persist one coalesced snapshot after the phase burst has gone quiet.
+    profileWriteTimer = setTimeout(() => {
+      profileWriteTimer = null
+      const snapshot = profileEvents.slice(-100)
+      const next = profileWrites.then(() => FileManager.writeAsString(profilePath, JSON.stringify({
+        schemaVersion: 1,
+        runtimeId: LOVEJS_RUNTIME.id,
+        payloadVersion: options.payloadVersion,
+        startedAt,
+        events: snapshot,
+      }, null, 2)))
+      profileWrites = next.catch(() => { /* A later event retries the diagnostic snapshot. */ })
+    }, 2_000)
   }
   const failed = (status: "error" | "timeout", detail: string): LoveJsBootReport => ({
     schemaVersion: 2,

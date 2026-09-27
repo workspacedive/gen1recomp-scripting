@@ -224,6 +224,9 @@ do
           return unpackValues(results)
         end
       end
+    elseif moduleName == "src.core.ChipAudio" then
+      module.__hostProfiled = true
+      timedMethod(module, "playMusic", "audio.chip_play", "music")
     elseif moduleName == "src.render.BattleTransition" then
       module.__hostProfiled = true
       local nativeNew, nativeUpdate = module.new, module.update

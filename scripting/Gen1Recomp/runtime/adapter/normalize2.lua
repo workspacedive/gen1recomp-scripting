@@ -203,15 +203,46 @@ do
       return facade
     end
     audio.newQueueableSource = function(...)
+      local clock = love and love.timer and love.timer.getTime
+      local started = type(clock) == "function" and clock() or nil
       local results = pack(nativeNewQueueableSource(...))
       for index = 1, results.n do
         local source = adaptSource(results[index])
-        if source then return source end
+        if source then
+          if started then
+            print(string.format("[gen1-profile] phase=audio.queueable_constructor ms=%.3f",
+              (clock() - started) * 1000))
+          end
+          return source
+        end
       end
       local kinds = {}
       for index = 1, results.n do kinds[index] = type(results[index]) end
       error("love.js audio contract: newQueueableSource returned ["
         .. table.concat(kinds, ",") .. "] instead of Source", 2)
+    end
+  end
+end
+
+-- Measure the cross-thread hand-off of a chip-song definition separately
+-- from QueueableSource construction. The native Channel receiver and command
+-- payload remain unchanged.
+do
+  local registry = debug and debug.getregistry and debug.getregistry()
+  local channelType = registry and registry.Channel
+  local nativePush = channelType and channelType.push
+  local unpackValues = unpack or (table and table.unpack)
+  if type(nativePush) == "function" and type(unpackValues) == "function" then
+    channelType.push = function(channel, value, ...)
+      local isMusicPlay = type(value) == "table" and value.cmd == "play"
+      local clock = love and love.timer and love.timer.getTime
+      local started = isMusicPlay and type(clock) == "function" and clock() or nil
+      local results = { nativePush(channel, value, ...) }
+      if started then
+        print(string.format("[gen1-profile] phase=audio.worker_push ms=%.3f",
+          (clock() - started) * 1000))
+      end
+      return unpackValues(results)
     end
   end
 end
