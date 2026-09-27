@@ -226,12 +226,13 @@ do
       end
     elseif moduleName == "src.render.BattleTransition" then
       module.__hostProfiled = true
-      local nativeNew = module.new
+      local nativeNew, nativeUpdate = module.new, module.update
       if type(nativeNew) == "function" then
         module.new = function(game, onDone, opts)
           local started = profileClock()
           local transition
           transition = nativeNew(game, function(...)
+            transition.__hostTransitionDone = true
             local expectedFrames = (transition.wipeLen or 0) + 60
               + ((transition.def and transition.def.flash) and 72 or 0)
             profile("battle.transition", {
@@ -241,7 +242,32 @@ do
             })
             if onDone then return onDone(...) end
           end, opts)
+          transition.__hostTransitionClock = started
+          transition.__hostTransitionAccum = 0
           return transition
+        end
+      end
+      if type(nativeUpdate) == "function" then
+        module.update = function(self, dt)
+          local now = profileClock()
+          local previous = self.__hostTransitionClock or now
+          local elapsed = now - previous
+          self.__hostTransitionClock = now
+          if elapsed < 0 then elapsed = 0 end
+          if elapsed > 0.25 then elapsed = 0.25 end
+          local speed = 1
+          if self.game and type(self.game.logicSpeed) == "function" then
+            speed = tonumber(self.game:logicSpeed()) or 1
+          end
+          self.__hostTransitionAccum = (self.__hostTransitionAccum or 0)
+            + elapsed * 60 * math.max(1, speed)
+          local steps = math.floor(self.__hostTransitionAccum)
+          if steps < 1 then return end
+          self.__hostTransitionAccum = self.__hostTransitionAccum - steps
+          for _ = 1, steps do
+            nativeUpdate(self, dt)
+            if self.__hostTransitionDone then break end
+          end
         end
       end
     end

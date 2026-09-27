@@ -19,7 +19,11 @@ local fixture = [=[return "\\xc3\\x97", "\\\\xc3"]=]
 local transitionFixture = [=[
 local M = {}
 function M.new(game, done)
-  return { wipeLen = 60, def = {}, style = "circle", finish = done }
+  return { game = game, wipeLen = 60, def = {}, style = "circle", finish = done }
+end
+function M.update(self)
+  self.updates = (self.updates or 0) + 1
+  if self.updates == 3 then self.finish() end
 end
 return M
 ]=]
@@ -42,12 +46,14 @@ local times, escaped = chunk()
 assert(times == string.char(195, 151), "normalized bytes")
 assert(escaped == string.char(92) .. "xc3", "escaped literal")
 local transition = assert(package.loaders[2]("src.render.BattleTransition"))()
-local state = transition.new({}, function() end, {})
-now = 2.25
-state.finish()
+local game = { logicSpeed = function() return 1 end }
+local state = transition.new(game, function() end, {})
+now = 0.05
+transition.update(state, 1 / 60)
+assert(state.updates == 3, "wall-clock pacing advances three 60 Hz steps")
 assert(lines[1]:match("phase=battle%.transition"))
 assert(lines[1]:match("style=circle"))
-assert(lines[1]:match("ms=2250%.000"))
+assert(lines[1]:match("ms=50%.000"))
 `
   const state = lauxlib.luaL_newstate()
   lualib.luaL_openlibs(state)

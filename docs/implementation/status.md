@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.12.2`
+Stand: 2026-09-27 · App-Version `0.12.3`
+
+## Iteration 0.12.3
+
+- **VERIFIZIERT (Gerät):** Der r20-Profiler isoliert den Engpass auf den Battle-Übergang. Konstruktion benötigt 0–3 ms, Musikstart 140–150 ms, `enter` 0 ms und erster Draw 1–6 ms.
+- Trainer-`spiralin`: 216 Soll-Frames in 6829 ms = 31,6 logische Frames/s statt 60.
+- Wild-`doublecircle`: 162 Soll-Frames in 6695–6801 ms = 23,8–24,2 logische Frames/s statt 60.
+- **VERIFIZIERT (Ursache):** Die framegezählten Übergänge liefen unter love.js damit in Zeitlupe; die restlichen Startphasen sind kein relevanter Engpass.
+- Adapter r21 taktet ausschließlich `BattleTransition:update` anhand einer monotonen Wanduhr auf 60 Hz und berücksichtigt die bestehende Battle-Speed-Option. Ein Sprung ist auf 250 ms begrenzt. Gameplay-, Kampfmechanik- und Audiotakt bleiben unangetastet.
+- Erwartete 1X-Dauer nach Korrektur: `doublecircle` ca. 2,7 s, `spiralin` ca. 3,6 s statt jeweils ca. 6,7–6,8 s. **NICHT VERIFIZIERT (Gerät)** bis zum r21-Test.
 
 ## Iteration 0.12.2
 
