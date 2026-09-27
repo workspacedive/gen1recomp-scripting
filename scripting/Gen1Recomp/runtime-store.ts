@@ -172,7 +172,9 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   const finalPath = `${PATHS.diagnostics}/${options.finalName}`
   const progressPath = `${PATHS.diagnostics}/${options.progressName}`
   const runtimeErrorPath = `${PATHS.diagnostics}/${options.probe}-runtime-error.v1.json`
+  const profilePath = `${PATHS.diagnostics}/battle-profile.v1.json`
   await removeIfExists(runtimeErrorPath)
+  if (options.probe === "gen1recomp-gameplay") await removeIfExists(profilePath)
   const startedAt = new Date().toISOString()
   // Gameplay saves live in love.js' IDBFS mount. A non-ephemeral WKWebView
   // data store is required for that IndexedDB database to survive disposal,
@@ -201,6 +203,19 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
     progressWrites = next.catch(() => { /* A later final report remains authoritative. */ })
     return next
   }
+  const profileEvents: Array<{ recordedAt: string; line: string }> = []
+  let profileWrites = Promise.resolve()
+  const queueProfileWrite = (): void => {
+    const snapshot = profileEvents.slice(-100)
+    const next = profileWrites.then(() => FileManager.writeAsString(profilePath, JSON.stringify({
+      schemaVersion: 1,
+      runtimeId: LOVEJS_RUNTIME.id,
+      payloadVersion: options.payloadVersion,
+      startedAt,
+      events: snapshot,
+    }, null, 2)))
+    profileWrites = next.catch(() => { /* A later event retries the diagnostic snapshot. */ })
+  }
   const failed = (status: "error" | "timeout", detail: string): LoveJsBootReport => ({
     schemaVersion: 2,
     testedAt: new Date().toISOString(),
@@ -222,6 +237,15 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
     await controller.addScriptMessageHandler("gen1HostBridge", (raw?: unknown) => {
       const message = parseRuntimeBridgeMessage(raw)
       if (!message) return { accepted: false }
+      if (message.type === "runtime.profile") {
+        const line = typeof message.data.line === "string" ? message.data.line : ""
+        if (options.probe !== "gen1recomp-gameplay" || !line.startsWith("[gen1-profile] ")
+          || line.length > 1000) return { accepted: false }
+        profileEvents.push({ recordedAt: new Date().toISOString(), line })
+        if (profileEvents.length > 100) profileEvents.shift()
+        queueProfileWrite()
+        return { accepted: true }
+      }
       if (message.type === "session.config") {
         return {
           ok: true,

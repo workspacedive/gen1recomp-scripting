@@ -158,6 +158,7 @@ end
 do
   local loaders = package and (package.loaders or package.searchers)
   local nativeLoadString = loadstring
+  local unpackValues = unpack or (table and table.unpack)
 
   local function normalizeHexEscapes(source)
     local changed
@@ -172,6 +173,79 @@ do
       end
     until changed == 0
     return source
+  end
+
+  local function profileClock()
+    if love and love.timer and type(love.timer.getTime) == "function" then
+      return love.timer.getTime()
+    end
+    return os.clock()
+  end
+
+  local function profile(phase, fields)
+    local parts = { "[gen1-profile]", "phase=" .. phase }
+    for key, value in pairs(fields or {}) do
+      parts[#parts + 1] = tostring(key) .. "=" .. tostring(value):gsub("%s+", "_")
+    end
+    print(table.concat(parts, " "))
+  end
+
+  local function timedMethod(target, name, phase, kind)
+    local native = target and target[name]
+    if type(native) ~= "function" then return end
+    target[name] = function(...)
+      local started = profileClock()
+      local results = { native(...) }
+      profile(phase, { kind = kind or name,
+        ms = string.format("%.3f", (profileClock() - started) * 1000) })
+      return unpackValues(results)
+    end
+  end
+
+  local function instrumentModule(moduleName, module)
+    if type(module) ~= "table" or module.__hostProfiled then return module end
+    if moduleName == "src.battle.BattleState" then
+      module.__hostProfiled = true
+      timedMethod(module, "newWild", "battle.construct", "wild")
+      timedMethod(module, "newTrainer", "battle.construct", "trainer")
+      timedMethod(module, "playBattleTheme", "battle.music", "theme")
+      timedMethod(module, "enter", "battle.enter", "state")
+      local nativeDraw = module.draw
+      if type(nativeDraw) == "function" then
+        module.draw = function(self, ...)
+          local first = not self.__hostFirstDrawProfiled
+          local started = first and profileClock() or nil
+          local results = { nativeDraw(self, ...) }
+          if first then
+            self.__hostFirstDrawProfiled = true
+            profile("battle.first_draw", { kind = self.kind or "unknown",
+              ms = string.format("%.3f", (profileClock() - started) * 1000) })
+          end
+          return unpackValues(results)
+        end
+      end
+    elseif moduleName == "src.render.BattleTransition" then
+      module.__hostProfiled = true
+      local nativeNew = module.new
+      if type(nativeNew) == "function" then
+        module.new = function(game, onDone, opts)
+          local started = profileClock()
+          local transition
+          transition = nativeNew(game, function(...)
+            local expectedFrames = (transition.wipeLen or 0) + 60
+              + ((transition.def and transition.def.flash) and 72 or 0)
+            profile("battle.transition", {
+              style = transition.style or "unknown",
+              frames = expectedFrames,
+              ms = string.format("%.3f", (profileClock() - started) * 1000),
+            })
+            if onDone then return onDone(...) end
+          end, opts)
+          return transition
+        end
+      end
+    end
+    return module
   end
 
   if type(loaders) == "table" and type(nativeLoadString) == "function" then
@@ -189,7 +263,11 @@ do
       end
       local chunk, compileError = nativeLoadString(normalizeHexEscapes(source), "@" .. path)
       if not chunk then return compileError end
-      return chunk
+      return function(...)
+        local results = { chunk(...) }
+        results[1] = instrumentModule(moduleName, results[1])
+        return unpackValues(results)
+      end
     end
     table.insert(loaders, 2, gen1SourceLoader)
   end

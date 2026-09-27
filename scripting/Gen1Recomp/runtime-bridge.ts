@@ -8,6 +8,7 @@ export type RuntimeBridgeType =
   | "resources.error"
   | "player.loaded"
   | "runtime.ready"
+  | "runtime.profile"
   | "runtime.error"
   | "runtime.timeout"
 
@@ -20,7 +21,7 @@ export interface RuntimeBridgeMessage {
 
 const TYPES = new Set<RuntimeBridgeType>([
   "bridge.ready", "session.config", "resource.read", "resources.ready", "resources.error", "player.loaded",
-  "runtime.ready", "runtime.error", "runtime.timeout",
+  "runtime.ready", "runtime.profile", "runtime.error", "runtime.timeout",
 ])
 
 export function parseRuntimeBridgeMessage(raw: unknown): RuntimeBridgeMessage | null {

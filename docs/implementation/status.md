@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.12.1`
+Stand: 2026-09-27 · App-Version `0.12.2`
+
+## Iteration 0.12.2
+
+- **VERIFIZIERT (Gerät):** Speicherpersistenz und Gelbs Eich-Demo-Menge sind korrigiert.
+- Der separate Files-Save-Export ist auf ausdrücklichen Benutzerwunsch zurückgestellt; Laufzeit/Kampfruckler haben Priorität.
+- Adapter r20 misst Kampf-Konstruktion, Musikstart, Übergang, `BattleState:enter` und ersten Draw separat.
+- Der Host schreibt höchstens 100 streng präfixvalidierte Ereignisse nach `Documents/Gen1Recomp/Diagnostics/battle-profile.v1.json`.
+- Die statische Prüfung weist je nach Übergang bereits ca. 1,9–4,1 Sekunden beabsichtigtes Framebudget aus. Ob zusätzliche Geräte-Stalls auftreten, ist **BENCHMARK ERFORDERLICH**.
+- Detailprüfung: [`conformance-audit-0.12.2.md`](../architecture/conformance-audit-0.12.2.md).
 
 ## Iteration 0.12.1
 

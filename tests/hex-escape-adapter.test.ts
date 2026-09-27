@@ -16,12 +16,24 @@ test('Lua 5.2 hexadecimal escapes are normalized before Gen1Recomp modules compi
   const script = `
 loadstring = loadstring or load
 local fixture = [=[return "\\xc3\\x97", "\\\\xc3"]=]
+local transitionFixture = [=[
+local M = {}
+function M.new(game, done)
+  return { wipeLen = 60, def = {}, style = "circle", finish = done }
+end
+return M
+]=]
 _lfs_getInfo = function(path, kind)
-  if path == "src/ui/ListMenu.lua" and kind == "file" then return { type = "file" } end
+  if kind == "file" and (path == "src/ui/ListMenu.lua"
+      or path == "src/render/BattleTransition.lua") then return { type = "file" } end
 end
 _lfs_read = function(path)
   if path == "src/ui/ListMenu.lua" then return fixture end
+  if path == "src/render/BattleTransition.lua" then return transitionFixture end
 end
+local now, lines = 0, {}
+love = { timer = { getTime = function() return now end } }
+print = function(line) lines[#lines + 1] = line end
 package.loaders = { function() end, function() end }
 ${shim}
 assert(#package.loaders == 3)
@@ -29,6 +41,13 @@ local chunk = assert(package.loaders[2]("src.ui.ListMenu"))
 local times, escaped = chunk()
 assert(times == string.char(195, 151), "normalized bytes")
 assert(escaped == string.char(92) .. "xc3", "escaped literal")
+local transition = assert(package.loaders[2]("src.render.BattleTransition"))()
+local state = transition.new({}, function() end, {})
+now = 2.25
+state.finish()
+assert(lines[1]:match("phase=battle%.transition"))
+assert(lines[1]:match("style=circle"))
+assert(lines[1]:match("ms=2250%.000"))
 `
   const state = lauxlib.luaL_newstate()
   lualib.luaL_openlibs(state)

@@ -14,6 +14,12 @@ test('runtime bridge accepts only the versioned narrow protocol', () => {
     detail: 'ready',
     data: { webAssembly: true },
   })
+  assert.equal(parseRuntimeBridgeMessage({
+    protocolVersion: 1,
+    type: 'runtime.profile',
+    detail: 'phase=battle.transition',
+    data: { line: '[gen1-profile] phase=battle.transition ms=2000' },
+  })?.type, 'runtime.profile')
   for (const value of [
     null,
     { protocolVersion: 2, type: 'bridge.ready', detail: 'wrong version' },
