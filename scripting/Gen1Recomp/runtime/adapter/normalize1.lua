@@ -104,6 +104,12 @@ end
 -- ROM data and sandboxed modules. Preserve native reader behavior when no
 -- compatibility arguments are requested; otherwise compile text/binary only
 -- when the requested mode permits it and apply the explicit environment.
+--
+-- Dynamic mod sources can also come from LuaJIT-oriented packages. LuaJIT's
+-- loader accepts a UTF-8 BOM and 64-bit hexadecimal LL/ULL suffixes; PUC Lua
+-- 5.1 in love.js accepts neither. Retry only a source that failed for one of
+-- those exact dialect boundaries. Stored packages and upstream files remain
+-- byte-for-byte unchanged.
 do
   local nativeLoad, nativeLoadString, nativeSetfenv = load, loadstring, setfenv
   if nativeLoadString and nativeSetfenv then
@@ -119,7 +125,17 @@ do
       if not binary and not mode:find("t", 1, true) then
         return nil, "attempt to load a text chunk (mode is '" .. mode .. "')"
       end
-      local fn, message = nativeLoadString(source, chunkname)
+      local candidate = source
+      local fn, message = nativeLoadString(candidate, chunkname)
+      if not fn and not binary and candidate:sub(1, 3) == "\239\187\191" then
+        candidate = candidate:sub(4)
+        fn, message = nativeLoadString(candidate, chunkname)
+      end
+      if not fn and not binary and tostring(message):match("near '[Uu]?[Ll][Ll]'") then
+        candidate = candidate:gsub(
+          "(%f[%w_]0[xX]%x+)[Uu]?[Ll][Ll]%f[^%w_]", "%1")
+        fn, message = nativeLoadString(candidate, chunkname)
+      end
       if fn and environment ~= nil then nativeSetfenv(fn, environment) end
       return fn, message
     end
@@ -144,6 +160,14 @@ do
         pieces[#pieces + 1] = piece
       end
       return compile(table.concat(pieces), chunkname, mode, environment)
+    end
+    -- Gen1Recomp's sandbox compiles mod:read() sources through the global
+    -- loadstring, so route that one entry point through the same bounded retry.
+    loadstring = function(source, chunkname)
+      if type(source) ~= "string" then
+        error("bad argument #1 to 'loadstring' (string expected)", 2)
+      end
+      return compile(source, chunkname, "bt", nil)
     end
   end
 end

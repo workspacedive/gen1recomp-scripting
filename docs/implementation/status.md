@@ -1,6 +1,17 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.4`
+Stand: 2026-09-28 · App-Version `0.13.5`
+
+## Iteration 0.13.5
+
+- **VERIFIZIERT (vom Benutzer bereitgestelltes Original):** `potato_voxel-1.5.8.zip` hat SHA-256 `2d4b4b8768c95dea02a36dedfac5a397da359f853d2916f92dd8dfaf0abe8091`; ZIP-CRC und Paketstruktur sind intakt.
+- **VERIFIZIERT (Ursache des sichtbaren Fehlers):** `lib/BattleScene.lua` beginnt mit den Bytes `EF BB BF` (UTF-8-BOM). Gen1Recomps Mod-Namespace liest die Datei als String und kompiliert sie über `loadstring`; PUC Lua 5.1 in love.js meldet deshalb bereits bei Byte 1 `unexpected symbol near '<\\239>'`.
+- **VERIFIZIERT (zweite, danach erreichbare Grenze):** `lib/VRXR.lua` enthält die LuaJIT-Zahlenliterale `0x7fffffffffffffffLL` und `0x0001000000000000ULL`. PUC Lua 5.1 lehnt deren Suffixe ab. Nach BOM-Entfernung und Suffixnormalisierung kompilieren sämtliche 77 Lua-Dateien des Pakets im Lua-5.1-kompatiblen Testparser; ohne Normalisierung scheitern exakt diese beiden Dateien.
+- Adapter r26 wiederholt ausschließlich bereits fehlgeschlagene dynamische Textkompilierungen: zuerst ohne führende UTF-8-BOM und, nur bei einem `near 'LL'/'ULL'`-Compilerfehler, ohne den LuaJIT-64-Bit-Suffix. Paket, Gen1Recomp-Quellen, Player, love.js und WASM bleiben unverändert.
+- Die Ausrufezeichen auf der Berechtigungsseite sind laut `ManagerState.PERMISSION_ROWS` feste Warnsymbole für `engine_internals` und `filesystem`, keine Fähigkeitsfehler. Der echte Fehler war die davon getrennte Kompilierung.
+- Status: **TEILWEISE VERIFIZIERT** bis PotatoVoxel 1.5.8 mit r26 auf dem Gerät erneut startet. Der Files-App-Save-Export bleibt ausgeschlossen.
+- 45/45 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Importartefakt SHA-256: `641adf86d2a671d1ec537fab39bc2e5ce72ff471ed19f6d35ed5be4a697cc7b8`.
+- Detailprüfung: [`potatovoxel-lua-compat-0.13.5.md`](../architecture/potatovoxel-lua-compat-0.13.5.md).
 
 ## Iteration 0.13.4
 

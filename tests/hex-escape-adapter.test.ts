@@ -6,6 +6,31 @@ import test from 'node:test'
 const require = createRequire(import.meta.url)
 const { lua, lauxlib, lualib, to_luastring } = require('fengari')
 
+test('dynamic mod source retries only proven LuaJIT syntax boundaries', async () => {
+  const adapter = await readFile(new URL('../scripting/Gen1Recomp/runtime/adapter/normalize1.lua', import.meta.url), 'utf8')
+  const start = adapter.indexOf('-- Gen1Recomp host adapter: love.js embeds Lua 5.1')
+  const end = adapter.indexOf('-- Gen1Recomp source uses Lua 5.2 hexadecimal string escapes', start)
+  assert.notEqual(start, -1)
+  assert.notEqual(end, -1)
+  const shim = adapter.slice(start, end)
+  const script = `
+loadstring = load
+setfenv = function(fn) return fn end
+${shim}
+local bom = string.char(239, 187, 191)
+assert(assert(loadstring(bom .. "return 17"))() == 17, "UTF-8 BOM retry")
+assert(assert(loadstring("return 0x7fffffffffffffffLL"))() ~= nil, "LuaJIT LL retry")
+assert(assert(loadstring("return 0x0001000000000000ULL"))() ~= nil, "LuaJIT ULL retry")
+local invalid, message = loadstring("return )")
+assert(invalid == nil and type(message) == "string", "unrelated syntax stays rejected")
+`
+  const state = lauxlib.luaL_newstate()
+  lualib.luaL_openlibs(state)
+  const status = lauxlib.luaL_dostring(state, to_luastring(script))
+  if (status !== lua.LUA_OK) assert.fail(lua.lua_tojsstring(state, -1))
+  lua.lua_close(state)
+})
+
 test('Lua 5.2 hexadecimal escapes are normalized before Gen1Recomp modules compile', async () => {
   const adapter = await readFile(new URL('../scripting/Gen1Recomp/runtime/adapter/normalize1.lua', import.meta.url), 'utf8')
   const start = adapter.indexOf('-- Gen1Recomp source uses Lua 5.2 hexadecimal string escapes')
