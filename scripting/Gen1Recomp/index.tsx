@@ -5,7 +5,7 @@ import {
 import { APP } from "./config"
 import { runCapabilityProbe } from "./capability-probe"
 import { evaluateRuntimeGate } from "./runtime-gate"
-import { bootstrap, importContent, libraryRows, ROOT, type LibraryRow } from "./host"
+import { bootstrap, importContent, libraryRows, removeLibraryGame, ROOT, type LibraryRow } from "./host"
 import {
   COMPONENTS, checkUpstreamRelease, loadCachedReleaseStatus, type UpstreamReleaseStatus,
 } from "./component-catalog"
@@ -35,6 +35,7 @@ function GamesView(props: {
   refresh: () => Promise<void>
   importGame: () => Promise<void>
   launchGame: (row: LibraryRow) => Promise<void>
+  removeGame: (row: LibraryRow) => Promise<void>
 }) {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Spiele" navigationBarTitleDisplayMode="large">
@@ -51,6 +52,8 @@ function GamesView(props: {
                 ? <Button title="Spiel starten" systemImage="play.fill" disabled={props.busy}
                     action={() => props.launchGame(row)} />
                 : null}
+              <Button title="Aus Bibliothek entfernen" systemImage="trash" disabled={props.busy}
+                action={() => props.removeGame(row)} />
             </VStack>)}
       </Section>
       <Section header={<Text>Aktionen</Text>}>
@@ -251,6 +254,23 @@ function App() {
     finally { DocumentPicker.stopAcessingSecurityScopedResources(); setBusy(false) }
   }
 
+  async function removeGame(row: LibraryRow): Promise<void> {
+    if (busy) return
+    const confirmed = await Dialog.confirm({
+      title: "Spiel aus Bibliothek entfernen?",
+      message: `${row.displayName}: Die importierte ROM wird entfernt. Spielstände und Mods bleiben erhalten.`,
+      cancelLabel: "Abbrechen", confirmLabel: "Entfernen",
+    })
+    if (!confirmed) return
+    setBusy(true)
+    try {
+      await removeLibraryGame(row)
+      setRows(await libraryRows())
+      setGameNotice(`${row.displayName} wurde aus der Bibliothek entfernt. Spielstände und Mods wurden beibehalten.`)
+    } catch (error) { setGameNotice(`Entfernen fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
+  }
+
   async function chooseMod(): Promise<void> {
     if (busy) return
     setBusy(true)
@@ -408,7 +428,8 @@ function App() {
 
   return <TabView tabIndex={tabIndex} onTabIndexChanged={setTabIndex}>
     <GamesView tag={0} tabItem={<Label title="Spiele" systemImage="gamecontroller" />}
-      rows={rows} busy={busy} notice={gameNotice} refresh={refreshGames} importGame={chooseGame} launchGame={launchGame} />
+      rows={rows} busy={busy} notice={gameNotice} refresh={refreshGames} importGame={chooseGame}
+      launchGame={launchGame} removeGame={removeGame} />
     <ModsView tag={1} tabItem={<Label title="Mods" systemImage="puzzlepiece.extension" />}
       mods={mods} busy={busy} notice={modNotice} refresh={refreshMods} importMod={chooseMod} removeMod={removeMod} />
     <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}

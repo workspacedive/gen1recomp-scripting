@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.13.0`
+Stand: 2026-09-27 · App-Version `0.13.1`
+
+## Iteration 0.13.1
+
+- Neue Spielverwaltung: Importierte ROMs können über `Aus Bibliothek entfernen` gelöscht werden.
+- Vor dem Entfernen erscheint eine native Bestätigung mit explizitem Hinweis, dass Spielstände und Mods erhalten bleiben.
+- Die Löschtransaktion publiziert zuerst den neuen Library-Index, synchronisiert dessen Backup und entfernt erst danach den content-addressed ROM-Ordner. Ein Indexfehler kann dadurch keine noch referenzierte ROM löschen; Backup-Recovery kann keinen gelöschten Eintrag wiederherstellen.
+- Saves, Mods, Profile und Diagnosen werden vom Entfernen nicht berührt.
+- Der separate Save-Dateiexport bleibt weiterhin zurückgestellt.
 
 ## Iteration 0.13.0 Release Candidate
 

@@ -262,6 +262,28 @@ export async function importContent(sourcePath: string): Promise<LibraryRow> {
   return row
 }
 
+export async function removeLibraryGame(row: LibraryRow): Promise<void> {
+  const sha256 = segment(row.sha256)
+  const rows = await libraryRows()
+  const current = rows.find(item => item.sha256 === sha256)
+  if (!current || current.id !== row.id || current.upstreamSha1 !== row.upstreamSha1) {
+    throw new Error('The library entry changed before removal')
+  }
+  const remaining = rows.filter(item => item.sha256 !== sha256)
+
+  // Publish and back up the index without the entry before deleting content.
+  // A failed index write therefore never strands a referenced ROM, and a
+  // later backup recovery cannot resurrect an entry whose content is gone.
+  await replaceIndex(remaining)
+  if (await FileManager.exists(INDEX_BACKUP)) await FileManager.remove(INDEX_BACKUP)
+  await FileManager.copyFile(INDEX, INDEX_BACKUP)
+
+  const contentDirectory = `${PATHS.content}/${sha256}`
+  if (await FileManager.exists(contentDirectory)) await FileManager.remove(contentDirectory)
+  // Saves, Mods, Profiles and Diagnostics are deliberately independent and
+  // survive removing a ROM from the library.
+}
+
 export async function readVerifiedLibraryRom(row: LibraryRow): Promise<ScriptingData> {
   const known = identifyGame(row.upstreamSha1)
   if (row.status !== 'runtime-unverified' || !known || row.game !== known.id
