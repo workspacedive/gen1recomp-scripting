@@ -186,6 +186,7 @@ do
   -- Release builds keep the proven compatibility/pacing adapters but avoid
   -- timing wrappers and bridge traffic. Set true only in a diagnostic build.
   local PROFILE_ENABLED = false
+  local HOST_PACKAGE_CONFIG = package and package.config or "/\n;\n?\n!\n-"
 
   local function normalizeHexEscapes(source)
     local changed
@@ -232,7 +233,25 @@ do
 
   local function instrumentModule(moduleName, module)
     if type(module) ~= "table" or module.__hostProfiled then return module end
-    if moduleName == "src.core.ChipSynth" then
+    if moduleName == "src.mods.LegacyCompat" then
+      -- The official legacy sandbox intentionally exposes a data-only package
+      -- stand-in, but omitted package.config. Older mods use only its first
+      -- byte to join scoped cache paths. Supply the host descriptor without
+      -- exposing package.loaded, searchers, loaders, paths, or the real table.
+      local nativeNew = module.new
+      if type(nativeNew) == "function" then
+        module.new = function(...)
+          local compat = nativeNew(...)
+          local globals = type(compat) == "table" and compat.globals or nil
+          local packageShim = type(globals) == "table" and globals.package or nil
+          if type(packageShim) == "table" and rawget(packageShim, "config") == nil then
+            packageShim.config = HOST_PACKAGE_CONFIG
+          end
+          return compat
+        end
+      end
+      module.__hostProfiled = true
+    elseif moduleName == "src.core.ChipSynth" then
       -- love.thread is unavailable on the measured love.js device path, so
       -- ChipAudio synthesizes buffers on the render thread. 8192-sample
       -- buffers cost 35-50 ms each; the four-buffer song preroll therefore

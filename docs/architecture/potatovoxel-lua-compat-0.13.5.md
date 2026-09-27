@@ -35,6 +35,12 @@ Gen1Recomps Loader, Mod-API, Sandbox und UI bleiben unverändert. Player, love.j
 
 **VERIFIZIERT (offizieller Pin):** `src/mods/ManagerState.lua` weist den Berechtigungszeilen `engine_internals` und `filesystem` fest das Glyph `!` zu. Es ist eine Risikowarnung über die Manifestdeklaration, kein Hinweis auf eine fehlende Hostfähigkeit. Der Modstatus `FOR GEN 1 FAILED` und der Compilertext sind davon getrennt.
 
+## r28: begrenzte Legacy-Paketkonfiguration
+
+Der r27-Gerätelauf erreicht erstmals `MeshCache.dir()` und belegt damit, dass BOM und LuaJIT-Suffixe passiert werden. Dort liest PotatoVoxel `package.config:sub(1, 1)`, um `/` gegen `\\` zu unterscheiden. Gen1Recomps `LegacyCompat.packageShim` ist absichtlich eine isolierte Datentabelle und enthält kein `config`; die echte `package`-Tabelle darf wegen Modullader-/Sandboxzugriff nicht sichtbar werden.
+
+r28 instrumentiert allgemein die Rückgabe von `src.mods.LegacyCompat.new`: Nur wenn dessen isolierter `globals.package`-Shim kein eigenes `config` besitzt, erhält er den Konfigurationsstring des Host-Lua. `loaded`, Loader, Suchpfade und die echte Paket-Tabelle werden nicht übernommen. Damit bleibt PotatoVoxels anschließender Datei-I/O in den bereits offiziellen virtuellen/scoped Legacy-Fassaden.
+
 ## Evidenzstatus
 
 - Ursachenanalyse und Parser-Reproduktion: **VERIFIZIERT**.

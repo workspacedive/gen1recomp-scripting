@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.6`
+Stand: 2026-09-28 · App-Version `0.13.7`
+
+## Iteration 0.13.7
+
+- **VERIFIZIERT (Gerät):** PotatoVoxel passiert mit r27 beide belegten Compilergrenzen und führt nun Modcode aus. Beim Fortsetzen stürzt `MeshCache.dir()` an `package.config:sub(...)` ab, weil Gen1Recomps offizieller `LegacyCompat.packageShim` zwar `path`, `cpath`, `preload`, `loaded` und `loaders`, aber absichtlich nicht die echte `package`-Tabelle und auch kein harmloses `config`-Feld bereitstellt.
+- **VERIFIZIERT (Paketquelltext):** PotatoVoxel verwendet nur das erste Zeichen von `package.config` zur Wahl des Pfadtrenners. Sein Cachepfad läuft anschließend über Gen1Recomps vorhandene virtuelle/scoped `love.filesystem`-, `io`- und `os`-Kompatibilität; ein echter Modullader ist dafür nicht erforderlich.
+- r28 ergänzt beim Erzeugen des offiziellen Legacy-Kompatibilitätsobjekts ausschließlich den bereits vom Host bekannten `package.config`-String in dessen datenisoliertem Paketshim. Die echte `package`-Tabelle, das echte `package.loaded`, Suchpfade und Loader bleiben verborgen; Gen1Recomps Sandbox wird nicht geöffnet.
+- Status: **TEILWEISE VERIFIZIERT** bis der nächste Gerätelauf den Cachepfad und nachfolgende Modinitialisierung bestätigt.
+- 45/45 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `2942bd5ff97386daa9328243d4b790dfccff8f9dd99963e66eb4c5aacde5d4ab`.
 
 ## Iteration 0.13.6
 

@@ -44,6 +44,11 @@ test('Lua 5.2 hexadecimal escapes are normalized before Gen1Recomp modules compi
 loadstring = loadstring or load
 local fixture = [=[return "\\xc3\\x97", "\\\\xc3"]=]
 local chipSynthFixture = [=[return { MUSIC_BUFFER_SAMPLES = 8192 }]=]
+local legacyCompatFixture = [=[
+return { new = function()
+  return { globals = { package = { path = "", loaded = {}, loaders = {} } } }
+end }
+]=]
 local transitionFixture = [=[
 local M = {}
 function M.new(game, done)
@@ -57,11 +62,13 @@ return M
 ]=]
 _lfs_getInfo = function(path, kind)
   if kind == "file" and (path == "src/ui/ListMenu.lua"
+      or path == "src/mods/LegacyCompat.lua"
       or path == "src/core/ChipSynth.lua"
       or path == "src/render/BattleTransition.lua") then return { type = "file" } end
 end
 _lfs_read = function(path)
   if path == "src/ui/ListMenu.lua" then return fixture end
+  if path == "src/mods/LegacyCompat.lua" then return legacyCompatFixture end
   if path == "src/core/ChipSynth.lua" then return chipSynthFixture end
   if path == "src/render/BattleTransition.lua" then return transitionFixture end
 end
@@ -75,6 +82,11 @@ local chunk = assert(package.loaders[2]("src.ui.ListMenu"))
 local times, escaped = chunk()
 assert(times == string.char(195, 151), "normalized bytes")
 assert(escaped == string.char(92) .. "xc3", "escaped literal")
+local LegacyCompat = assert(package.loaders[2]("src.mods.LegacyCompat"))()
+local packageShim = LegacyCompat.new().globals.package
+assert(type(packageShim.config) == "string" and #packageShim.config > 0,
+  "legacy package config")
+assert(packageShim.loaded ~= package.loaded, "real module cache stays hidden")
 local chipSynth = assert(package.loaders[2]("src.core.ChipSynth"))()
 assert(chipSynth.MUSIC_BUFFER_SAMPLES == 2048, "sync PCM work is frame-sized")
 local transition = assert(package.loaders[2]("src.render.BattleTransition"))()
