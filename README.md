@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.13.2 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r25. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. 0.13.2 ergänzt die zuvor fehlende Laufzeitsichtbarkeit geprüfter Mods über das offizielle `mods/<id>/`-Layout; dieser neue Aktivierungspfad ist reproduzierbar getestet und benötigt noch den konkreten Mod-Gerätetest (**TEILWEISE VERIFIZIERT**).
+> **Ehrlicher Status:** Die Scripting-App 0.13.3 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r25. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. 0.13.2 ergänzt die zuvor fehlende Laufzeitsichtbarkeit geprüfter Mods über das offizielle `mods/<id>/`-Layout; 0.13.3 trennt die Aktivieren-/Entfernen-Trefferflächen in nativen Listenzeilen. Der Aktivierungspfad ist reproduzierbar getestet und benötigt noch den konkreten Mod-Gerätetest (**TEILWEISE VERIFIZIERT**).
 
 ## Warum kein schneller Rewrite?
 

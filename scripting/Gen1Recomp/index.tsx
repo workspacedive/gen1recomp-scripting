@@ -44,7 +44,7 @@ function GamesView(props: {
       </Text>}>
         {props.rows.length === 0
           ? <VStack spacing={8}><Text>Noch kein Spiel importiert.</Text><Text>Der Import ist dauerhaft und offline nutzbar.</Text></VStack>
-          : props.rows.map((row) => <VStack key={row.sha256} alignment="leading" spacing={4}>
+          : props.rows.map((row) => <VStack key={row.sha256} alignment="leading" spacing={4} buttonStyle="borderless">
               <Text>{row.displayName}</Text>
               <Text>{`${row.game} · ${row.region} · ${row.language}`}</Text>
               <Text>{`${row.byteLength} Bytes · ${row.status === "runtime-unverified" ? "Spielbereit" : "Nicht unterstützt"}`}</Text>
@@ -88,7 +88,7 @@ function ModsView(props: {
         Aktivierte Pakete werden vor jedem Start erneut per SHA-256, ZIP-Struktur, CRC-32 und Manifest geprüft und danach über die Ressourcen-Bridge als offizielles mods/&lt;id&gt;/ eingeblendet. Der gespeicherte Gen1Recomp-Payload bleibt unverändert.
       </Text>}>
         {props.mods.length === 0 ? <Text>Keine Mod-Pakete gespeichert.</Text> : props.mods.map((mod) =>
-          <VStack key={`${mod.id}-${mod.version}-${mod.sha256}`} alignment="leading" spacing={4}>
+          <VStack key={`${mod.id}-${mod.version}-${mod.sha256}`} alignment="leading" spacing={4} buttonStyle="borderless">
             <Text>{mod.name}</Text>
             <Text>{`${mod.id} · ${mod.version} · API ${mod.api}`}</Text>
             <Text>{mod.activation === "enabled"

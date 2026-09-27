@@ -14,6 +14,12 @@ test("gameplay exposes only a validated transient mod overlay through the resour
   assert.ok(ready > 0 && mark > ready, "runtime-visible state must follow a ready report")
 })
 
+test("multiple actions in each native List row use independent button hit handling", async () => {
+  const source = await readFile(new URL("index.tsx", root), "utf8")
+  assert.match(source, /key=\{`\$\{mod\.id\}-\$\{mod\.version\}-\$\{mod\.sha256\}`\}[^>]*buttonStyle="borderless"/)
+  assert.match(source, /key=\{row\.sha256\}[^>]*buttonStyle="borderless"/)
+})
+
 test("mod activation revalidates retained package identity before creating mods/id paths", async () => {
   const source = await readFile(new URL("mod-store.ts", root), "utf8")
   for (const required of [

@@ -1,6 +1,13 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.2`
+Stand: 2026-09-28 · App-Version `0.13.3`
+
+## Iteration 0.13.3
+
+- **VERIFIZIERT (Gerätebefund):** In einer nativen `List` wurden die beiden Buttons derselben Mod-Zeile mit dem kontextabhängigen automatischen Buttonstil als gemeinsame Zeilenaktion behandelt. Beim Tippen auf „Aktivieren“ wurde deshalb auch die Entfernen-Bestätigung ausgelöst.
+- Mod- und Spielzeilen mit mehreren Aktionen verwenden nun den offiziell dokumentierten SwiftUI-/Scripting-Stil `buttonStyle="borderless"` auf der jeweiligen Button-Hierarchie. Dadurch besitzen Aktivieren/Deaktivieren, Entfernen sowie Spiel starten jeweils unabhängige Trefferflächen.
+- **TEILWEISE VERIFIZIERT:** Offizielle API-Dokumentation und ein statischer Regressionstest bestätigen die unabhängige Button-Konfiguration; die konkrete Trefferfläche benötigt die erneute Gerätebestätigung.
+- 44/44 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Importartefakt SHA-256: `9f425636512f97248494be2d54ff0e1b31f758ecd24f012c9ea019a48c96f806`.
 
 ## Iteration 0.13.2
 
