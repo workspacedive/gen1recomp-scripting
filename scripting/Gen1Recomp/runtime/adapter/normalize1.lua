@@ -131,9 +131,9 @@ do
         candidate = candidate:sub(4)
         fn, message = nativeLoadString(candidate, chunkname)
       end
-      if not fn and not binary and tostring(message):match("near '[Uu]?[Ll][Ll]'") then
-        candidate = candidate:gsub(
-          "(%f[%w_]0[xX]%x+)[Uu]?[Ll][Ll]%f[^%w_]", "%1")
+      local jitIntegerPattern = "(%f[%w_]0[xX]%x+)[Uu]?[Ll][Ll]%f[^%w_]"
+      if not fn and not binary and candidate:match(jitIntegerPattern) then
+        candidate = candidate:gsub(jitIntegerPattern, "%1")
         fn, message = nativeLoadString(candidate, chunkname)
       end
       if fn and environment ~= nil then nativeSetfenv(fn, environment) end

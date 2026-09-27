@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.13.5 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r26. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. Importierte Mods werden über das offizielle `mods/<id>/`-Layout laufzeitsichtbar. r26 normalisiert nach dem konkreten PotatoVoxel-1.5.8-Befund ausschließlich fehlgeschlagene dynamische Lua-Quellen mit UTF-8-BOM beziehungsweise LuaJIT-LL/ULL-Zahlenliteralen; der erneute Mod-Gerätetest ist **TEILWEISE VERIFIZIERT**.
+> **Ehrlicher Status:** Die Scripting-App 0.13.6 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r27. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. Importierte Mods werden über das offizielle `mods/<id>/`-Layout laufzeitsichtbar. r27 normalisiert nach den konkreten PotatoVoxel-1.5.8-Befunden ausschließlich bereits fehlgeschlagene dynamische Lua-Quellen mit UTF-8-BOM beziehungsweise tokenbegrenzten LuaJIT-LL/ULL-Zahlenliteralen; der erneute Mod-Gerätetest ist **TEILWEISE VERIFIZIERT**.
 
 ## Warum kein schneller Rewrite?
 

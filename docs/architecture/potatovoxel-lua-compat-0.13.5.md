@@ -26,7 +26,7 @@ Der Host verändert weder das gespeicherte Mod-ZIP noch den transienten `mods/<i
 
 1. Jede dynamische Textquelle wird zunächst unverändert kompiliert.
 2. Nur wenn das fehlschlägt und die ersten drei Bytes exakt `EF BB BF` sind, wird ohne diese BOM erneut kompiliert.
-3. Nur wenn auch eine Kompilierung mit einer Fehlermeldung `near 'LL'` oder `near 'ULL'` scheitert, werden tokenbegrenzte Suffixe an hexadezimalen Zahlen entfernt und genau einmal erneut kompiliert.
+3. Nur wenn auch eine Kompilierung scheitert und die Quelle selbst ein tokenbegrenztes `LL`-/`ULL`-Suffix an einer hexadezimalen Zahl enthält, wird dieses entfernt und genau einmal erneut kompiliert. r27 bindet den Retry bewusst an den Quelltoken statt an den Wortlaut der VM-Fehlermeldung, weil der Gerätelauf einen abweichend formatierten Fehler für dieselbe Syntaxgrenze belegt.
 4. Andere Syntaxfehler bleiben unverändert Fehler. Bytecode-, Mod-Sandbox-, Berechtigungs- und Pfadregeln werden nicht gelockert.
 
 Gen1Recomps Loader, Mod-API, Sandbox und UI bleiben unverändert. Player, love.js und WASM bleiben opaque und SHA-256-gepinnt; r26 versioniert nur den Hostadapter seitlich neben r25.

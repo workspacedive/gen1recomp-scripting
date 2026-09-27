@@ -13,6 +13,8 @@ test('dynamic mod source retries only proven LuaJIT syntax boundaries', async ()
   assert.notEqual(start, -1)
   assert.notEqual(end, -1)
   const shim = adapter.slice(start, end)
+  assert.match(shim, /not fn and not binary and candidate:match\(jitIntegerPattern\)/)
+  assert.doesNotMatch(shim, /message\):match\([^\n]*[Ll][Ll]/)
   const script = `
 loadstring = load
 setfenv = function(fn) return fn end

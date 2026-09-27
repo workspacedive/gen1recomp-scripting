@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.5`
+Stand: 2026-09-28 · App-Version `0.13.6`
+
+## Iteration 0.13.6
+
+- **VERIFIZIERT (Gerät):** r26 entfernt die führende BOM erfolgreich; PotatoVoxel erreicht danach wie vorhergesagt `lib/VRXR.lua`. Dessen LuaJIT-`LL`/`ULL`-Syntax bleibt jedoch im love.js-Compilerfehler hängen.
+- Ursache der unvollständigen r26-Korrektur: Der Retry war zusätzlich an den erwarteten Fehlermeldungstext `near 'LL'/'ULL'` gebunden. Die reale VM formatiert den abgeschnittenen Fehler anders, obwohl derselbe bereits statisch belegte Quelltoken scheitert.
+- r27 normalisiert den tokenbegrenzten LuaJIT-Suffix deshalb nach jeder fehlgeschlagenen Textkompilierung, wenn und nur wenn die Quelle selbst ein passendes hexadezimales `LL`-/`ULL`-Literal enthält. Andere Quellen und andere Syntaxfehler bleiben unverändert.
+- Status: **TEILWEISE VERIFIZIERT** bis der nächste Gerätelauf die bereits reproduzierte zweite Kompatibilitätsgrenze bestätigt.
+- 45/45 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `ae0cedff6169ef62f3b710b42fc71a1b4c33ee6d1089365cd3b1a6ccaf379eef`.
 
 ## Iteration 0.13.5
 
