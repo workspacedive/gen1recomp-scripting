@@ -1,6 +1,19 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.13.1`
+Stand: 2026-09-28 · App-Version `0.13.2`
+
+## Iteration 0.13.2
+
+- **VERIFIZIERT (offizieller Gen1Recomp-Pin):** Der Loader entdeckt Mods ausschließlich im laufzeitsichtbaren Layout `mods/<Ordner>/manifest.json`; der bisherige Hostspeicher unter `Documents/Gen1Recomp/Mods` war nicht automatisch sichtbar.
+- Neue Importe behalten deshalb ihr SHA-256-adressiertes Original-ZIP und sind standardmäßig für den nächsten Start aktiviert. Ältere Store-only-Einträge werden sicher als deaktiviert migriert und benötigen einmaligen Reimport.
+- Vor jedem Start werden Archiv-SHA-256, ZIP-Sicherheitsregeln, Extraktion/CRC sowie Manifest-ID/-Version erneut geprüft. Danach ergänzt ein eigener ZIP32-Overlay-Writer ausschließlich `mods/<id>/...` in eine transiente Kopie des Startpakets.
+- Der gepinnte Gen1Recomp-Payload auf Disk, Player, love.js und WASM bleiben unverändert und unabhängig updatebar. Das transiente Paket läuft durch dieselbe allowlistete Ressourcen-Bridge; Gen1Recomps offizieller Loader bleibt allein für Modsemantik, Abhängigkeiten und Konflikte verantwortlich.
+- Die UI unterscheidet gespeichert/deaktiviert, für den nächsten Start aktiviert und zuletzt nach `runtime.ready` laufzeitsichtbar. Entfernen publiziert zuerst den Index und bereinigt danach nur Moddateien und das Modarchiv.
+- Der Paket-Inventarcheck liest `unzip`-Ausgaben nun vollständig in temporäre Dateien, statt sie unter `pipefail` an früh beendendes `grep -q` zu leiten. Damit kann ein erfolgreicher Treffer nicht mehr durch `unzip`-SIGPIPE fälschlich als fehlende Runtime-Datei erscheinen.
+- **TEILWEISE VERIFIZIERT:** 43 reproduzierbare Tests und Standard-ZIP-Prüfung des Overlays belegen die Hostseite; der konkrete Drittanbieter-Mod im echten iOS-Lauf benötigt den Gerätetest.
+- Importartefakt: `Gen1Recomp.scripting`, SHA-256 `6a9adb91dd71c563496cb94b4b7ce7f43832856453d3af8e1e8a0811aae5cd67`.
+- Detailprüfung: [`mod-runtime-activation-0.13.2.md`](../architecture/mod-runtime-activation-0.13.2.md).
+- Der separate Save-Dateiexport bleibt zurückgestellt.
 
 ## Iteration 0.13.1
 

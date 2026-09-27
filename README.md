@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.10.5 besitzt vier native Tabs und getrennte persistente Library-/Mod-/Payload-Speicher. love.js/LÖVE 11.5 und der Gen1Recomp-0.3.20-Payload bis `Module.postrun` sind auf dem echten Gerät **VERIFIZIERT**. Runtime r10 behebt die in 0.10.4 eingeführte synchrone Bridge-Regression, behält den systematischen Lua-Kompatibilitätsadapter bei und ergänzt einen ausschließlich im Gameplay-Modus sichtbaren Touch-Controller. Gameplay und Controllerereignisse bleiben bis zum Gerätetest **NICHT VERIFIZIERT**.
+> **Ehrlicher Status:** Die Scripting-App 0.13.2 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r25. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. 0.13.2 ergänzt die zuvor fehlende Laufzeitsichtbarkeit geprüfter Mods über das offizielle `mods/<id>/`-Layout; dieser neue Aktivierungspfad ist reproduzierbar getestet und benötigt noch den konkreten Mod-Gerätetest (**TEILWEISE VERIFIZIERT**).
 
 ## Warum kein schneller Rewrite?
 
@@ -36,9 +36,7 @@ Gen1Recomp v0.3.20 besteht aus einem großen Lua/LÖVE-Core mit Fixed-Step-Timin
 4. Im Tab „Diagnose“ zuerst die Geräteprüfung ausführen. Der Bericht landet unter `Diagnostics/capabilities.v3.json`.
 5. Dort „Runtime installieren und Boot testen“ antippen. Der gepinnte Kandidat wird vollständig gehasht und startet ausschließlich `nogame.love`; das Ergebnis landet unter `Diagnostics/lovejs-boot.v2.json`.
 6. Nach sicherem Payload-Staging unter „Einstellungen“ kann „Gen1Recomp-Payload Boot testen“ ausschließlich dessen Initialisierung ohne ROM/Mods/Saves prüfen; Bericht: `Diagnostics/gen1recomp-payload-boot.v1.json`.
-7. Optional im Tab „Mods“ ein eigenes Gen1Recomp-Mod-ZIP prüfen und inaktiv speichern; Mod-Ausführung bleibt bis zum Runtime-Gate gesperrt.
-
-Auch erfolgreiche Boot-Gates sind noch keine vollständige Spieltauglichkeit und aktivieren keinen Core.
+7. Optional im Tab „Mods“ ein eigenes Gen1Recomp-Mod-ZIP prüfen und speichern. Neue Pakete sind für den nächsten Spielstart aktiviert; vor jedem Start werden sie erneut geprüft und über die Ressourcen-Bridge als `mods/<id>/` laufzeitsichtbar gemacht.
 
 ## Entwicklung
 
@@ -47,7 +45,7 @@ npm install
 npm run check
 ```
 
-Aktuell: 35 Unit-Tests einschließlich adversarieller ZIP-Preflight-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
+Aktuell: 43 Unit-Tests einschließlich adversarieller ZIP-Preflight- und Mod-Overlay-Fälle. `npm run check:scripting` typprüft die App gegen einen engen, aus der offiziellen Dokumentation abgeleiteten Hostvertrag und bündelt anschließend den vollständigen Importgraphen. Der Check unterscheidet ausdrücklich Modul-Exporte (UI/React) von injizierten Globals (`FileManager`, `DocumentPicker`, `Crypto`, `WebViewController`) und verhindert damit den auf einem echten Gerät gefundenen 0.2.1-Fehler. Ein echter Scripting-Gerätetest bleibt trotzdem Release-Gate.
 
 ## Free-Tier-Regel
 

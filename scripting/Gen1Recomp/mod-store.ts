@@ -1,6 +1,7 @@
 import { PATHS } from "./host"
 import { extractZipEntry } from "./zip-extract"
 import { MOD_ARCHIVE_LIMITS, preflightModZip } from "./zip-preflight"
+import { appendZipOverlay, type ZipOverlayEntry } from "./zip-overlay"
 
 const MODS_ROOT = PATHS.mods
 const INDEX_PATH = `${MODS_ROOT}/index.v1.json`
@@ -18,10 +19,17 @@ export interface InstalledMod {
   sha256: string
   installedAt: string
   relativePath: string
-  activation: "stored"
+  archiveRelativePath?: string
+  activation: "stored" | "enabled"
+  runtimeVisibleAt?: string
 }
 
-interface ModIndex { schemaVersion: 1; mods: InstalledMod[] }
+interface ModIndex { schemaVersion: 2; mods: InstalledMod[] }
+
+export interface RuntimeModOverlay {
+  data: ScriptingData
+  modIds: string[]
+}
 interface RawManifest {
   id?: unknown; name?: unknown; version?: unknown; api?: unknown
   entry?: unknown; profile?: unknown; description?: unknown
@@ -53,23 +61,34 @@ function isInstalledMod(value: unknown): value is InstalledMod {
     && typeof mod.description === "string" && typeof mod.installedAt === "string"
     && typeof mod.sha256 === "string" && /^[0-9a-f]{64}$/.test(mod.sha256)
     && mod.relativePath === `${mod.id}/${mod.version}/${mod.sha256}`
-    && mod.activation === "stored"
+    && (mod.archiveRelativePath == null || mod.archiveRelativePath === `${mod.relativePath}.zip`)
+    && (mod.activation === "stored" || (mod.activation === "enabled" && mod.archiveRelativePath != null))
+    && (mod.runtimeVisibleAt == null || typeof mod.runtimeVisibleAt === "string")
+}
+
+function parseIndex(raw: string): ModIndex | null {
+  const parsed = JSON.parse(raw) as { schemaVersion?: unknown, mods?: unknown }
+  if (!Array.isArray(parsed.mods) || !parsed.mods.every(isInstalledMod)) return null
+  const mods = parsed.mods as InstalledMod[]
+  if (parsed.schemaVersion === 2) return { schemaVersion: 2, mods }
+  if (parsed.schemaVersion === 1) {
+    // 0.13.x packages had no retained archive, so they remain truthfully stored
+    // until the user imports the original ZIP once more.
+    return { schemaVersion: 2, mods: mods.map((mod) => ({ ...mod, activation: "stored" as const })) }
+  }
+  return null
 }
 
 async function loadIndex(): Promise<ModIndex> {
-  if (!(await exists(INDEX_PATH))) return { schemaVersion: 1, mods: [] }
+  if (!(await exists(INDEX_PATH))) return { schemaVersion: 2, mods: [] }
   try {
-    const parsed = JSON.parse(await FileManager.readAsString(INDEX_PATH)) as Partial<ModIndex>
-    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.mods) || !parsed.mods.every(isInstalledMod)) {
-      throw new Error("invalid")
-    }
-    return { schemaVersion: 1, mods: parsed.mods }
+    const index = parseIndex(await FileManager.readAsString(INDEX_PATH))
+    if (!index) throw new Error("invalid")
+    return index
   } catch {
     if (await exists(INDEX_BACKUP)) {
-      const parsed = JSON.parse(await FileManager.readAsString(INDEX_BACKUP)) as Partial<ModIndex>
-      if (parsed.schemaVersion === 1 && Array.isArray(parsed.mods) && parsed.mods.every(isInstalledMod)) {
-        return { schemaVersion: 1, mods: parsed.mods }
-      }
+      const index = parseIndex(await FileManager.readAsString(INDEX_BACKUP))
+      if (index) return index
     }
     throw new Error("Der lokale Mod-Index ist beschädigt. Es wurden keine Dateien verändert.")
   }
@@ -79,7 +98,7 @@ async function saveIndex(index: ModIndex): Promise<void> {
   await ensureDirectory(MODS_ROOT)
   await FileManager.writeAsString(INDEX_TEMP, JSON.stringify(index, null, 2))
   const roundTrip = JSON.parse(await FileManager.readAsString(INDEX_TEMP)) as Partial<ModIndex>
-  if (roundTrip.schemaVersion !== 1 || !Array.isArray(roundTrip.mods) || !roundTrip.mods.every(isInstalledMod)) {
+  if (roundTrip.schemaVersion !== 2 || !Array.isArray(roundTrip.mods) || !roundTrip.mods.every(isInstalledMod)) {
     throw new Error("Der neue Mod-Index konnte nicht verifiziert werden.")
   }
   if (await exists(INDEX_PATH)) {
@@ -218,15 +237,26 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
     const destination = safeJoin(MODS_ROOT, relativePath)
     await ensureDirectory(`${MODS_ROOT}/${manifest.id}/${manifest.version}`)
     if (!(await exists(destination))) await FileManager.rename(root, destination)
+    const archiveRelativePath = `${relativePath}.zip`
+    const publishedArchive = safeJoin(MODS_ROOT, archiveRelativePath)
+    if (!(await exists(publishedArchive))) await FileManager.copyFile(archive, publishedArchive)
+    const publishedData = await FileManager.readAsData(publishedArchive)
+    if (publishedData.size !== archiveData.size
+      || Crypto.sha256(publishedData).toHexString().toLowerCase() !== sha256) {
+      await removeIfExists(publishedArchive)
+      throw new Error("Das veröffentlichte Mod-Archiv hat die Integritätsprüfung nicht bestanden.")
+    }
 
     const row: InstalledMod = {
       id: manifest.id, name: manifest.name, version: manifest.version,
       api: manifest.api, profile: manifest.profile, description: manifest.description,
-      sha256, installedAt: new Date().toISOString(), relativePath, activation: "stored",
+      sha256, installedAt: new Date().toISOString(), relativePath, archiveRelativePath,
+      activation: "enabled",
     }
     const index = await loadIndex()
-    index.mods = index.mods.filter((item) =>
-      !(item.id === row.id && item.version === row.version && item.sha256 === row.sha256))
+    index.mods = index.mods
+      .filter((item) => !(item.id === row.id && item.version === row.version && item.sha256 === row.sha256))
+      .map((item) => item.id === row.id ? { ...item, activation: "stored" as const, runtimeVisibleAt: undefined } : item)
     index.mods.push(row)
     await saveIndex(index)
     try { await removeIfExists(TRANSACTION) } catch { /* Startup recovery will retry cleanup. */ }
@@ -247,13 +277,100 @@ export async function importModZip(sourcePath: string): Promise<InstalledMod> {
   }
 }
 
+export async function setModEnabled(mod: InstalledMod, enabled: boolean): Promise<void> {
+  const index = await loadIndex()
+  const current = index.mods.find((item) =>
+    item.id === mod.id && item.version === mod.version && item.sha256 === mod.sha256)
+  if (!current) throw new Error("Das Mod-Paket ist nicht mehr im Index enthalten.")
+  if (enabled) {
+    if (!current.archiveRelativePath || !(await exists(safeJoin(MODS_ROOT, current.archiveRelativePath)))) {
+      throw new Error("Dieses ältere Paket muss einmal erneut importiert werden, bevor es aktiviert werden kann.")
+    }
+    index.mods = index.mods.map((item) => item.id === current.id
+      ? { ...item, activation: item.sha256 === current.sha256 ? "enabled" as const : "stored" as const,
+        runtimeVisibleAt: undefined }
+      : item)
+  } else {
+    index.mods = index.mods.map((item) => item.sha256 === current.sha256
+      ? { ...item, activation: "stored" as const, runtimeVisibleAt: undefined } : item)
+  }
+  await saveIndex(index)
+}
+
+export async function prepareRuntimeModOverlay(payload: ScriptingData): Promise<RuntimeModOverlay> {
+  const index = await loadIndex()
+  const enabled = index.mods.filter((mod) => mod.activation === "enabled")
+  if (enabled.length === 0) return { data: payload, modIds: [] }
+  const overlay: ZipOverlayEntry[] = []
+  let expandedBytes = 0
+  for (const mod of enabled) {
+    if (!mod.archiveRelativePath) throw new Error(`${mod.name}: aktiviertes Paketarchiv fehlt.`)
+    const archivePath = safeJoin(MODS_ROOT, mod.archiveRelativePath)
+    if (!(await exists(archivePath))) throw new Error(`${mod.name}: gespeichertes Paketarchiv fehlt.`)
+    const archiveData = await FileManager.readAsData(archivePath)
+    if (Crypto.sha256(archiveData).toHexString().toLowerCase() !== mod.sha256) {
+      throw new Error(`${mod.name}: SHA-256 des gespeicherten Paketarchivs stimmt nicht.`)
+    }
+    const bytes = archiveData.toUint8Array()
+    if (bytes == null) throw new Error(`${mod.name}: Paketarchiv konnte nicht binär gelesen werden.`)
+    const archive = preflightModZip(bytes)
+    const manifestRecord = archive.records.find((entry) => entry.path === archive.manifestPath)
+    if (!manifestRecord) throw new Error(`${mod.name}: manifest.json fehlt bei der Laufzeitprüfung.`)
+    const raw = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(
+      extractZipEntry(bytes, manifestRecord),
+    )) as RawManifest
+    const manifest = validateManifest(raw)
+    if (manifest.id !== mod.id || manifest.version !== mod.version) {
+      throw new Error(`${mod.name}: Manifest-Identität stimmt nicht mit dem Mod-Index überein.`)
+    }
+    const prefix = archive.rootPrefix ? `${archive.rootPrefix}/` : ""
+    for (const entry of archive.records) {
+      if (entry.isDirectory) continue
+      const relative = entry.path.slice(prefix.length)
+      if (!relative || relative === entry.path && prefix) {
+        throw new Error(`${mod.name}: Datei liegt außerhalb des geprüften Mod-Wurzelordners.`)
+      }
+      const data = extractZipEntry(bytes, entry)
+      expandedBytes += data.length
+      // The host has no streaming/random-write Data API; bound the in-memory
+      // overlay by the already documented 64 MiB archive transport limit.
+      if (expandedBytes > MOD_ARCHIVE_LIMITS.archiveBytes) {
+        throw new Error("Die aktivierten Mods überschreiten zusammen das 64-MiB-Laufzeitlimit.")
+      }
+      overlay.push({ path: `mods/${mod.id}/${relative}`, data, crc32: entry.crc32 })
+    }
+  }
+  const payloadBytes = payload.toUint8Array()
+  if (payloadBytes == null) throw new Error("Der geprüfte Payload konnte nicht binär gelesen werden.")
+  const combined = appendZipOverlay(payloadBytes, overlay)
+  const temporary = `${PATHS.transactions}/gameplay-mod-overlay.love`
+  await ensureDirectory(PATHS.transactions)
+  await removeIfExists(temporary)
+  try {
+    await FileManager.writeAsBytes(temporary, combined)
+    return { data: await FileManager.readAsData(temporary), modIds: enabled.map((mod) => mod.id) }
+  } finally {
+    await removeIfExists(temporary)
+  }
+}
+
+export async function markModsRuntimeVisible(modIds: string[], visibleAt: string): Promise<void> {
+  if (modIds.length === 0) return
+  const ids = new Set(modIds)
+  const index = await loadIndex()
+  index.mods = index.mods.map((mod) => mod.activation === "enabled" && ids.has(mod.id)
+    ? { ...mod, runtimeVisibleAt: visibleAt } : mod)
+  await saveIndex(index)
+}
+
 export async function removeInstalledMod(mod: InstalledMod): Promise<void> {
   const index = await loadIndex()
-  const next = index.mods.filter((item) =>
-    !(item.id === mod.id && item.version === mod.version && item.sha256 === mod.sha256))
-  if (next.length === index.mods.length) return
-  index.mods = next
+  const current = index.mods.find((item) =>
+    item.id === mod.id && item.version === mod.version && item.sha256 === mod.sha256)
+  if (!current) return
+  index.mods = index.mods.filter((item) => item !== current)
   await saveIndex(index)
-  // A crash before this cleanup leaves an unindexed orphan, never a broken index.
-  await removeIfExists(safeJoin(MODS_ROOT, mod.relativePath))
+  // A crash before this cleanup leaves unindexed orphans, never a broken index.
+  await removeIfExists(safeJoin(MODS_ROOT, current.relativePath))
+  if (current.archiveRelativePath) await removeIfExists(safeJoin(MODS_ROOT, current.archiveRelativePath))
 }

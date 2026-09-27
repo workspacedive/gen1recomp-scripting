@@ -2,7 +2,8 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { constants, deflateRawSync } from "node:zlib"
 import { crc32, extractZipEntry, inflateRaw } from "../scripting/Gen1Recomp/zip-extract.js"
-import { preflightModZip } from "../scripting/Gen1Recomp/zip-preflight.js"
+import { preflightModZip, preflightZipArchive } from "../scripting/Gen1Recomp/zip-preflight.js"
+import { appendZipOverlay } from "../scripting/Gen1Recomp/zip-overlay.js"
 
 interface Entry {
   path: string
@@ -78,6 +79,28 @@ function realZip(files: Array<{ path: string, data: Uint8Array, method: 0 | 8, d
   put32(output, central.length); put32(output, centralOffset); put16(output, 0)
   return Uint8Array.from(output)
 }
+
+test("runtime overlay preserves upstream entries and adds official mods/id paths", () => {
+  const originalData = new TextEncoder().encode("return 'upstream'")
+  const modData = new TextEncoder().encode("return 'mod'")
+  const payload = realZip([{ path: "main.lua", data: originalData, method: 8 }])
+  const combined = appendZipOverlay(payload, [{
+    path: "mods/example/main.lua", data: modData, crc32: crc32(modData),
+  }])
+  const archive = preflightZipArchive(combined)
+  assert.deepEqual(archive.entries, ["main.lua", "mods/example/main.lua"])
+  assert.deepEqual(extractZipEntry(combined, archive.records[0]!), originalData)
+  assert.deepEqual(extractZipEntry(combined, archive.records[1]!), modData)
+  assert.deepEqual(combined.slice(0, 40), payload.slice(0, 40))
+})
+
+test("runtime overlay rejects collisions with upstream paths", () => {
+  const data = new TextEncoder().encode("x")
+  const payload = realZip([{ path: "mods/example/main.lua", data, method: 0 }])
+  assert.throws(() => appendZipOverlay(payload, [{
+    path: "mods/example/main.lua", data, crc32: crc32(data),
+  }]), /kollidiert/)
+})
 
 test("accepts a single-folder Gen1Recomp mod package", () => {
   const result = preflightModZip(centralZip([

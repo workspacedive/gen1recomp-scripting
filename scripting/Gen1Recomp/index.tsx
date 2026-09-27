@@ -14,7 +14,7 @@ import {
   type StagedPayload,
 } from "./component-store"
 import {
-  importModZip, listInstalledMods, recoverPendingModImport, removeInstalledMod,
+  importModZip, listInstalledMods, recoverPendingModImport, removeInstalledMod, setModEnabled,
   type InstalledMod,
 } from "./mod-store"
 import {
@@ -79,18 +79,26 @@ function ModsView(props: {
   notice: string
   refresh: () => Promise<void>
   importMod: () => Promise<void>
+  toggleMod: (mod: InstalledMod) => Promise<void>
   removeMod: (mod: InstalledMod) => Promise<void>
 }) {
   return <NavigationStack tag={props.tag} tabItem={props.tabItem}>
     <List navigationTitle="Mods" navigationBarTitleDisplayMode="large">
       <Section header={<Text>Lokale Pakete</Text>} footer={<Text>
-        Pakete werden vor dem Entpacken auf Pfade, Symlinks, Kompression und Größen geprüft. Fehlerdetails landen in Diagnostics/mod-import-last-failure.v1.json. Aktivierung folgt erst mit der verifizierten Spiellaufzeit.
+        Aktivierte Pakete werden vor jedem Start erneut per SHA-256, ZIP-Struktur, CRC-32 und Manifest geprüft und danach über die Ressourcen-Bridge als offizielles mods/&lt;id&gt;/ eingeblendet. Der gespeicherte Gen1Recomp-Payload bleibt unverändert.
       </Text>}>
         {props.mods.length === 0 ? <Text>Keine Mod-Pakete gespeichert.</Text> : props.mods.map((mod) =>
           <VStack key={`${mod.id}-${mod.version}-${mod.sha256}`} alignment="leading" spacing={4}>
             <Text>{mod.name}</Text>
             <Text>{`${mod.id} · ${mod.version} · API ${mod.api}`}</Text>
-            <Text>{`Sicher gespeichert · noch nicht aktiviert · ${mod.sha256.slice(0, 12)}…`}</Text>
+            <Text>{mod.activation === "enabled"
+              ? (mod.runtimeVisibleAt
+                ? `Aktiviert · zuletzt laufzeitsichtbar ${mod.runtimeVisibleAt} · ${mod.sha256.slice(0, 12)}…`
+                : `Aktiviert · wird beim nächsten Spielstart laufzeitsichtbar · ${mod.sha256.slice(0, 12)}…`)
+              : `Sicher gespeichert · deaktiviert · ${mod.sha256.slice(0, 12)}…`}</Text>
+            <Button title={mod.activation === "enabled" ? "Deaktivieren" : "Aktivieren"}
+              systemImage={mod.activation === "enabled" ? "pause.circle" : "play.circle"}
+              disabled={props.busy} action={() => props.toggleMod(mod)} />
             <Button title="Paket entfernen" systemImage="trash" disabled={props.busy} action={() => props.removeMod(mod)} />
           </VStack>)}
       </Section>
@@ -279,9 +287,21 @@ function App() {
       if (files.length === 0) { setModNotice("Import abgebrochen."); return }
       const mod = await importModZip(files[0])
       setMods(await listInstalledMods())
-      setModNotice(`${mod.name} ${mod.version} wurde geprüft und sicher gespeichert.`)
+      setModNotice(`${mod.name} ${mod.version} wurde geprüft, gespeichert und für den nächsten Spielstart aktiviert.`)
     } catch (error) { setModNotice(`Mod-Import fehlgeschlagen: ${errorMessage(error)}`) }
     finally { DocumentPicker.stopAcessingSecurityScopedResources(); setBusy(false) }
+  }
+
+  async function toggleMod(mod: InstalledMod): Promise<void> {
+    if (busy) return
+    setBusy(true)
+    try {
+      const enable = mod.activation !== "enabled"
+      await setModEnabled(mod, enable)
+      setMods(await listInstalledMods())
+      setModNotice(`${mod.name} wurde ${enable ? "für den nächsten Spielstart aktiviert" : "deaktiviert"}.`)
+    } catch (error) { setModNotice(`Aktivierung fehlgeschlagen: ${errorMessage(error)}`) }
+    finally { setBusy(false) }
   }
 
   async function removeMod(mod: InstalledMod): Promise<void> {
@@ -372,6 +392,7 @@ function App() {
       const candidate = await installRuntimeCandidate()
       setRuntime(candidate)
       const report = await presentGen1Gameplay(row)
+      setMods(await listInstalledMods())
       setGameNotice(report.status === "ready"
         ? `${row.displayName}: Spiel beendet.`
         : `Spielstart ${report.status} · Phase ${report.stage}: ${report.detail}`)
@@ -431,7 +452,8 @@ function App() {
       rows={rows} busy={busy} notice={gameNotice} refresh={refreshGames} importGame={chooseGame}
       launchGame={launchGame} removeGame={removeGame} />
     <ModsView tag={1} tabItem={<Label title="Mods" systemImage="puzzlepiece.extension" />}
-      mods={mods} busy={busy} notice={modNotice} refresh={refreshMods} importMod={chooseMod} removeMod={removeMod} />
+      mods={mods} busy={busy} notice={modNotice} refresh={refreshMods} importMod={chooseMod}
+      toggleMod={toggleMod} removeMod={removeMod} />
     <DiagnosticsView tag={2} tabItem={<Label title="Diagnose" systemImage="stethoscope" />}
       busy={busy} summary={diagnosticSummary} details={diagnosticDetails} runtime={runtime} stagedPayload={stagedPayload}
       runtimeStatus={runtimeStatus} payloadBootStatus={payloadBootStatus}

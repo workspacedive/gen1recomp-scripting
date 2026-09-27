@@ -35,7 +35,9 @@ mapfile -d '' FILES < <(cd "$STAGE" && find . -type f -print0 | sort -z)
 # boundary while retaining ZIP CRC/inventory validation and reproducibility.
 (cd "$STAGE" && zip -X -q -0 "$EXPECTED" "${FILES[@]}")
 unzip -tqq "$EXPECTED"
-if unzip -lv "$EXPECTED" | grep -q ' Defl'; then
+unzip -Z1 "$EXPECTED" > "$WORK/inventory.txt"
+unzip -lv "$EXPECTED" > "$WORK/listing.txt"
+if grep -q ' Defl' "$WORK/listing.txt"; then
   echo "Scripting package unexpectedly contains compressed entries" >&2
   exit 1
 fi
@@ -45,7 +47,7 @@ for required in \
   runtime/lovejs/lua/normalize1.lua runtime/lovejs/lua/normalize2.lua \
   runtime/adapter/normalize1.lua runtime/adapter/normalize2.lua \
   runtime/lovejs/11.5/love.js runtime/lovejs/11.5/love.wasm runtime/lovejs/11.5/license.txt; do
-  unzip -Z1 "$EXPECTED" | grep -Fqx "$required" || {
+  grep -Fqx "$required" "$WORK/inventory.txt" || {
     echo "runtime asset missing from package: $required" >&2
     exit 1
   }

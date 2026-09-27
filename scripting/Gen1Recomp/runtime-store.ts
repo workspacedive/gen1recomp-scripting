@@ -7,6 +7,7 @@ import {
   parseRuntimeResourceRequest, runtimeCandidatePath, type BridgedRuntimePath,
 } from "./runtime-resource"
 import { readVerifiedStagedPayload } from "./component-store"
+import { markModsRuntimeVisible, prepareRuntimeModOverlay } from "./mod-store"
 
 const RUNTIMES_ROOT = `${PATHS.cores}/runtimes`
 const DESTINATION = `${RUNTIMES_ROOT}/${LOVEJS_RUNTIME.id}`
@@ -409,12 +410,15 @@ export async function presentGen1PayloadPreview(): Promise<LoveJsBootReport> {
 
 export async function presentGen1Gameplay(row: LibraryRow): Promise<LoveJsBootReport> {
   const [payload, rom] = await Promise.all([readVerifiedStagedPayload(), readVerifiedLibraryRom(row)])
-  return runBootProbe({
+  // The transient .love resource adds only validated mods/<id>/ files. The
+  // pinned upstream payload on disk remains byte-identical and independently updateable.
+  const runtimePayload = await prepareRuntimeModOverlay(payload.data)
+  const report = await runBootProbe({
     probe: "gen1recomp-gameplay",
     gamePath: GEN1_PAYLOAD_BRIDGE_PATH,
     resourcePaths: [GEN1_PAYLOAD_BRIDGE_PATH, GEN1_ROM_BRIDGE_PATH, ...RUNTIME_SUPPORT_PATHS],
     extraResources: new Map<BridgedRuntimePath, ScriptingData>([
-      [GEN1_PAYLOAD_BRIDGE_PATH, payload.data],
+      [GEN1_PAYLOAD_BRIDGE_PATH, runtimePayload.data],
       [GEN1_ROM_BRIDGE_PATH, rom],
     ]),
     payloadVersion: payload.metadata.version,
@@ -425,4 +429,19 @@ export async function presentGen1Gameplay(row: LibraryRow): Promise<LoveJsBootRe
     presentOnReady: true,
     touchController: true,
   })
+  if (report.status === "ready") {
+    try {
+      await markModsRuntimeVisible(runtimePayload.modIds, report.testedAt)
+    } catch (error) {
+      // Status bookkeeping must not relabel a completed gameplay session as a
+      // launch failure. Keep the conservative pre-launch UI state and diagnose.
+      try {
+        await FileManager.writeAsString(`${PATHS.diagnostics}/mod-runtime-status-failure.v1.json`, JSON.stringify({
+          schemaVersion: 1, recordedAt: new Date().toISOString(),
+          message: error instanceof Error ? error.message : String(error),
+        }, null, 2))
+      } catch { /* Gameplay result remains authoritative. */ }
+    }
+  }
+  return report
 }
