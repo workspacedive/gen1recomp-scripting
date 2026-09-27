@@ -226,7 +226,21 @@ do
       end
     elseif moduleName == "src.core.ChipAudio" then
       module.__hostProfiled = true
-      timedMethod(module, "playMusic", "audio.chip_play", "music")
+      local nativePlayMusic = module.playMusic
+      if type(nativePlayMusic) == "function" then
+        module.playMusic = function(...)
+          local started = profileClock()
+          local results = { nativePlayMusic(...) }
+          local stats = type(module.stats) == "function" and module.stats() or {}
+          profile("audio.chip_play", {
+            kind = "music",
+            worker = stats.worker or "unknown",
+            buffers = stats.buffers or 0,
+            ms = string.format("%.3f", (profileClock() - started) * 1000),
+          })
+          return unpackValues(results)
+        end
+      end
     elseif moduleName == "src.render.BattleTransition" then
       module.__hostProfiled = true
       local nativeNew, nativeUpdate = module.new, module.update
@@ -241,6 +255,8 @@ do
             profile("battle.transition", {
               style = transition.style or "unknown",
               frames = expectedFrames,
+              adapterCalls = transition.__hostTransitionCalls or 0,
+              adapterSteps = transition.__hostTransitionSteps or 0,
               ms = string.format("%.3f", (profileClock() - started) * 1000),
             })
             if onDone then return onDone(...) end
@@ -252,6 +268,7 @@ do
       end
       if type(nativeUpdate) == "function" then
         module.update = function(self, dt)
+          self.__hostTransitionCalls = (self.__hostTransitionCalls or 0) + 1
           local now = profileClock()
           local previous = self.__hostTransitionClock or now
           local elapsed = now - previous
@@ -268,6 +285,7 @@ do
           if steps < 1 then return end
           self.__hostTransitionAccum = self.__hostTransitionAccum - steps
           for _ = 1, steps do
+            self.__hostTransitionSteps = (self.__hostTransitionSteps or 0) + 1
             nativeUpdate(self, dt)
             if self.__hostTransitionDone then break end
           end

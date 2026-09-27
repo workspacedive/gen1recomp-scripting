@@ -1,6 +1,13 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.12.4`
+Stand: 2026-09-27 · App-Version `0.12.5`
+
+## Iteration 0.12.5
+
+- **VERIFIZIERT (Gerät):** QueueableSource-Erzeugung benötigt 0 ms; `ChipAudio.playMusic` benötigt beim Trainerkampf 160 ms und bei anderen Songwechseln 52–180 ms.
+- Für `audio.worker_push` erschien kein Ereignis. Das kann entweder synchronen Fallback oder eine im love.js-Build nicht über die erwartete Registry-Tabelle erreichbare Channel-Methode bedeuten; der Workerstatus war im r22-Bericht noch nicht enthalten.
+- r23 ergänzt `worker=<sync|starting|interp|jit|none>` aus Gen1Recomps eigener `ChipAudio.stats()`-Schnittstelle und zählt Adapter-Aufrufe sowie tatsächlich ausgeführte 60-Hz-Übergangsschritte.
+- Damit entscheidet ein letzter gezielter Datensatz zwischen synchroner PCM-Erzeugung, Worker-Übergabe und fehlerhafter Transition-Taktung. **BENCHMARK ERFORDERLICH**.
 
 ## Iteration 0.12.4
 
