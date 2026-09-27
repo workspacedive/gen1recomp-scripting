@@ -1,5 +1,5 @@
 export const APP = {
-  version: '0.12.5',
+  version: '0.12.6',
   storageSchema: 1,
   librarySchema: 1,
   capabilitySchema: 3,

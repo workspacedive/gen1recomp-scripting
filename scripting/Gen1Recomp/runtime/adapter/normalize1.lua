@@ -204,7 +204,19 @@ do
 
   local function instrumentModule(moduleName, module)
     if type(module) ~= "table" or module.__hostProfiled then return module end
-    if moduleName == "src.battle.BattleState" then
+    if moduleName == "src.core.ChipSynth" then
+      -- love.thread is unavailable on the measured love.js device path, so
+      -- ChipAudio synthesizes buffers on the render thread. 8192-sample
+      -- buffers cost 35-50 ms each; the four-buffer song preroll therefore
+      -- blocks 140-200 ms before every transition. Smaller buffers preserve
+      -- sample rate and PCM output while amortizing the same work below one
+      -- display-frame budget on the measured device.
+      if type(module.MUSIC_BUFFER_SAMPLES) == "number"
+          and module.MUSIC_BUFFER_SAMPLES > 2048 then
+        module.MUSIC_BUFFER_SAMPLES = 2048
+      end
+      module.__hostProfiled = true
+    elseif moduleName == "src.battle.BattleState" then
       module.__hostProfiled = true
       timedMethod(module, "newWild", "battle.construct", "wild")
       timedMethod(module, "newTrainer", "battle.construct", "trainer")

@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-27 · App-Version `0.12.5`
+Stand: 2026-09-27 · App-Version `0.12.6`
+
+## Iteration 0.12.6
+
+- **VERIFIZIERT (Gerät):** Gen1Recomps eigene Diagnose meldet `worker=sync`. love.thread steht dem Musikpfad unter love.js nicht funktionsfähig zur Verfügung; jeder Songwechsel erzeugt PCM auf dem Renderthread.
+- **VERIFIZIERT (Gerät):** QueueableSource kostet 0 ms, während vier initiale 8192-Sample-Puffer zusammen 141–203 ms blockieren. Beim Trainerkampf wurden 164 ms gemessen.
+- r24 reduziert ausschließlich die ChipSynth-Musikpuffer-Granularität von 8192 auf 2048 Samples. Sample-Rate, PCM-Synthese, Musiktempo, Kanäle und Queue-Anzahl bleiben unverändert.
+- Erwartung: Initialer Vier-Puffer-Block ungefähr 35–50 ms statt 141–203 ms; laufende Synthesearbeit wird in ungefähr 9–13-ms-Einheiten amortisiert statt 35–50-ms-Einheiten. **NICHT VERIFIZIERT (Gerät)**.
+- Der r23-Übergang führte exakt 216 Adapter-Schritte aus; 128 Aufrufe benötigten 5402 ms. Der synchrone Audio-Queue-Aufbau während dieser Phase ist damit der nächste nachgewiesene Störfaktor.
 
 ## Iteration 0.12.5
 

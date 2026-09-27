@@ -16,6 +16,7 @@ test('Lua 5.2 hexadecimal escapes are normalized before Gen1Recomp modules compi
   const script = `
 loadstring = loadstring or load
 local fixture = [=[return "\\xc3\\x97", "\\\\xc3"]=]
+local chipSynthFixture = [=[return { MUSIC_BUFFER_SAMPLES = 8192 }]=]
 local transitionFixture = [=[
 local M = {}
 function M.new(game, done)
@@ -29,10 +30,12 @@ return M
 ]=]
 _lfs_getInfo = function(path, kind)
   if kind == "file" and (path == "src/ui/ListMenu.lua"
+      or path == "src/core/ChipSynth.lua"
       or path == "src/render/BattleTransition.lua") then return { type = "file" } end
 end
 _lfs_read = function(path)
   if path == "src/ui/ListMenu.lua" then return fixture end
+  if path == "src/core/ChipSynth.lua" then return chipSynthFixture end
   if path == "src/render/BattleTransition.lua" then return transitionFixture end
 end
 local now, lines = 0, {}
@@ -45,6 +48,8 @@ local chunk = assert(package.loaders[2]("src.ui.ListMenu"))
 local times, escaped = chunk()
 assert(times == string.char(195, 151), "normalized bytes")
 assert(escaped == string.char(92) .. "xc3", "escaped literal")
+local chipSynth = assert(package.loaders[2]("src.core.ChipSynth"))()
+assert(chipSynth.MUSIC_BUFFER_SAMPLES == 2048, "sync PCM work is frame-sized")
 local transition = assert(package.loaders[2]("src.render.BattleTransition"))()
 local game = { logicSpeed = function() return 1 end }
 local state = transition.new(game, function() end, {})
