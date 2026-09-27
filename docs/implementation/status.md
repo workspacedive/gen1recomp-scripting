@@ -1,6 +1,16 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-26 · App-Version `0.11.3`
+Stand: 2026-09-26 · App-Version `0.12.0`
+
+## Iteration 0.12.0
+
+- **VERIFIZIERT (Gerät):** r17 startet Spiel, Karte, Steuerung und Audio ohne den bisherigen Music-Absturz.
+- **VERIFIZIERT (Gerät):** In-Game-Speichern meldet Erfolg, aber nach vollständigem Neustart fehlt `CONTINUE`.
+- **VERIFIZIERT (Quellprüfung):** Gen1Recomp schreibt korrekt in love.filesystems VFS; love.js persistiert `/home/web_user` per IDBFS. Der Host verwendete jedoch einen ephemeren WKWebView-Datenspeicher, und der offizielle Exit-Sync ist asynchron und beim Prozessende nicht zuverlässig.
+- r18 verwendet `ephemeral: false` und synchronisiert love.js-IDBFS nach Runtime-Start alle 750 ms sowie bei Hintergrund-/Seitenende. Überlappende Syncs werden serialisiert.
+- **BENCHMARK ERFORDERLICH:** langsame Trainer-/Wildkampfstarts. Keine spekulative Performanceänderung ohne Messung.
+- **NICHT VERIFIZIERT:** Die genaue fehlerhafte Pokéball-Anzahl-Glyphenfolge in Gelbs Eich-Demo; statisch ist die Menge numerisch `1`, die Darstellung zeichnet `×` plus Zahl.
+- Detailprüfung: [`conformance-audit-0.12.0.md`](../architecture/conformance-audit-0.12.0.md).
 
 ## Iteration 0.11.3
 

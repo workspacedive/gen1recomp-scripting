@@ -174,7 +174,10 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   const runtimeErrorPath = `${PATHS.diagnostics}/${options.probe}-runtime-error.v1.json`
   await removeIfExists(runtimeErrorPath)
   const startedAt = new Date().toISOString()
-  const controller = new WebViewController({ ephemeral: true })
+  // Gameplay saves live in love.js' IDBFS mount. A non-ephemeral WKWebView
+  // data store is required for that IndexedDB database to survive disposal,
+  // app termination, and the next launch.
+  const controller = new WebViewController({ ephemeral: false })
   const milestones: string[] = []
   let stage: LoveJsBootReport["stage"] = "load-file"
   const stageOrder: LoveJsBootReport["stage"][] = [

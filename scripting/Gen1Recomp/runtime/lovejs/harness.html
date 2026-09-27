@@ -160,14 +160,46 @@
 
   var canvas = document.getElementById('canvas');
   var spinner = document.getElementById('spinner');
-  new MutationObserver(function () {
-    if (spinner.className === '') bridge.terminal('runtime.ready', 'Module.postrun reached', {
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-      indexedDB: typeof indexedDB !== 'undefined',
-      webAssembly: typeof WebAssembly !== 'undefined',
-      playerUri: window.Player && typeof window.Player.uri === 'string' ? window.Player.uri : ''
+  var fsSyncBusy = false;
+  var fsSyncAgain = false;
+  var fsSyncTimer = null;
+  function syncRuntimeFilesystem() {
+    var module = window.Module;
+    if (!module || !module.FS || typeof module.FS.syncfs !== 'function') return;
+    if (fsSyncBusy) { fsSyncAgain = true; return; }
+    fsSyncBusy = true;
+    module.FS.syncfs(false, function (error) {
+      fsSyncBusy = false;
+      if (error) console.error('IDBFS save sync failed', error);
+      if (fsSyncAgain) {
+        fsSyncAgain = false;
+        syncRuntimeFilesystem();
+      }
     });
+  }
+  function startRuntimeFilesystemSync() {
+    if (fsSyncTimer !== null) return;
+    // Gen1Recomp confirms the in-memory love.filesystem write immediately.
+    // Flush shortly afterwards so an iOS process kill cannot discard it.
+    fsSyncTimer = setInterval(syncRuntimeFilesystem, 750);
+    syncRuntimeFilesystem();
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') syncRuntimeFilesystem();
+  });
+  window.addEventListener('pagehide', syncRuntimeFilesystem);
+
+  new MutationObserver(function () {
+    if (spinner.className === '') {
+      startRuntimeFilesystemSync();
+      bridge.terminal('runtime.ready', 'Module.postrun reached', {
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        indexedDB: typeof indexedDB !== 'undefined',
+        webAssembly: typeof WebAssembly !== 'undefined',
+        playerUri: window.Player && typeof window.Player.uri === 'string' ? window.Player.uri : ''
+      });
+    }
     if (spinner.className === 'error') bridge.terminal('runtime.error', 'player error state');
   }).observe(spinner, { attributes: true, attributeFilter: ['class'] });
 
