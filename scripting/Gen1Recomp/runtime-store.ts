@@ -173,7 +173,7 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   const finalPath = `${PATHS.diagnostics}/${options.finalName}`
   const progressPath = `${PATHS.diagnostics}/${options.progressName}`
   const runtimeErrorPath = `${PATHS.diagnostics}/${options.probe}-runtime-error.v1.json`
-  const profilePath = `${PATHS.diagnostics}/battle-profile.v1.json`
+  const profilePath = `${PATHS.diagnostics}/runtime-performance-profile.v1.json`
   await removeIfExists(runtimeErrorPath)
   if (options.probe === "gen1recomp-gameplay") await removeIfExists(profilePath)
   const startedAt = new Date().toISOString()

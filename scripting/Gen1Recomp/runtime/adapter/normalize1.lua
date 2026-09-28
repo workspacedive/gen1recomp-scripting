@@ -688,3 +688,41 @@ do
     end
   end
 end
+
+-- Bounded, mod-agnostic frame pacing telemetry. love.timer.step is the
+-- engine's authoritative wall-clock delta once per presented frame, so this
+-- measures the exact input the fixed-step loop receives without wrapping any
+-- particular mod or changing timing. One aggregate line every five seconds
+-- avoids per-frame bridge traffic and records tail latency plus Lua heap size.
+do
+  local timer = love and love.timer
+  local nativeStep = timer and timer.step
+  if type(nativeStep) == "function" then
+    local frames, total, maximum = 0, 0, 0
+    local over33, over50, over100, over250 = 0, 0, 0, 0
+    timer.step = function(...)
+      local dt = nativeStep(...)
+      if type(dt) == "number" and dt >= 0 and dt == dt then
+        frames = frames + 1
+        total = total + dt
+        if dt > maximum then maximum = dt end
+        if dt >= 0.033 then over33 = over33 + 1 end
+        if dt >= 0.050 then over50 = over50 + 1 end
+        if dt >= 0.100 then over100 = over100 + 1 end
+        if dt >= 0.250 then over250 = over250 + 1 end
+      end
+      if total >= 5 and frames > 0 then
+        local heap = 0
+        local ok, measured = pcall(collectgarbage, "count")
+        if ok and type(measured) == "number" then heap = measured end
+        print(string.format(
+          "[gen1-profile] phase=frame.window frames=%d avg_ms=%.3f max_ms=%.3f over33=%d over50=%d over100=%d over250=%d heap_kb=%.0f",
+          frames, total * 1000 / frames, maximum * 1000,
+          over33, over50, over100, over250, heap))
+        frames, total, maximum = 0, 0, 0
+        over33, over50, over100, over250 = 0, 0, 0, 0
+      end
+      return dt
+    end
+  end
+end

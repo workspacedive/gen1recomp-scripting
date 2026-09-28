@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.12`
+Stand: 2026-09-28 · App-Version `0.13.13`
+
+## Iteration 0.13.13
+
+- r34 ergänzt ausschließlich eine begrenzte, modunabhängige Messung an `love.timer.step`, also an genau dem Wall-Clock-Delta, das Gen1Recomps FixedStep pro dargestelltem Frame erhält. Alle fünf Sekunden werden Framezahl, Mittel-/Maximaldelta, Schwellenzähler ab 33/50/100/250 ms sowie der Lua-Heap in KiB als `[gen1-profile] phase=frame.window` ausgegeben.
+- Das Host-Bridge-Profil heißt jetzt allgemein `runtime-performance-profile.v1.json`, bleibt auf höchstens 100 Zeilen begrenzt und wird koalesziert erst zwei Sekunden nach einem Ereignisburst in den sichtbaren Diagnostics-Ordner geschrieben. Die Messung verändert weder FixedStep, GC-Parameter noch Mod-Budgets.
+- Diese Iteration behauptet bewusst **keine** Performanceverbesserung. Sie trennt zunächst dauerhaft niedrige Framerate, einzelne lange Stalls, FixedStep-Clamps und Heapwachstum auf dem realen Gerät. Adaptive GC-, Scheduler- oder GPU-Änderungen bleiben bis zu diesen Daten **BENCHMARK ERFORDERLICH**.
+- Der bestehende r33-LegacyCompat-Grafikpfad, Readable-Depth-Guard, Alert-Unterdrückung und vollständige Konsolendiagnostik bleiben erhalten.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `a38fa1cf2df0747d9a3613fb9be2ead374abbe2cbfc443a9f9eaffc04935fbf8`; Geräteprofil **BENCHMARK ERFORDERLICH**.
 
 ## Iteration 0.13.12
 
