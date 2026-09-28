@@ -596,18 +596,27 @@ do
   local graphics = love.graphics
   local nativeNewShader = graphics and graphics.newShader
   local nativeNewCanvas = graphics and graphics.newCanvas
-  local canvasFormats = nil
+  local canvasFormats = { readable = nil, nonreadable = nil }
   if graphics and graphics.getCanvasFormats then
-    local ok, reported = pcall(graphics.getCanvasFormats)
-    if ok and type(reported) == "table" then canvasFormats = reported end
+    local readableOK, readable = pcall(graphics.getCanvasFormats, true)
+    if readableOK and type(readable) == "table" then
+      canvasFormats.readable = readable
+    end
+    local nonreadableOK, nonreadable = pcall(graphics.getCanvasFormats, false)
+    if nonreadableOK and type(nonreadable) == "table" then
+      canvasFormats.nonreadable = nonreadable
+    end
   end
-  if nativeNewCanvas and canvasFormats then
+  if nativeNewCanvas then
     graphics.newCanvas = function(...)
       local settings = select(3, ...)
       local format = type(settings) == "table" and settings.format or nil
-      if type(format) == "string" and canvasFormats[format] == false then
-        print("[gen1-graphics] skipped unsupported Canvas format: " .. format)
-        error("The " .. format .. " Canvas format is not supported by your graphics drivers.", 2)
+      local wantsReadable = type(settings) == "table" and settings.readable == true
+      local formats = wantsReadable and canvasFormats.readable or canvasFormats.nonreadable
+      if type(format) == "string" and formats and formats[format] == false then
+        local kind = wantsReadable and "readable " or ""
+        print("[gen1-graphics] skipped unsupported " .. kind .. "Canvas format: " .. format)
+        error("The " .. format .. " " .. kind .. "Canvas format is not supported by your graphics drivers.", 2)
       end
       return nativeNewCanvas(...)
     end

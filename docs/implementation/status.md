@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.9`
+Stand: 2026-09-28 · App-Version `0.13.10`
+
+## Iteration 0.13.10
+
+- Der r30-Gerätelog zeigt weiterhin denselben `depth24 readable canvas`-Alert. Ursache der unvollständigen Vorprüfung: LÖVE 11.x unterscheidet offiziell `getCanvasFormats(true)` für lesbare und `getCanvasFormats(false)` für nicht lesbare Canvases. r30 hatte nur die nicht-lesbare/default Capability-Tabelle ausgewertet; dort ist `depth24` korrekt unterstützt, während genau die explizit lesbare Variante auf WebGL abgelehnt wird.
+- r31 erfasst beide offiziellen Capability-Tabellen getrennt und wählt sie anhand von `settings.readable == true`. Damit wird nur PotatoVoxels tatsächlich abgelehnte lesbare Probe als Lua-Fehler behandelt; dasselbe `depth24` bleibt für den vorgesehenen internen/nicht-lesbaren Tiefenpuffer verfügbar.
+- Diese Unterscheidung ist lokal durch eine Regression abgedeckt, die denselben Formatnamen lesbar ablehnt und nicht lesbar bis zum nativen Konstruktor durchlässt.
+- VOXEL-/3D-BTL-Ausgabe bleibt bis zum r31-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `411e124e71bc0e94bb402fd578f7e0ec516bbe18bbff6dc8b94c91e2d56d1f09`.
 
 ## Iteration 0.13.9
 

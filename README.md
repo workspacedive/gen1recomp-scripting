@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.13.9 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r30. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. Importierte Mods werden über das offizielle `mods/<id>/`-Layout laufzeitsichtbar. Der r29-Gerätelog identifiziert PotatoVoxels nächste Grafikgrenze: love.js behandelt die absichtliche Probe eines vom Treiber abgelehnten lesbaren `depth24`-Canvas bereits vor Lua-`pcall` als fatal. r30 lässt ausdrücklich nicht unterstützte Formate als normalen Lua-Fehler in den vorhandenen internen Depth-Buffer-Fallback laufen und bildet den entfernten GBCFX-Clear schmal auf ShaderFX ab. Vollständige 3D-Ausgabe bleibt bis zum r30-Gerätetest **TEILWEISE VERIFIZIERT**.
+> **Ehrlicher Status:** Die Scripting-App 0.13.10 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r31. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. Importierte Mods werden über das offizielle `mods/<id>/`-Layout laufzeitsichtbar. Der r30-Gerätelog präzisiert PotatoVoxels Grafikgrenze: `depth24` wird als nicht lesbarer Tiefenpuffer unterstützt, aber nicht als lesbare Shader-Textur. r31 wertet LÖVEs offizielle lesbare und nicht lesbare Canvas-Capability getrennt aus, damit die abgelehnte Probe sauber in PotatoVoxels internen Depth-Buffer-Fallback läuft. Vollständige 3D-Ausgabe bleibt bis zum r31-Gerätetest **TEILWEISE VERIFIZIERT**.
 
 ## Warum kein schneller Rewrite?
 

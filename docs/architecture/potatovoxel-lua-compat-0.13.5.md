@@ -49,6 +49,10 @@ r30 fragt LÖVEs eigene `love.graphics.getCanvasFormats()`-Tabelle einmal ab. Nu
 
 Derselbe Log belegt außerdem, dass PotatoVoxel noch `src.render.GBCFX.setLevel(0)` zum Abschalten eines konkurrierenden Effekts verwendet. Gen1Recomp 0.3.20 hat GBCFX offiziell entfernt und durch ShaderFX ersetzt. r30 stellt deshalb ausschließlich diese schmale Clear-Operation bereit: `setLevel(0)` deaktiviert die aktuelle ShaderFX-Kette. Nicht-null GBCFX-Stufen oder der entfernte Effekt werden nicht emuliert.
 
+## r31: lesbare und nicht lesbare Capability getrennt
+
+Der r30-Gerätetest korrigiert eine Annahme der ersten Vorprüfung: LÖVE 11 bietet zwei offizielle Varianten, `getCanvasFormats(true)` und `getCanvasFormats(false)`. Auf dem Gerät ist `depth24` als nicht lesbarer Render-Tiefenpuffer unterstützt, aber nicht als lesbare Shader-Textur. r31 speichert beide Tabellen und prüft exakt gegen `settings.readable`. Diese Trennung verhindert den love.js-Alert, ohne den unterstützten internen Depth-Buffer-Fallback versehentlich ebenfalls zu sperren.
+
 ## Evidenzstatus
 
 - Ursachenanalyse und Parser-Reproduktion: **VERIFIZIERT**.

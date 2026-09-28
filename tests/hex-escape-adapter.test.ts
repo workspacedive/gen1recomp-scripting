@@ -45,7 +45,9 @@ package.preload["src.render.ShaderFX"] = function()
   return { deactivate = function() shaderFxDeactivated = true end }
 end
 love = { graphics = {
-  getCanvasFormats = function() return { depth24 = false, rgba8 = true } end,
+  getCanvasFormats = function(readable)
+    return { depth24 = not readable, rgba8 = true }
+  end,
   newCanvas = function(...) canvasCalls = canvasCalls + 1 return { args = {...} } end,
   newShader = function(source)
     if source == "bad" then error("shader compiler fixture") end
@@ -55,12 +57,14 @@ love = { graphics = {
 ${shim}
 local ok, message = pcall(love.graphics.newCanvas, 64, 64,
   { format = "depth24", readable = true })
-assert(not ok and message:match("depth24 Canvas format"), "unsupported format is a Lua error")
-assert(canvasCalls == 0, "unsupported format never enters native newCanvas")
+assert(not ok and message:match("depth24 readable Canvas format"), "unsupported format is a Lua error")
+assert(canvasCalls == 0, "unsupported readable format never enters native newCanvas")
+assert(love.graphics.newCanvas(64, 64, { format = "depth24", readable = false }))
+assert(canvasCalls == 1, "same non-readable depth format reaches native newCanvas")
 assert(love.graphics.newCanvas(64, 64, { format = "rgba8" }))
-assert(canvasCalls == 1, "supported format reaches native newCanvas")
+assert(canvasCalls == 2, "supported format reaches native newCanvas")
 assert(love.graphics.newCanvas(64, 64))
-assert(canvasCalls == 2, "default Canvas reaches native newCanvas")
+assert(canvasCalls == 3, "default Canvas reaches native newCanvas")
 local shaderOK, shaderMessage = pcall(love.graphics.newShader, "bad")
 assert(not shaderOK and shaderMessage:match("shader compiler fixture"), "shader failure is preserved")
 local GBCFX = require("src.render.GBCFX")
