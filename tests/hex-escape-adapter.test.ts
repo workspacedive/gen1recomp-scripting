@@ -72,7 +72,11 @@ assert(not shaderOK and shaderMessage:match("shader compiler fixture"), "shader 
 local GBCFX = require("src.render.GBCFX")
 assert(GBCFX.setLevel(0) == 0 and shaderFxDeactivated,
   "removed GBCFX clear maps narrowly to ShaderFX deactivate")
-assert(#lines == 2, "bounded graphics diagnostics cover Canvas and shader failures")
+local graphicsLines = 0
+for _, line in ipairs(lines) do
+  if line:match("^%[gen1%-graphics%]") then graphicsLines = graphicsLines + 1 end
+end
+assert(graphicsLines == 2, "bounded graphics diagnostics cover Canvas and shader failures")
 `
   const state = lauxlib.luaL_newstate()
   lualib.luaL_openlibs(state)

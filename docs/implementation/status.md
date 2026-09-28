@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.15`
+Stand: 2026-09-28 · App-Version `0.13.16`
+
+## Iteration 0.13.16
+
+- **VERIFIZIERT (Gerät):** r36 trennt den Engpass eindeutig: In den schlechtesten Fünf-Sekunden-Fenstern verbringt `Game.update` 4,75–4,81 s, `Game.draw` dagegen nur 47–66 ms. Einzelne Updates dauern bis 671 ms; parallel wächst der Lua-Heap von etwa 16 MiB über 182 MiB auf 214 MiB. Danach fällt er auf 139 MiB und steigt erneut auf 193 MiB. Das ist ein update-/allokationslastiger CPU-Pfad mit späten großen GC-Zyklen, kein primärer Draw-/GPU-Engpass.
+- Die Daten passen zur bereits statisch belegten FFI-losen Tabellen-Meshing-Strecke von PotatoVoxel 1.5.8, beweisen aber noch nicht, welcher Anteil innerhalb eines Updates auf Meshing, Mesh-Upload und GC entfällt. Diese feinere Zuordnung bleibt **TEILWEISE VERIFIZIERT**.
+- r37 ist ein allgemeiner A/B-Kandidat für früheres Lua-GC-Pacing: `setpause` wird von PUC Lua 5.1s Default 200 auf 120 gesetzt, während `stepmul` unverändert bleibt. Dadurch beginnt ein neuer Zyklus früher; es wird weder eine Vollsammlung pro Frame noch ein Modbudget oder eine Mod-ID verändert. Ob geringere Heapspitzen die Maximal-Updates verbessern oder zusätzliche kontinuierliche CPU-Arbeit die Framerate verschlechtert, ist **BENCHMARK ERFORDERLICH**.
+- Das Profil protokolliert die aktive GC-Konfiguration als `phase=gc.config`; Browser-, Update-/Draw- und Heapmessung bleiben aktiv.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `9fc2873c05c83e4760fe1106bdda6819455f93945bb539b435d3d40455ed07b8`.
 
 ## Iteration 0.13.15
 

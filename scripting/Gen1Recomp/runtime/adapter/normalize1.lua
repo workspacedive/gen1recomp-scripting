@@ -777,3 +777,19 @@ do
     end
   end
 end
+
+-- Device profiling showed allocation-heavy update windows growing the Lua heap
+-- from roughly 16 MiB beyond 200 MiB before a later collection. PUC Lua 5.1's
+-- default pause of 200 permits the heap to double relative to the previous
+-- cycle. Start the next cycle earlier while retaining the collector's default
+-- work multiplier; this is a general GC pacing candidate, not a mod-specific
+-- allocation or scheduler patch. Device A/B results remain authoritative.
+do
+  local ok, previous = pcall(collectgarbage, "setpause", 120)
+  if ok then
+    print("[gen1-profile] phase=gc.config pause=120 previous_pause=" .. tostring(previous)
+      .. " stepmul=unchanged")
+  else
+    print("[gen1-profile] phase=gc.config unsupported=true")
+  end
+end
