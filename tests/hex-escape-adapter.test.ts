@@ -45,8 +45,10 @@ package.preload["src.render.ShaderFX"] = function()
   return { deactivate = function() shaderFxDeactivated = true end }
 end
 love = { graphics = {
-  getCanvasFormats = function(readable)
-    return { depth24 = not readable, rgba8 = true }
+  -- Reproduce pinned love.js: it reports readable depth24 as supported even
+  -- though native newCanvas raises the fatal browser alert for that request.
+  getCanvasFormats = function()
+    return { depth24 = true, rgba8 = true }
   end,
   newCanvas = function(...) canvasCalls = canvasCalls + 1 return { args = {...} } end,
   newShader = function(source)

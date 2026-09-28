@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.10`
+Stand: 2026-09-28 · App-Version `0.13.11`
+
+## Iteration 0.13.11
+
+- Der r31-Gerätelog zeigt weiterhin den nativen `depth24 readable canvas`-Alert und enthält nicht die Adaptermeldung für ein übersprungenes Format. Damit ist belegt, dass das gepinnte love.js `getCanvasFormats(true)` für diesen Fall positiv meldet, während sein nativer `newCanvas(..., { readable = true })` unmittelbar danach fatal scheitert.
+- r32 behandelt im love.js-spezifischen Adapter explizit lesbare Depth-/Stencil-Canvases konservativ als nicht verfügbar. Nicht lesbare Depth-/Stencil-Canvases bleiben zugelassen, sodass PotatoVoxels vorgesehener interner Depth-Buffer-Fallback erhalten bleibt. Es wird keine Capability erfunden; lediglich die nachweislich falsche positive Web-Abfrage wird fail-closed korrigiert.
+- Der LuaJIT-Wunsch wurde gegen den offiziellen LuaJIT-Quellstand `c6ffc141a8762b41703f9287d63d93622a13dd8f` untersucht. Es existiert dort kein WASM-Ziel; ein Sidecar könnte LÖVEs bestehenden `lua_State` und Userdata nicht übernehmen. Ein echter Einsatz erfordert einen separat neu gebauten love.js/LÖVE-Runtimekandidaten und ist **EXPERIMENTELL / BENCHMARK ERFORDERLICH**. Dokumentation: `docs/architecture/luajit-web-runtime-assessment-0.13.11.md`.
+- VOXEL-/3D-BTL-Ausgabe bleibt bis zum r32-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `f7756de6bdd92cde019d94ed87d4f28fc9c77f74caa6921fb4b1fdefd6515ae8`.
 
 ## Iteration 0.13.10
 

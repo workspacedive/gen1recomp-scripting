@@ -53,6 +53,10 @@ Derselbe Log belegt außerdem, dass PotatoVoxel noch `src.render.GBCFX.setLevel(
 
 Der r30-Gerätetest korrigiert eine Annahme der ersten Vorprüfung: LÖVE 11 bietet zwei offizielle Varianten, `getCanvasFormats(true)` und `getCanvasFormats(false)`. Auf dem Gerät ist `depth24` als nicht lesbarer Render-Tiefenpuffer unterstützt, aber nicht als lesbare Shader-Textur. r31 speichert beide Tabellen und prüft exakt gegen `settings.readable`. Diese Trennung verhindert den love.js-Alert, ohne den unterstützten internen Depth-Buffer-Fallback versehentlich ebenfalls zu sperren.
 
+## r32: fail-closed für lesbare Web-Depth-Targets
+
+Der r31-Gerätelog enthält erneut den nativen Alert, aber nicht die unmittelbar davor erwartete Adaptermeldung. Die lesbare Capability-Tabelle des gepinnten love.js liefert somit ein falsches Positiv. Da ein nativer Test selbst den nicht abfangbaren Alert auslöst, behandelt der love.js-spezifische Adapter explizit lesbare Depth-/Stencil-Formate konservativ als nicht verfügbar. Das betrifft nicht `depth = true` oder explizit nicht lesbare Depth-Canvases; PotatoVoxels dokumentierter interner Fallback bleibt nutzbar. Lesbare Wasserreflexionen werden auf diesem Webpfad nicht vorgetäuscht.
+
 ## Evidenzstatus
 
 - Ursachenanalyse und Parser-Reproduktion: **VERIFIZIERT**.

@@ -613,7 +613,16 @@ do
       local format = type(settings) == "table" and settings.format or nil
       local wantsReadable = type(settings) == "table" and settings.readable == true
       local formats = wantsReadable and canvasFormats.readable or canvasFormats.nonreadable
-      if type(format) == "string" and formats and formats[format] == false then
+      local depthOrStencil = type(format) == "string"
+        and (format:match("^depth") ~= nil or format:match("stencil") ~= nil)
+      -- This pinned love.js build reports readable depth formats as supported
+      -- through getCanvasFormats(true), but its native newCanvas binding then
+      -- raises the device-observed fatal browser alert for the same request.
+      -- Fail closed for explicit readable depth/stencil probes in this web
+      -- adapter. Non-readable depth remains available for the normal fallback.
+      local unsafeWebReadableDepth = wantsReadable and depthOrStencil
+      if type(format) == "string"
+        and (unsafeWebReadableDepth or (formats and formats[format] == false)) then
         local kind = wantsReadable and "readable " or ""
         print("[gen1-graphics] skipped unsupported " .. kind .. "Canvas format: " .. format)
         error("The " .. format .. " " .. kind .. "Canvas format is not supported by your graphics drivers.", 2)
