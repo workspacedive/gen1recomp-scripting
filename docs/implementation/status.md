@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.16`
+Stand: 2026-09-28 · App-Version `0.13.17`
+
+## Iteration 0.13.17
+
+- **VERIFIZIERT (Geräte-A/B):** `setpause=120` verbessert r36s Engpass nicht. Der Heap erreicht mit r37 sogar 264 MiB statt zuvor 214 MiB; `Game.update` belegt weiterhin 4,73–4,80 s je Fünf-Sekunden-Fenster und Einzelupdates erreichen 679 ms. Die Zeitlupe beginnt zudem früher. Der Kandidat wird deshalb vollständig verworfen und r38 übernimmt wieder PUC Lua 5.1s unveränderte GC-Parameter.
+- Damit ist ein bloß früher gestarteter automatischer GC-Zyklus als Lösung **WIDERLEGT**. Die Hauptursache bleibt die allokations-/arbeitsintensive Update-Strecke selbst; zusätzliche GC-CPU-Arbeit beseitigt sie nicht.
+- r38 ergänzt zwei begrenzte, allgemeine Diagnosekanäle: aggregierte Zeit und Aufrufszahl von `love.graphics.newMesh` zur Trennung des nativen Mesh-Uploads von Lua-Arbeit sowie einen Update-only Instruction-Sampler alle 250.000 Lua-Instruktionen. Pro Fenster werden höchstens drei heiße Quellpfade ausgegeben. Der vorherige Debug-Hook wird nach jedem Update wiederhergestellt.
+- Diese Instrumentierung verändert weder Modbudgets noch FixedStep, Grafikqualität oder GC-Konfiguration. Die nächste Optimierung bleibt bis zur Mesh-/Hot-Source-Zuordnung **BENCHMARK ERFORDERLICH**.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `7e99752f4c134e22ce9cc0a9a7dccaa6589af70df70b7730619576ce4d6f61c6`.
 
 ## Iteration 0.13.16
 

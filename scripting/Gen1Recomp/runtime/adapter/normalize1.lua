@@ -538,6 +538,7 @@ end
 -- bootGame failure before returning to the frame loop. Preserve that original
 -- failure on the Game singleton so the following draw reports the actionable
 -- cause instead of masking it with a secondary nil StateStack error.
+local hostResourceProfile = { meshCalls = 0, meshTotal = 0, meshMaximum = 0 }
 do
   local originalRequire = require
   local unpackValues = table.unpack or unpack
@@ -554,6 +555,15 @@ do
       local phaseWindowStarted
       local updateStats = { calls = 0, total = 0, maximum = 0 }
       local drawStats = { calls = 0, total = 0, maximum = 0 }
+      local updateSamples = {}
+      local samplingAvailable = debug and type(debug.sethook) == "function"
+        and type(debug.getinfo) == "function"
+      local function sampleUpdate()
+        local info = debug.getinfo(2, "S")
+        local source = info and (info.short_src or info.source) or "unknown"
+        source = tostring(source):gsub("%s+", "_"):sub(1, 80)
+        updateSamples[source] = (updateSamples[source] or 0) + 1
+      end
       local function phaseClock()
         if love and love.timer and type(love.timer.getTime) == "function" then
           return love.timer.getTime()
@@ -575,15 +585,30 @@ do
         local heap = 0
         local ok, measured = pcall(collectgarbage, "count")
         if ok and type(measured) == "number" then heap = measured end
+        local ranked = {}
+        for source, count in pairs(updateSamples) do
+          ranked[#ranked + 1] = { source = source, count = count }
+        end
+        table.sort(ranked, function(a, b) return a.count > b.count end)
+        local hot = {}
+        for index = 1, math.min(3, #ranked) do
+          hot[#hot + 1] = ranked[index].source .. ":" .. ranked[index].count
+        end
         print(string.format(
-          "[gen1-profile] phase=runtime.phases window_ms=%.3f update_calls=%d update_total_ms=%.3f update_max_ms=%.3f draw_calls=%d draw_total_ms=%.3f draw_max_ms=%.3f heap_kb=%.0f",
+          "[gen1-profile] phase=runtime.phases window_ms=%.3f update_calls=%d update_total_ms=%.3f update_max_ms=%.3f draw_calls=%d draw_total_ms=%.3f draw_max_ms=%.3f mesh_calls=%d mesh_total_ms=%.3f mesh_max_ms=%.3f heap_kb=%.0f update_hot=%s",
           window * 1000,
           updateStats.calls, updateStats.total * 1000, updateStats.maximum * 1000,
           drawStats.calls, drawStats.total * 1000, drawStats.maximum * 1000,
-          heap))
+          hostResourceProfile.meshCalls, hostResourceProfile.meshTotal * 1000,
+          hostResourceProfile.meshMaximum * 1000, heap,
+          #hot > 0 and table.concat(hot, ",") or "none"))
         phaseWindowStarted = now
         resetPhase(updateStats)
         resetPhase(drawStats)
+        hostResourceProfile.meshCalls = 0
+        hostResourceProfile.meshTotal = 0
+        hostResourceProfile.meshMaximum = 0
+        updateSamples = {}
       end
       module.load = function(self, ...)
         local arguments = pack(...)
@@ -601,11 +626,24 @@ do
       if type(originalUpdate) == "function" then
         module.update = function(self, ...)
           local arguments = pack(...)
+          local previousHook, previousMask, previousCount
+          if samplingAvailable then
+            if type(debug.gethook) == "function" then
+              previousHook, previousMask, previousCount = debug.gethook()
+            end
+            debug.sethook(sampleUpdate, "", 250000)
+          end
           local started = phaseClock()
-          local results = pack(originalUpdate(self,
+          local results = pack(pcall(originalUpdate, self,
             unpackValues(arguments, 1, arguments.n)))
-          recordPhase(updateStats, phaseClock() - started)
-          return unpackValues(results, 1, results.n)
+          local finished = phaseClock()
+          if samplingAvailable then
+            if previousHook then debug.sethook(previousHook, previousMask, previousCount)
+            else debug.sethook() end
+          end
+          recordPhase(updateStats, finished - started)
+          if not results[1] then error(results[2], 0) end
+          return unpackValues(results, 2, results.n)
         end
       end
       module.draw = function(self, ...)
@@ -672,6 +710,7 @@ do
   local graphics = love.graphics
   local nativeNewShader = graphics and graphics.newShader
   local nativeNewCanvas = graphics and graphics.newCanvas
+  local nativeNewMesh = graphics and graphics.newMesh
   local canvasFormats = { readable = nil, nonreadable = nil }
   if graphics and graphics.getCanvasFormats then
     local readableOK, readable = pcall(graphics.getCanvasFormats, true)
@@ -681,6 +720,20 @@ do
     local nonreadableOK, nonreadable = pcall(graphics.getCanvasFormats, false)
     if nonreadableOK and type(nonreadable) == "table" then
       canvasFormats.nonreadable = nonreadable
+    end
+  end
+  if nativeNewMesh then
+    graphics.newMesh = function(...)
+      local clock = love.timer and love.timer.getTime or os.clock
+      local started = clock()
+      local mesh = nativeNewMesh(...)
+      local elapsed = clock() - started
+      hostResourceProfile.meshCalls = hostResourceProfile.meshCalls + 1
+      hostResourceProfile.meshTotal = hostResourceProfile.meshTotal + elapsed
+      if elapsed > hostResourceProfile.meshMaximum then
+        hostResourceProfile.meshMaximum = elapsed
+      end
+      return mesh
     end
   end
   if nativeNewCanvas then
@@ -778,18 +831,3 @@ do
   end
 end
 
--- Device profiling showed allocation-heavy update windows growing the Lua heap
--- from roughly 16 MiB beyond 200 MiB before a later collection. PUC Lua 5.1's
--- default pause of 200 permits the heap to double relative to the previous
--- cycle. Start the next cycle earlier while retaining the collector's default
--- work multiplier; this is a general GC pacing candidate, not a mod-specific
--- allocation or scheduler patch. Device A/B results remain authoritative.
-do
-  local ok, previous = pcall(collectgarbage, "setpause", 120)
-  if ok then
-    print("[gen1-profile] phase=gc.config pause=120 previous_pause=" .. tostring(previous)
-      .. " stepmul=unchanged")
-  else
-    print("[gen1-profile] phase=gc.config unsupported=true")
-  end
-end
