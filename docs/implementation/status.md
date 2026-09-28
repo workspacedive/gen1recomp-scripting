@@ -7,7 +7,9 @@ Stand: 2026-09-28 · App-Version `0.13.12`
 - r32 zeigte unverändert denselben nativen Alert. Da die r32-Guard-Meldung fehlt, erreicht PotatoVoxel in seiner Legacy-Sandbox nicht zuverlässig die später ersetzte globale `love.graphics.newCanvas`-Funktion.
 - r33 installiert denselben konservativen Readable-Depth-Guard zusätzlich an Gen1Recomps offiziellem `LegacyCompat.new()`-/`Sandbox.loveFacade`-Override. Das ist die exakte API-Grenze, die der Mod sieht; die echte Grafikmodultabelle bleibt lesend erreichbar, während nur `newCanvas` für explizit lesbare Depth-/Stencil-Ziele vor der nativen love.js-Bindung abgefangen wird.
 - Eine Regression erzeugt einen isolierten LegacyCompat-Shim und belegt: lesbares `depth24` erreicht den nativen Konstruktor nicht, nicht lesbares `depth24` dagegen schon. Paketshim-/Modulcache-Isolation bleibt separat geprüft.
-- VOXEL-/3D-BTL-Ausgabe bleibt bis zum r33-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- **VERIFIZIERT (Gerät):** r33 passiert die lesbaren Depth-Proben an der Legacy-Sandbox-Grenze; PotatoVoxel-VOXEL und 3D-BTL funktionieren.
+- Der verbleibende zeitweise Slow-Motion-Effekt korreliert mit PotatoVoxel 1.5.8s deaktiviertem Meshcache (`cache rejected: unavailable`, `0/446`): love.js stellt kein LuaJIT-`ffi` bereit, daher nutzt diese Modversion den allokationsintensiven Lua-Tabellen-Mesher und baut Karten auf dem Hauptthread. Gen1Recomps FixedStep begrenzt extrem große Frame-Deltas auf 0,25 s; längere Mesh-/GC-Stalls können deshalb als Zeitlupe statt nur als unregelmäßige Frames erscheinen. Ursachenpfad: **TEILWEISE VERIFIZIERT**, Gerätebenchmark je Qualitätsmodus weiterhin **BENCHMARK ERFORDERLICH**.
+- Die offizielle PotatoVoxel-Version 1.9.6 hat laut geprüftem Tag den FFI-Pfad entfernt und implementiert Pure-Lua-Packing, scoped Cache und begrenzte Vorberechnung. Ein Update ist architektonisch sinnvoller als ein nicht vorhandener LuaJIT-WASM-Sidecar, bleibt auf diesem Host aber bis zum Gerätetest **TEILWEISE VERIFIZIERT**.
 - 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `f6603aad5d9270a63b491a07535481eb7668f1766954c956bb04ba044d25d4cd`.
 
 ## Iteration 0.13.11
