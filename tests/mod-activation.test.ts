@@ -14,6 +14,19 @@ test("gameplay exposes only a validated transient mod overlay through the resour
   assert.ok(ready > 0 && mark > ready, "runtime-visible state must follow a ready report")
 })
 
+test("prepared mod overlay cache is content-identified, bounded, and reverified", async () => {
+  const source = await readFile(new URL("mod-store.ts", root), "utf8")
+  assert.match(source, /prepared-overlay-v1/)
+  assert.match(source, /runtimeId: LOVEJS_RUNTIME\.id/)
+  assert.match(source, /adapterVersion: LOVEJS_RUNTIME\.adapterVersion/)
+  assert.match(source, /payloadSha256/)
+  assert.match(source, /Crypto\.sha256\(data\).*typed\.outputSha256/s)
+  assert.match(source, /status: "hit" \| "built" \| "bypassed"/)
+  assert.match(source, /removeIfExists\(PREPARED_OVERLAY_CURRENT\)/)
+  assert.match(source, /FileManager\.rename\(PREPARED_OVERLAY_TRANSACTION, PREPARED_OVERLAY_CURRENT\)/)
+  assert.match(source, /prepared-overlay-last\.v1\.json/)
+})
+
 test("multiple actions in each native List row use independent button hit handling", async () => {
   const source = await readFile(new URL("index.tsx", root), "utf8")
   for (const title of ["Spiel starten", "Aus Bibliothek entfernen", "Paket entfernen"]) {

@@ -2,12 +2,16 @@ import { PATHS } from "./host"
 import { extractZipEntry } from "./zip-extract"
 import { MOD_ARCHIVE_LIMITS, preflightModZip } from "./zip-preflight"
 import { appendZipOverlay, type ZipOverlayEntry } from "./zip-overlay"
+import { LOVEJS_RUNTIME } from "./runtime-manifest"
 
 const MODS_ROOT = PATHS.mods
 const INDEX_PATH = `${MODS_ROOT}/index.v1.json`
 const INDEX_TEMP = `${MODS_ROOT}/index.v1.json.new`
 const INDEX_BACKUP = `${MODS_ROOT}/index.v1.json.bak`
 const TRANSACTION = `${PATHS.transactions}/mod-import-pending`
+const PREPARED_OVERLAY_ROOT = `${PATHS.cache}/prepared-overlay-v1`
+const PREPARED_OVERLAY_CURRENT = `${PREPARED_OVERLAY_ROOT}/current`
+const PREPARED_OVERLAY_TRANSACTION = `${PATHS.transactions}/prepared-overlay-v1`
 
 export interface InstalledMod {
   id: string
@@ -29,6 +33,19 @@ interface ModIndex { schemaVersion: 2; mods: InstalledMod[] }
 export interface RuntimeModOverlay {
   data: ScriptingData
   modIds: string[]
+  cacheStatus?: "hit" | "built" | "bypassed"
+}
+
+interface PreparedOverlayManifest {
+  schemaVersion: 1
+  runtimeId: string
+  adapterVersion: number
+  payloadSha256: string
+  mods: Array<{ id: string; version: string; sha256: string }>
+  outputSha256: string
+  outputBytes: number
+  createdAt: string
+  artifact: "game.love"
 }
 interface RawManifest {
   id?: unknown; name?: unknown; version?: unknown; api?: unknown
@@ -297,10 +314,73 @@ export async function setModEnabled(mod: InstalledMod, enabled: boolean): Promis
   await saveIndex(index)
 }
 
+function preparedManifestMatches(
+  value: unknown,
+  payloadSha256: string,
+  enabled: InstalledMod[],
+): value is PreparedOverlayManifest {
+  if (!value || typeof value !== "object") return false
+  const item = value as Partial<PreparedOverlayManifest>
+  if (item.schemaVersion !== 1 || item.runtimeId !== LOVEJS_RUNTIME.id
+      || item.adapterVersion !== LOVEJS_RUNTIME.adapterVersion
+      || item.payloadSha256 !== payloadSha256 || item.artifact !== "game.love"
+      || typeof item.outputSha256 !== "string" || !/^[0-9a-f]{64}$/.test(item.outputSha256)
+      || typeof item.outputBytes !== "number" || !Number.isInteger(item.outputBytes)
+      || item.outputBytes <= 0 || typeof item.createdAt !== "string"
+      || !Array.isArray(item.mods) || item.mods.length !== enabled.length) return false
+  return item.mods.every((mod, index) => mod.id === enabled[index].id
+    && mod.version === enabled[index].version && mod.sha256 === enabled[index].sha256)
+}
+
+async function recordPreparedOverlayDiagnostic(
+  status: "hit" | "built" | "bypassed",
+  started: number,
+  outputBytes: number,
+  modIds: string[],
+): Promise<void> {
+  try {
+    await ensureDirectory(PATHS.diagnostics)
+    await FileManager.writeAsString(`${PATHS.diagnostics}/prepared-overlay-last.v1.json`, JSON.stringify({
+      schemaVersion: 1,
+      recordedAt: new Date().toISOString(),
+      runtimeId: LOVEJS_RUNTIME.id,
+      status,
+      elapsedMs: Date.now() - started,
+      outputBytes,
+      modIds,
+    }, null, 2))
+  } catch { /* Cache diagnostics must never block gameplay. */ }
+}
+
 export async function prepareRuntimeModOverlay(payload: ScriptingData): Promise<RuntimeModOverlay> {
+  const started = Date.now()
   const index = await loadIndex()
+  // Stable ordering makes the cache identity deterministic without changing
+  // the runtime-visible mods/<id>/ paths or depending on import chronology.
   const enabled = index.mods.filter((mod) => mod.activation === "enabled")
-  if (enabled.length === 0) return { data: payload, modIds: [] }
+    .sort((left, right) => left.id.localeCompare(right.id))
+  if (enabled.length === 0) {
+    await recordPreparedOverlayDiagnostic("bypassed", started, payload.size, [])
+    return { data: payload, modIds: [], cacheStatus: "bypassed" }
+  }
+  const payloadSha256 = Crypto.sha256(payload).toHexString().toLowerCase()
+  const cachedManifestPath = `${PREPARED_OVERLAY_CURRENT}/manifest.json`
+  const cachedArtifactPath = `${PREPARED_OVERLAY_CURRENT}/game.love`
+  if (await exists(cachedManifestPath) && await exists(cachedArtifactPath)) {
+    try {
+      const manifest = JSON.parse(await FileManager.readAsString(cachedManifestPath)) as unknown
+      if (preparedManifestMatches(manifest, payloadSha256, enabled)) {
+        const typed = manifest as PreparedOverlayManifest
+        const data = await FileManager.readAsData(cachedArtifactPath)
+        if (data.size === typed.outputBytes
+            && Crypto.sha256(data).toHexString().toLowerCase() === typed.outputSha256) {
+          const modIds = enabled.map((mod) => mod.id)
+          await recordPreparedOverlayDiagnostic("hit", started, data.size, modIds)
+          return { data, modIds, cacheStatus: "hit" }
+        }
+      }
+    } catch { /* A cache miss rebuilds from immutable verified inputs below. */ }
+  }
   const overlay: ZipOverlayEntry[] = []
   let expandedBytes = 0
   for (const mod of enabled) {
@@ -343,14 +423,44 @@ export async function prepareRuntimeModOverlay(payload: ScriptingData): Promise<
   const payloadBytes = payload.toUint8Array()
   if (payloadBytes == null) throw new Error("Der geprüfte Payload konnte nicht binär gelesen werden.")
   const combined = appendZipOverlay(payloadBytes, overlay)
-  const temporary = `${PATHS.transactions}/gameplay-mod-overlay.love`
+  const modIds = enabled.map((mod) => mod.id)
   await ensureDirectory(PATHS.transactions)
-  await removeIfExists(temporary)
+  await ensureDirectory(PREPARED_OVERLAY_ROOT)
+  await removeIfExists(PREPARED_OVERLAY_TRANSACTION)
+  await ensureDirectory(PREPARED_OVERLAY_TRANSACTION)
   try {
-    await FileManager.writeAsBytes(temporary, combined)
-    return { data: await FileManager.readAsData(temporary), modIds: enabled.map((mod) => mod.id) }
-  } finally {
-    await removeIfExists(temporary)
+    const stagedArtifact = `${PREPARED_OVERLAY_TRANSACTION}/game.love`
+    await FileManager.writeAsBytes(stagedArtifact, combined)
+    const stagedData = await FileManager.readAsData(stagedArtifact)
+    const outputSha256 = Crypto.sha256(stagedData).toHexString().toLowerCase()
+    const manifest: PreparedOverlayManifest = {
+      schemaVersion: 1,
+      runtimeId: LOVEJS_RUNTIME.id,
+      adapterVersion: LOVEJS_RUNTIME.adapterVersion,
+      payloadSha256,
+      mods: enabled.map((mod) => ({ id: mod.id, version: mod.version, sha256: mod.sha256 })),
+      outputSha256,
+      outputBytes: stagedData.size,
+      createdAt: new Date().toISOString(),
+      artifact: "game.love",
+    }
+    await FileManager.writeAsString(`${PREPARED_OVERLAY_TRANSACTION}/manifest.json`,
+      JSON.stringify(manifest, null, 2))
+    const reloaded = await FileManager.readAsData(stagedArtifact)
+    if (reloaded.size !== manifest.outputBytes
+        || Crypto.sha256(reloaded).toHexString().toLowerCase() !== manifest.outputSha256) {
+      throw new Error("Der vorbereitete Mod-Overlay hat die SHA-256-Nachprüfung nicht bestanden.")
+    }
+    // This is a one-slot disposable cache: invalidation never touches the
+    // retained payload, ROM, mod archives, saves, or their indexes.
+    await removeIfExists(PREPARED_OVERLAY_CURRENT)
+    await FileManager.rename(PREPARED_OVERLAY_TRANSACTION, PREPARED_OVERLAY_CURRENT)
+    const data = await FileManager.readAsData(cachedArtifactPath)
+    await recordPreparedOverlayDiagnostic("built", started, data.size, modIds)
+    return { data, modIds, cacheStatus: "built" }
+  } catch (error) {
+    try { await removeIfExists(PREPARED_OVERLAY_TRANSACTION) } catch { /* Preserve original error. */ }
+    throw error
   }
 }
 

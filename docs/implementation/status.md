@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.17`
+Stand: 2026-09-28 · App-Version `0.13.18`
+
+## Iteration 0.13.18
+
+- Der Host besitzt jetzt einen einsatzfähigen, strikt begrenzten Prepared-Overlay-Cache. Die Cacheidentität bindet Runtime-ID, Adapterversion, Payload-SHA-256 sowie die stabil sortierten IDs, Versionen und SHA-256-Werte aller aktivierten Mods.
+- Der erste Start baut `Cache/prepared-overlay-v1/current/game.love` transaktional aus den unveränderten, erneut geprüften Quellen. Folgestarts verwenden ihn nur nach Größen- und SHA-256-Nachprüfung. Jede Abhängigkeitsänderung wird zum Miss; der Ein-Slot-Cache ersetzt ausschließlich verwerfbare Daten und kann niemals ROM, Payload, Modarchive, Saves oder Indizes löschen.
+- `Diagnostics/prepared-overlay-last.v1.json` weist `built`, `hit` oder `bypassed`, Dauer, Ausgabegröße und Mod-IDs aus. Damit sind Nutzen und Fehlannahmen messbar.
+- Die Runtime lädt Payload, ROM, Adapter und WASM bereits parallel über die begrenzte Resource-Bridge vor dem Player-Start. Ein echtes Predictive Map-/Mesh-Prefetch für beliebige bestehende Mods ist dagegen **NUR MIT MOD-/RUNTIME-UNTERSTÜTZUNG** möglich: Der Host kann einen bereits laufenden synchronen Lua-Aufruf nicht sicher unterbrechen und darf keine modinternen Datenstrukturen erfinden.
+- 47/47 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `3d181c944b18301258b66fc25c6e27068e229db0f3be04afdfcfe4ee8597e421`.
 
 ## Iteration 0.13.17
 
