@@ -177,6 +177,19 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
   await removeIfExists(runtimeErrorPath)
   if (options.probe === "gen1recomp-gameplay") await removeIfExists(profilePath)
   const startedAt = new Date().toISOString()
+  if (options.probe === "gen1recomp-gameplay") {
+    // Create the diagnostic before WebView startup. Absence then cannot be
+    // confused with "no slow frames", and bridge/instrumentation failures are
+    // visible as an awaiting-runtime-events state instead of no file at all.
+    await FileManager.writeAsString(profilePath, JSON.stringify({
+      schemaVersion: 2,
+      runtimeId: LOVEJS_RUNTIME.id,
+      payloadVersion: options.payloadVersion,
+      startedAt,
+      status: "awaiting-runtime-events",
+      events: [],
+    }, null, 2))
+  }
   // Gameplay saves live in love.js' IDBFS mount. A non-ephemeral WKWebView
   // data store is required for that IndexedDB database to survive disposal,
   // app termination, and the next launch.
@@ -215,10 +228,11 @@ async function runBootProbe(options: BootProbeOptions): Promise<LoveJsBootReport
       profileWriteTimer = null
       const snapshot = profileEvents.slice(-100)
       const next = profileWrites.then(() => FileManager.writeAsString(profilePath, JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
         runtimeId: LOVEJS_RUNTIME.id,
         payloadVersion: options.payloadVersion,
         startedAt,
+        status: "recording",
         events: snapshot,
       }, null, 2)))
       profileWrites = next.catch(() => { /* A later event retries the diagnostic snapshot. */ })

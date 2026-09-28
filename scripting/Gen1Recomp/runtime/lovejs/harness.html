@@ -238,9 +238,48 @@
   });
   window.addEventListener('pagehide', function () { syncRuntimeFilesystem(true); });
 
+  var frameProfileStarted = false;
+  function startFrameProfile() {
+    if (frameProfileStarted || typeof requestAnimationFrame !== 'function') return;
+    frameProfileStarted = true;
+    var started = 0;
+    var previous = 0;
+    var frames = 0;
+    var total = 0;
+    var maximum = 0;
+    var over33 = 0, over50 = 0, over100 = 0, over250 = 0;
+    function frame(now) {
+      if (started === 0) { started = now; previous = now; }
+      else {
+        var delta = now - previous;
+        previous = now;
+        frames += 1;
+        total += delta;
+        if (delta > maximum) maximum = delta;
+        if (delta >= 33) over33 += 1;
+        if (delta >= 50) over50 += 1;
+        if (delta >= 100) over100 += 1;
+        if (delta >= 250) over250 += 1;
+      }
+      if (now - started >= 5000 && frames > 0) {
+        console.log('[gen1-profile] phase=browser.frame.window frames=' + frames
+          + ' avg_ms=' + (total / frames).toFixed(3)
+          + ' max_ms=' + maximum.toFixed(3)
+          + ' over33=' + over33 + ' over50=' + over50
+          + ' over100=' + over100 + ' over250=' + over250);
+        started = now;
+        frames = 0; total = 0; maximum = 0;
+        over33 = 0; over50 = 0; over100 = 0; over250 = 0;
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
   new MutationObserver(function () {
     if (spinner.className === '') {
       startRuntimeFilesystemSync();
+      startFrameProfile();
       bridge.terminal('runtime.ready', 'Module.postrun reached', {
         canvasWidth: canvas.width,
         canvasHeight: canvas.height,

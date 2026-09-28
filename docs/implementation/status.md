@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.13`
+Stand: 2026-09-28 · App-Version `0.13.14`
+
+## Iteration 0.13.14
+
+- **VERIFIZIERT (Gerät):** In r34 wurde `runtime-performance-profile.v1.json` nicht angelegt. Damit ist die bisherige Behauptung, dass der Lua-`timer.step`-Wrapper auf dem realen love.js-Ausführungspfad Ereignisse liefert, widerlegt; aus einer fehlenden Datei darf kein Performancebefund abgeleitet werden.
+- r35 legt den begrenzten Profildatensatz vor dem WebView-Start mit `status: awaiting-runtime-events` an. Der Zustand „Instrumentierung hat noch kein Ereignis geliefert“ ist damit explizit von „keine langsamen Frames“ und von einer fehlenden Datei unterscheidbar.
+- Zusätzlich misst der Harness die tatsächlich präsentierten Browserframes unabhängig vom Lua-Hook per `requestAnimationFrame`. Fünf-Sekunden-Aggregate werden über dieselbe enge `runtime.profile`-Bridge geschrieben; der Lua-Profiler bleibt für Heap-/FixedStep-Korrelation erhalten. Das ist allgemeine Laufzeitinstrumentierung und enthält keine Mod-ID oder Modkonstante.
+- Eine eigentliche Slow-Motion-Optimierung bleibt bis zum Geräteprofil **BENCHMARK ERFORDERLICH**.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `2e7eb7ce1a9eac91463aa02c478a646b4dc6dd7ac21db5c3489691e5a5be6201`.
 
 ## Iteration 0.13.13
 
