@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.18`
+Stand: 2026-09-28 · App-Version `0.13.19`
+
+## Iteration 0.13.19
+
+- **VERIFIZIERT (Gerät):** r38 misst im Slow-Motion-Fenster 4,97–5,01 s `Game.update`, nur 8–74 ms `Game.draw` und exakt null `newMesh`-Aufrufe. Der native Mesh-Upload und die GPU sind damit für diesen Lauf als Hauptursache ausgeschlossen.
+- Der begrenzte Instruction-Sampler identifiziert stattdessen `src/core/ChipSynth.lua`, `src/core/ChipAudio.lua` und den Pure-Lua-Bitadapter in `normalize1.lua` als heiße Pfade. love.js besitzt kein nutzbares `love.thread`; Gen1Recomps dokumentierter synchroner ChipAudio-Fallback synthetisiert PCM daher auf dem Hauptthread. PotatoVoxel löst den beobachteten Zeitraum aus, aber die dominante Laufzeitgrenze ist eine allgemeine Audio-/Bit-Kompatibilitätsstrecke.
+- r39 optimiert den wahrheitsgetreuen 32-Bit-Fallback allgemein: `band(value, 2^n-1)` verwendet Modulo, einzelne Bitmasken verwenden eine direkte arithmetische Probe, und der generische Nibble-Walk endet nach dem höchsten relevanten Wort statt immer acht Wörter zu durchlaufen. Semantiktests decken niedrige Masken, Einzelbits, allgemeine nicht zusammenhängende Masken, Vorzeichen und MD5 ab.
+- Ein reproduzierbarer Fengari-Mikrobenchmark mit einer Million für ChipSynth typischen `band`-/`rshift`-Gruppen sinkt von 66.973 ms auf 32.264 ms (2,08×). Die Übertragung auf PUC Lua 5.1/love.js ist **BENCHMARK ERFORDERLICH**; es wird keine Gerätebeschleunigung behauptet.
+- Der spiel- und modbezogene Prepared-Launch-/Asset-Ausbau bleibt eine getrennte Architekturstrecke. Er kann Start- und Assetarbeit sparen, ersetzt aber nicht die hier nachgewiesene synchrone PCM-Synthese.
+- 47/47 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `e0d441223a7fd08c9b6525dfc80eebf24a72d7a16f9ff8677d16e628bafe6a7b`.
 
 ## Iteration 0.13.18
 

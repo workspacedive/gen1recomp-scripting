@@ -72,6 +72,14 @@ for _, vector in ipairs(vectors) do
   assert(MD5.new():update(vector[1]):final() == vector[2])
 end
 assert(bit.band(0xffffffff, 0xff) == 255)
+assert(bit.band(0x12345678, 0x0f0f0f0f) == 33818120)
+assert(bit.band(0xf2345678, 0x80808080) == -2147483648)
+for exponent = 0, 31 do
+  local single = 2 ^ exponent
+  assert(bit32.band(0xffffffff, single) == single)
+  assert(bit32.band(single - 1, single) == 0)
+  assert(bit32.band(0xffffffff, single - 1) == single - 1)
+end
 assert(bit.bor(0x80000000, 1) == -2147483647)
 assert(bit.bxor(1, 2, 4, 8) == 15)
 assert(bit.bnot(0) == -1)

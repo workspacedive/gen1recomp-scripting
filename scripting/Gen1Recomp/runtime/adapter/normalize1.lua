@@ -457,13 +457,37 @@ if not rawget(_G, "bit") and not rawget(_G, "bit32") then
       AND[left][right], OR[left][right], XOR[left][right] = av, ov, xv
     end
   end
+  -- Chip synthesis performs millions of small-mask operations. The fallback
+  -- used to walk all eight 4-bit words even for band(value, 3), making the
+  -- compatibility shim itself a sampled update hotspot on device. Preserve
+  -- exact 32-bit semantics while fast-pathing every low-bit mask and single
+  -- bit, then stop the generic nibble walk once no significant bits remain.
+  local LOW_MASK, SINGLE_BIT = {}, {}
+  local power = 1
+  for _ = 0, 31 do
+    SINGLE_BIT[power] = true
+    LOW_MASK[power - 1] = power
+    power = power * 2
+  end
+  LOW_MASK[4294967295] = 4294967296
+
   local function pair(table_, left, right)
     left, right = u32(left), u32(right)
+    if table_ == AND then
+      local modulus = LOW_MASK[left]
+      if modulus then return right % modulus end
+      modulus = LOW_MASK[right]
+      if modulus then return left % modulus end
+      if SINGLE_BIT[left] then return math.floor(right / left) % 2 * left end
+      if SINGLE_BIT[right] then return math.floor(left / right) % 2 * right end
+      if left == 0 or right == 0 then return 0 end
+    end
     local value, place = 0, 1
-    for _ = 1, 8 do
+    while left > 0 or right > 0 do
       local a, b = left % 16, right % 16
       value = value + table_[a][b] * place
       left, right, place = math.floor(left / 16), math.floor(right / 16), place * 16
+      if table_ == AND and (left == 0 or right == 0) then break end
     end
     return value
   end
