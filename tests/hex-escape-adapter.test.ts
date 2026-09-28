@@ -33,6 +33,48 @@ assert(invalid == nil and type(message) == "string", "unrelated syntax stays rej
   lua.lua_close(state)
 })
 
+test('unsupported Canvas formats fail in Lua before love.js native alert handling', async () => {
+  const adapter = await readFile(new URL('../scripting/Gen1Recomp/runtime/adapter/normalize1.lua', import.meta.url), 'utf8')
+  const start = adapter.indexOf('-- Preserve shader compiler diagnostics')
+  assert.notEqual(start, -1)
+  const shim = adapter.slice(start)
+  const script = `
+local canvasCalls, lines, shaderFxDeactivated = 0, {}, false
+print = function(line) lines[#lines + 1] = line end
+package.preload["src.render.ShaderFX"] = function()
+  return { deactivate = function() shaderFxDeactivated = true end }
+end
+love = { graphics = {
+  getCanvasFormats = function() return { depth24 = false, rgba8 = true } end,
+  newCanvas = function(...) canvasCalls = canvasCalls + 1 return { args = {...} } end,
+  newShader = function(source)
+    if source == "bad" then error("shader compiler fixture") end
+    return { source = source }
+  end,
+} }
+${shim}
+local ok, message = pcall(love.graphics.newCanvas, 64, 64,
+  { format = "depth24", readable = true })
+assert(not ok and message:match("depth24 Canvas format"), "unsupported format is a Lua error")
+assert(canvasCalls == 0, "unsupported format never enters native newCanvas")
+assert(love.graphics.newCanvas(64, 64, { format = "rgba8" }))
+assert(canvasCalls == 1, "supported format reaches native newCanvas")
+assert(love.graphics.newCanvas(64, 64))
+assert(canvasCalls == 2, "default Canvas reaches native newCanvas")
+local shaderOK, shaderMessage = pcall(love.graphics.newShader, "bad")
+assert(not shaderOK and shaderMessage:match("shader compiler fixture"), "shader failure is preserved")
+local GBCFX = require("src.render.GBCFX")
+assert(GBCFX.setLevel(0) == 0 and shaderFxDeactivated,
+  "removed GBCFX clear maps narrowly to ShaderFX deactivate")
+assert(#lines == 2, "bounded graphics diagnostics cover Canvas and shader failures")
+`
+  const state = lauxlib.luaL_newstate()
+  lualib.luaL_openlibs(state)
+  const status = lauxlib.luaL_dostring(state, to_luastring(script))
+  if (status !== lua.LUA_OK) assert.fail(lua.lua_tojsstring(state, -1))
+  lua.lua_close(state)
+})
+
 test('Lua 5.2 hexadecimal escapes are normalized before Gen1Recomp modules compile', async () => {
   const adapter = await readFile(new URL('../scripting/Gen1Recomp/runtime/adapter/normalize1.lua', import.meta.url), 'utf8')
   const start = adapter.indexOf('-- Gen1Recomp source uses Lua 5.2 hexadecimal string escapes')

@@ -586,18 +586,62 @@ do
 end
 
 -- Preserve shader compiler diagnostics even when capability probes correctly
--- use pcall and fall back. love.js reports some fatal graphics failures only
--- through its JavaScript console; the host diagnostic bridge records this
--- bounded line without changing success or failure semantics.
+-- use pcall and fall back. Also reject canvas formats that LÖVE has already
+-- reported unsupported before entering love.js's native newCanvas binding:
+-- that binding displays a fatal browser alert before Lua's pcall can handle
+-- the ordinary optional-format probe. A Lua error keeps the documented pcall
+-- fallback intact (for example from readable depth to an internal depth
+-- buffer) without claiming support the WebGL driver did not report.
 do
   local graphics = love.graphics
   local nativeNewShader = graphics and graphics.newShader
+  local nativeNewCanvas = graphics and graphics.newCanvas
+  local canvasFormats = nil
+  if graphics and graphics.getCanvasFormats then
+    local ok, reported = pcall(graphics.getCanvasFormats)
+    if ok and type(reported) == "table" then canvasFormats = reported end
+  end
+  if nativeNewCanvas and canvasFormats then
+    graphics.newCanvas = function(...)
+      local settings = select(3, ...)
+      local format = type(settings) == "table" and settings.format or nil
+      if type(format) == "string" and canvasFormats[format] == false then
+        print("[gen1-graphics] skipped unsupported Canvas format: " .. format)
+        error("The " .. format .. " Canvas format is not supported by your graphics drivers.", 2)
+      end
+      return nativeNewCanvas(...)
+    end
+  end
   if nativeNewShader then
     graphics.newShader = function(...)
       local ok, shader = pcall(nativeNewShader, ...)
       if ok then return shader end
       print("[gen1-graphics] newShader failed: " .. tostring(shader))
       error(shader, 2)
+    end
+  end
+end
+
+-- Gen1Recomp removed the former GBCFX module when ShaderFX replaced its
+-- output slot. Legacy renderer mods still use GBCFX.setLevel(0) solely to
+-- clear a conflicting post-process. Preserve that narrow operation by
+-- deactivating the replacement ShaderFX chain; no removed nonzero effect or
+-- broader engine API is recreated.
+do
+  local preload = package and package.preload
+  if preload and preload["src.render.GBCFX"] == nil then
+    preload["src.render.GBCFX"] = function()
+      return {
+        level = 0,
+        setLevel = function(level)
+          level = math.floor(tonumber(level) or 0)
+          if level <= 0 then
+            local ShaderFX = require("src.render.ShaderFX")
+            if ShaderFX and ShaderFX.deactivate then ShaderFX.deactivate() end
+          end
+          return 0
+        end,
+      }
     end
   end
 end

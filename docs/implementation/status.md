@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.8`
+Stand: 2026-09-28 · App-Version `0.13.9`
+
+## Iteration 0.13.9
+
+- Der r29-Gerätelog identifiziert den fatalen Pfad: PotatoVoxel probiert ein lesbares `depth24`-Canvas; der WebGL-Treiber meldet es als nicht unterstützt. PotatoVoxel kapselt diese optionale Probe bereits in `pcall` und hat einen internen Depth-Buffer-Fallback, aber love.js öffnet seinen nativen Fatal-Alert schon vor der Lua-Fehlerbehandlung.
+- r30 prüft ein Canvas-Format vor dem nativen Aufruf nur dann ab, wenn LÖVEs eigenes `getCanvasFormats()` es ausdrücklich mit `false` meldet. Der bestehende Mod-Fallback bleibt zuständig; unterstützte, unbekannte und formatlose Canvas-Aufrufe bleiben unverändert. Status lokal **VERIFIZIERT**, Gerät **TEILWEISE VERIFIZIERT**.
+- Der Log belegt separat den Zugriff auf das in Gen1Recomp 0.3.20 entfernte `src.render.GBCFX`. Der schmale Legacy-Facade bildet ausschließlich `setLevel(0)` auf `ShaderFX.deactivate()` ab, weil PotatoVoxel damit nur den konkurrierenden Nachbearbeitungseffekt löscht. Der entfernte GBCFX-Effekt wird nicht nachgebaut.
+- Die Sandbox-Warnung zu `getDirectoryItems` stammt aus PotatoVoxels optionaler Stadium-ROM-Erkennung, die diesen Zugriff selbst per `pcall` abfängt; sie ist nicht Ursache des Canvas-Fatalfehlers.
+- Vollständige VOXEL-/3D-BTL-Ausgabe bleibt bis zum r30-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `96b5d125bdc4cb7cdada9187e1c7571a0bd0d443ab398924a3e37df048dbb668`.
 
 ## Iteration 0.13.8
 

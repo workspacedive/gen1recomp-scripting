@@ -41,6 +41,14 @@ Der r27-Gerätelauf erreicht erstmals `MeshCache.dir()` und belegt damit, dass B
 
 r28 instrumentiert allgemein die Rückgabe von `src.mods.LegacyCompat.new`: Nur wenn dessen isolierter `globals.package`-Shim kein eigenes `config` besitzt, erhält er den Konfigurationsstring des Host-Lua. `loaded`, Loader, Suchpfade und die echte Paket-Tabelle werden nicht übernommen. Damit bleibt PotatoVoxels anschließender Datei-I/O in den bereits offiziellen virtuellen/scoped Legacy-Fassaden.
 
+## r30: sichere Canvas-Formatprüfung und entfernter GBCFX-Clear
+
+Der vollständige r29-Gerätelog nennt als letzte native LÖVE-Ausgabe: `The depth24 readable canvas format is not supported by your graphics drivers.` PotatoVoxel testet mehrere optionale lesbare Tiefenformate absichtlich mit `pcall`; wenn alle abgelehnt werden, sieht sein Quellcode bereits den internen, nicht lesbaren Tiefenpuffer als vorgesehenen Fallback vor. love.js öffnet beim Eintritt in die native `newCanvas`-Bindung jedoch bereits seinen fatalen Browseralert, bevor der Lua-`pcall` diesen gewöhnlichen Capability-Fehler handhaben kann.
+
+r30 fragt LÖVEs eigene `love.graphics.getCanvasFormats()`-Tabelle einmal ab. Nur ein dort ausdrücklich mit `false` gemeldetes Format wird vor der nativen love.js-Bindung als Lua-Fehler zurückgegeben. Unterstützte, unbekannte und formatlose Canvas-Aufrufe gehen unverändert an `newCanvas`. So kann PotatoVoxel seinen bereits vorhandenen internen Depth-Buffer-Fallback wählen, ohne dass der Web-Wrapper den Prozess als fatal behandelt. Es wird keine Grafikfähigkeit erfunden.
+
+Derselbe Log belegt außerdem, dass PotatoVoxel noch `src.render.GBCFX.setLevel(0)` zum Abschalten eines konkurrierenden Effekts verwendet. Gen1Recomp 0.3.20 hat GBCFX offiziell entfernt und durch ShaderFX ersetzt. r30 stellt deshalb ausschließlich diese schmale Clear-Operation bereit: `setLevel(0)` deaktiviert die aktuelle ShaderFX-Kette. Nicht-null GBCFX-Stufen oder der entfernte Effekt werden nicht emuliert.
+
 ## Evidenzstatus
 
 - Ursachenanalyse und Parser-Reproduktion: **VERIFIZIERT**.
