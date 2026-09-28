@@ -1,0 +1,526 @@
+# Implementierungsstand der Scripting-App
+
+Stand: 2026-09-28 · App-Version `0.13.19`
+
+## Iteration 0.13.19
+
+- **VERIFIZIERT (Gerät):** r38 misst im Slow-Motion-Fenster 4,97–5,01 s `Game.update`, nur 8–74 ms `Game.draw` und exakt null `newMesh`-Aufrufe. Der native Mesh-Upload und die GPU sind damit für diesen Lauf als Hauptursache ausgeschlossen.
+- Der begrenzte Instruction-Sampler identifiziert stattdessen `src/core/ChipSynth.lua`, `src/core/ChipAudio.lua` und den Pure-Lua-Bitadapter in `normalize1.lua` als heiße Pfade. love.js besitzt kein nutzbares `love.thread`; Gen1Recomps dokumentierter synchroner ChipAudio-Fallback synthetisiert PCM daher auf dem Hauptthread. PotatoVoxel löst den beobachteten Zeitraum aus, aber die dominante Laufzeitgrenze ist eine allgemeine Audio-/Bit-Kompatibilitätsstrecke.
+- r39 optimiert den wahrheitsgetreuen 32-Bit-Fallback allgemein: `band(value, 2^n-1)` verwendet Modulo, einzelne Bitmasken verwenden eine direkte arithmetische Probe, und der generische Nibble-Walk endet nach dem höchsten relevanten Wort statt immer acht Wörter zu durchlaufen. Semantiktests decken niedrige Masken, Einzelbits, allgemeine nicht zusammenhängende Masken, Vorzeichen und MD5 ab.
+- Ein reproduzierbarer Fengari-Mikrobenchmark mit einer Million für ChipSynth typischen `band`-/`rshift`-Gruppen sinkt von 66.973 ms auf 32.264 ms (2,08×). Die Übertragung auf PUC Lua 5.1/love.js ist **BENCHMARK ERFORDERLICH**; es wird keine Gerätebeschleunigung behauptet.
+- Der spiel- und modbezogene Prepared-Launch-/Asset-Ausbau bleibt eine getrennte Architekturstrecke. Er kann Start- und Assetarbeit sparen, ersetzt aber nicht die hier nachgewiesene synchrone PCM-Synthese.
+- 47/47 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `e0d441223a7fd08c9b6525dfc80eebf24a72d7a16f9ff8677d16e628bafe6a7b`.
+
+## Iteration 0.13.18
+
+- Der Host besitzt jetzt einen einsatzfähigen, strikt begrenzten Prepared-Overlay-Cache. Die Cacheidentität bindet Runtime-ID, Adapterversion, Payload-SHA-256 sowie die stabil sortierten IDs, Versionen und SHA-256-Werte aller aktivierten Mods.
+- Der erste Start baut `Cache/prepared-overlay-v1/current/game.love` transaktional aus den unveränderten, erneut geprüften Quellen. Folgestarts verwenden ihn nur nach Größen- und SHA-256-Nachprüfung. Jede Abhängigkeitsänderung wird zum Miss; der Ein-Slot-Cache ersetzt ausschließlich verwerfbare Daten und kann niemals ROM, Payload, Modarchive, Saves oder Indizes löschen.
+- `Diagnostics/prepared-overlay-last.v1.json` weist `built`, `hit` oder `bypassed`, Dauer, Ausgabegröße und Mod-IDs aus. Damit sind Nutzen und Fehlannahmen messbar.
+- Die Runtime lädt Payload, ROM, Adapter und WASM bereits parallel über die begrenzte Resource-Bridge vor dem Player-Start. Ein echtes Predictive Map-/Mesh-Prefetch für beliebige bestehende Mods ist dagegen **NUR MIT MOD-/RUNTIME-UNTERSTÜTZUNG** möglich: Der Host kann einen bereits laufenden synchronen Lua-Aufruf nicht sicher unterbrechen und darf keine modinternen Datenstrukturen erfinden.
+- 47/47 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `3d181c944b18301258b66fc25c6e27068e229db0f3be04afdfcfe4ee8597e421`.
+
+## Iteration 0.13.17
+
+- **VERIFIZIERT (Geräte-A/B):** `setpause=120` verbessert r36s Engpass nicht. Der Heap erreicht mit r37 sogar 264 MiB statt zuvor 214 MiB; `Game.update` belegt weiterhin 4,73–4,80 s je Fünf-Sekunden-Fenster und Einzelupdates erreichen 679 ms. Die Zeitlupe beginnt zudem früher. Der Kandidat wird deshalb vollständig verworfen und r38 übernimmt wieder PUC Lua 5.1s unveränderte GC-Parameter.
+- Damit ist ein bloß früher gestarteter automatischer GC-Zyklus als Lösung **WIDERLEGT**. Die Hauptursache bleibt die allokations-/arbeitsintensive Update-Strecke selbst; zusätzliche GC-CPU-Arbeit beseitigt sie nicht.
+- r38 ergänzt zwei begrenzte, allgemeine Diagnosekanäle: aggregierte Zeit und Aufrufszahl von `love.graphics.newMesh` zur Trennung des nativen Mesh-Uploads von Lua-Arbeit sowie einen Update-only Instruction-Sampler alle 250.000 Lua-Instruktionen. Pro Fenster werden höchstens drei heiße Quellpfade ausgegeben. Der vorherige Debug-Hook wird nach jedem Update wiederhergestellt.
+- Diese Instrumentierung verändert weder Modbudgets noch FixedStep, Grafikqualität oder GC-Konfiguration. Die nächste Optimierung bleibt bis zur Mesh-/Hot-Source-Zuordnung **BENCHMARK ERFORDERLICH**.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `7e99752f4c134e22ce9cc0a9a7dccaa6589af70df70b7730619576ce4d6f61c6`.
+
+## Iteration 0.13.16
+
+- **VERIFIZIERT (Gerät):** r36 trennt den Engpass eindeutig: In den schlechtesten Fünf-Sekunden-Fenstern verbringt `Game.update` 4,75–4,81 s, `Game.draw` dagegen nur 47–66 ms. Einzelne Updates dauern bis 671 ms; parallel wächst der Lua-Heap von etwa 16 MiB über 182 MiB auf 214 MiB. Danach fällt er auf 139 MiB und steigt erneut auf 193 MiB. Das ist ein update-/allokationslastiger CPU-Pfad mit späten großen GC-Zyklen, kein primärer Draw-/GPU-Engpass.
+- Die Daten passen zur bereits statisch belegten FFI-losen Tabellen-Meshing-Strecke von PotatoVoxel 1.5.8, beweisen aber noch nicht, welcher Anteil innerhalb eines Updates auf Meshing, Mesh-Upload und GC entfällt. Diese feinere Zuordnung bleibt **TEILWEISE VERIFIZIERT**.
+- r37 ist ein allgemeiner A/B-Kandidat für früheres Lua-GC-Pacing: `setpause` wird von PUC Lua 5.1s Default 200 auf 120 gesetzt, während `stepmul` unverändert bleibt. Dadurch beginnt ein neuer Zyklus früher; es wird weder eine Vollsammlung pro Frame noch ein Modbudget oder eine Mod-ID verändert. Ob geringere Heapspitzen die Maximal-Updates verbessern oder zusätzliche kontinuierliche CPU-Arbeit die Framerate verschlechtert, ist **BENCHMARK ERFORDERLICH**.
+- Das Profil protokolliert die aktive GC-Konfiguration als `phase=gc.config`; Browser-, Update-/Draw- und Heapmessung bleiben aktiv.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `9fc2873c05c83e4760fe1106bdda6819455f93945bb539b435d3d40455ed07b8`.
+
+## Iteration 0.13.15
+
+- **VERIFIZIERT (Gerät):** r35 zeichnet Browser-Framefenster zuverlässig auf. Das bereitgestellte Profil fällt von zunächst 37,8–53,0 FPS auf zwei zusammenhängende Fünf-Sekunden-Fenster mit nur 7,1–7,4 FPS (`avg_ms` 135–141 ms); Maximalstillstände erreichen 759 ms. Auch angrenzende Fenster bleiben bei rund 23 FPS. Der Slow-Motion-Effekt ist daher reale, länger anhaltende Main-Thread-/Rendering-Sättigung und nicht nur ein einzelner gelegentlicher Frame oder ein reines Anzeigegefühl.
+- Im Profil fehlen weiterhin Lua-`frame.window`-Ereignisse. Der `love.timer.step`-Hook ist auf diesem konkreten love.js-Pfad damit **NICHT VERIFIZIERT** und wird nicht als Beleg für FixedStep-Clamping verwendet.
+- r36 misst nun allgemein die in Gen1Recomps `Game.update` und `Game.draw` verbrachte Zeit als Fünf-Sekunden-Aggregat (`phase=runtime.phases`): Aufrufszahl, Gesamt-/Maximalzeit und Lua-Heap. Es werden keine Modmethoden, Mod-IDs oder modinternen Konstanten instrumentiert. Zusammen mit dem unabhängigen Browserprofil trennt der nächste Lauf update-/Meshing-/GC-lastige Fenster von draw-/WebGL-lastigen Fenstern.
+- GC-, FixedStep-, Qualitäts- oder Schedulerparameter bleiben unverändert; die Auswahl einer Optimierung ist weiterhin **BENCHMARK ERFORDERLICH**.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `18046e60f2ffccff3b79140535d64d7f48457ca3693dd5af2043fc34d72b8a17`.
+
+## Iteration 0.13.14
+
+- **VERIFIZIERT (Gerät):** In r34 wurde `runtime-performance-profile.v1.json` nicht angelegt. Damit ist die bisherige Behauptung, dass der Lua-`timer.step`-Wrapper auf dem realen love.js-Ausführungspfad Ereignisse liefert, widerlegt; aus einer fehlenden Datei darf kein Performancebefund abgeleitet werden.
+- r35 legt den begrenzten Profildatensatz vor dem WebView-Start mit `status: awaiting-runtime-events` an. Der Zustand „Instrumentierung hat noch kein Ereignis geliefert“ ist damit explizit von „keine langsamen Frames“ und von einer fehlenden Datei unterscheidbar.
+- Zusätzlich misst der Harness die tatsächlich präsentierten Browserframes unabhängig vom Lua-Hook per `requestAnimationFrame`. Fünf-Sekunden-Aggregate werden über dieselbe enge `runtime.profile`-Bridge geschrieben; der Lua-Profiler bleibt für Heap-/FixedStep-Korrelation erhalten. Das ist allgemeine Laufzeitinstrumentierung und enthält keine Mod-ID oder Modkonstante.
+- Eine eigentliche Slow-Motion-Optimierung bleibt bis zum Geräteprofil **BENCHMARK ERFORDERLICH**.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `2e7eb7ce1a9eac91463aa02c478a646b4dc6dd7ac21db5c3489691e5a5be6201`.
+
+## Iteration 0.13.13
+
+- r34 ergänzt ausschließlich eine begrenzte, modunabhängige Messung an `love.timer.step`, also an genau dem Wall-Clock-Delta, das Gen1Recomps FixedStep pro dargestelltem Frame erhält. Alle fünf Sekunden werden Framezahl, Mittel-/Maximaldelta, Schwellenzähler ab 33/50/100/250 ms sowie der Lua-Heap in KiB als `[gen1-profile] phase=frame.window` ausgegeben.
+- Das Host-Bridge-Profil heißt jetzt allgemein `runtime-performance-profile.v1.json`, bleibt auf höchstens 100 Zeilen begrenzt und wird koalesziert erst zwei Sekunden nach einem Ereignisburst in den sichtbaren Diagnostics-Ordner geschrieben. Die Messung verändert weder FixedStep, GC-Parameter noch Mod-Budgets.
+- Diese Iteration behauptet bewusst **keine** Performanceverbesserung. Sie trennt zunächst dauerhaft niedrige Framerate, einzelne lange Stalls, FixedStep-Clamps und Heapwachstum auf dem realen Gerät. Adaptive GC-, Scheduler- oder GPU-Änderungen bleiben bis zu diesen Daten **BENCHMARK ERFORDERLICH**.
+- Der bestehende r33-LegacyCompat-Grafikpfad, Readable-Depth-Guard, Alert-Unterdrückung und vollständige Konsolendiagnostik bleiben erhalten.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `a38fa1cf2df0747d9a3613fb9be2ead374abbe2cbfc443a9f9eaffc04935fbf8`; Geräteprofil **BENCHMARK ERFORDERLICH**.
+
+## Iteration 0.13.12
+
+- r32 zeigte unverändert denselben nativen Alert. Da die r32-Guard-Meldung fehlt, erreicht PotatoVoxel in seiner Legacy-Sandbox nicht zuverlässig die später ersetzte globale `love.graphics.newCanvas`-Funktion.
+- r33 installiert denselben konservativen Readable-Depth-Guard zusätzlich an Gen1Recomps offiziellem `LegacyCompat.new()`-/`Sandbox.loveFacade`-Override. Das ist die exakte API-Grenze, die der Mod sieht; die echte Grafikmodultabelle bleibt lesend erreichbar, während nur `newCanvas` für explizit lesbare Depth-/Stencil-Ziele vor der nativen love.js-Bindung abgefangen wird.
+- Eine Regression erzeugt einen isolierten LegacyCompat-Shim und belegt: lesbares `depth24` erreicht den nativen Konstruktor nicht, nicht lesbares `depth24` dagegen schon. Paketshim-/Modulcache-Isolation bleibt separat geprüft.
+- **VERIFIZIERT (Gerät):** r33 passiert die lesbaren Depth-Proben an der Legacy-Sandbox-Grenze; PotatoVoxel-VOXEL und 3D-BTL funktionieren.
+- Der verbleibende zeitweise Slow-Motion-Effekt korreliert mit PotatoVoxel 1.5.8s deaktiviertem Meshcache (`cache rejected: unavailable`, `0/446`): love.js stellt kein LuaJIT-`ffi` bereit, daher nutzt diese Modversion den allokationsintensiven Lua-Tabellen-Mesher und baut Karten auf dem Hauptthread. Gen1Recomps FixedStep begrenzt extrem große Frame-Deltas auf 0,25 s; längere Mesh-/GC-Stalls können deshalb als Zeitlupe statt nur als unregelmäßige Frames erscheinen. Ursachenpfad: **TEILWEISE VERIFIZIERT**, Gerätebenchmark je Qualitätsmodus weiterhin **BENCHMARK ERFORDERLICH**.
+- Die offizielle PotatoVoxel-Version 1.9.6 hat laut geprüftem Tag den FFI-Pfad entfernt und implementiert Pure-Lua-Packing, scoped Cache und begrenzte Vorberechnung. Ein Update ist architektonisch sinnvoller als ein nicht vorhandener LuaJIT-WASM-Sidecar, bleibt auf diesem Host aber bis zum Gerätetest **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `f6603aad5d9270a63b491a07535481eb7668f1766954c956bb04ba044d25d4cd`.
+
+## Iteration 0.13.11
+
+- Der r31-Gerätelog zeigt weiterhin den nativen `depth24 readable canvas`-Alert und enthält nicht die Adaptermeldung für ein übersprungenes Format. Damit ist belegt, dass das gepinnte love.js `getCanvasFormats(true)` für diesen Fall positiv meldet, während sein nativer `newCanvas(..., { readable = true })` unmittelbar danach fatal scheitert.
+- r32 behandelt im love.js-spezifischen Adapter explizit lesbare Depth-/Stencil-Canvases konservativ als nicht verfügbar. Nicht lesbare Depth-/Stencil-Canvases bleiben zugelassen, sodass PotatoVoxels vorgesehener interner Depth-Buffer-Fallback erhalten bleibt. Es wird keine Capability erfunden; lediglich die nachweislich falsche positive Web-Abfrage wird fail-closed korrigiert.
+- Der LuaJIT-Wunsch wurde gegen den offiziellen LuaJIT-Quellstand `c6ffc141a8762b41703f9287d63d93622a13dd8f` untersucht. Es existiert dort kein WASM-Ziel; ein Sidecar könnte LÖVEs bestehenden `lua_State` und Userdata nicht übernehmen. Ein echter Einsatz erfordert einen separat neu gebauten love.js/LÖVE-Runtimekandidaten und ist **EXPERIMENTELL / BENCHMARK ERFORDERLICH**. Dokumentation: `docs/architecture/luajit-web-runtime-assessment-0.13.11.md`.
+- VOXEL-/3D-BTL-Ausgabe bleibt bis zum r32-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `f7756de6bdd92cde019d94ed87d4f28fc9c77f74caa6921fb4b1fdefd6515ae8`.
+
+## Iteration 0.13.10
+
+- Der r30-Gerätelog zeigt weiterhin denselben `depth24 readable canvas`-Alert. Ursache der unvollständigen Vorprüfung: LÖVE 11.x unterscheidet offiziell `getCanvasFormats(true)` für lesbare und `getCanvasFormats(false)` für nicht lesbare Canvases. r30 hatte nur die nicht-lesbare/default Capability-Tabelle ausgewertet; dort ist `depth24` korrekt unterstützt, während genau die explizit lesbare Variante auf WebGL abgelehnt wird.
+- r31 erfasst beide offiziellen Capability-Tabellen getrennt und wählt sie anhand von `settings.readable == true`. Damit wird nur PotatoVoxels tatsächlich abgelehnte lesbare Probe als Lua-Fehler behandelt; dasselbe `depth24` bleibt für den vorgesehenen internen/nicht-lesbaren Tiefenpuffer verfügbar.
+- Diese Unterscheidung ist lokal durch eine Regression abgedeckt, die denselben Formatnamen lesbar ablehnt und nicht lesbar bis zum nativen Konstruktor durchlässt.
+- VOXEL-/3D-BTL-Ausgabe bleibt bis zum r31-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `411e124e71bc0e94bb402fd578f7e0ec516bbe18bbff6dc8b94c91e2d56d1f09`.
+
+## Iteration 0.13.9
+
+- Der r29-Gerätelog identifiziert den fatalen Pfad: PotatoVoxel probiert ein lesbares `depth24`-Canvas; der WebGL-Treiber meldet es als nicht unterstützt. PotatoVoxel kapselt diese optionale Probe bereits in `pcall` und hat einen internen Depth-Buffer-Fallback, aber love.js öffnet seinen nativen Fatal-Alert schon vor der Lua-Fehlerbehandlung.
+- r30 prüft ein Canvas-Format vor dem nativen Aufruf nur dann ab, wenn LÖVEs eigenes `getCanvasFormats()` es ausdrücklich mit `false` meldet. Der bestehende Mod-Fallback bleibt zuständig; unterstützte, unbekannte und formatlose Canvas-Aufrufe bleiben unverändert. Status lokal **VERIFIZIERT**, Gerät **TEILWEISE VERIFIZIERT**.
+- Der Log belegt separat den Zugriff auf das in Gen1Recomp 0.3.20 entfernte `src.render.GBCFX`. Der schmale Legacy-Facade bildet ausschließlich `setLevel(0)` auf `ShaderFX.deactivate()` ab, weil PotatoVoxel damit nur den konkurrierenden Nachbearbeitungseffekt löscht. Der entfernte GBCFX-Effekt wird nicht nachgebaut.
+- Die Sandbox-Warnung zu `getDirectoryItems` stammt aus PotatoVoxels optionaler Stadium-ROM-Erkennung, die diesen Zugriff selbst per `pcall` abfängt; sie ist nicht Ursache des Canvas-Fatalfehlers.
+- Vollständige VOXEL-/3D-BTL-Ausgabe bleibt bis zum r30-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `96b5d125bdc4cb7cdada9187e1c7571a0bd0d443ab398924a3e37df048dbb668`.
+
+## Iteration 0.13.8
+
+- Der r28-Gerätelauf passiert `package.config`; PotatoVoxel registriert und zeigt seine Optionen. Trotz `VOXEL = HIGH/POTATO` bleibt die Darstellung 2D, `3D-BTL = ON` endet wiederholt im allgemeinen love.js-Alert vor Fensterinitialisierung.
+- Das automatisch übermittelte r28-Diagnostikobjekt enthält nur den Alerttext: Der Browser-Wrapper hatte `console.error`, aber nicht die von LÖVE für diesen nativen Ausnahmeweg verwendeten normalen Log-/Warnkanäle gepuffert. Die eigentliche Grafikursache ist deshalb weiterhin **TECHNISCH UNBEKANNT**.
+- r29 puffert begrenzt die letzten 16 `console.log`-, `console.warn`- und `console.error`-Zeilen und hängt sie an den vorhandenen `runtime.error`-Datensatz. Fehlgeschlagene Shader-Kompilation wird am Hostadapter protokolliert, auch wenn ein Mod den Fehler erwartungsgemäß per `pcall` in einen 2D-Fallback umwandelt.
+- Derselbe identische JavaScript-Alert wird pro Sitzung nur einmal angezeigt; weitere Vorkommen werden weiterhin diagnostisch gemeldet, aber nicht mehr als unendliche modale Alertfolge geöffnet.
+- Dies ist eine Diagnose- und Bedienbarkeitskorrektur, keine behauptete 3D-Grafikkorrektur. Status: **TEILWEISE VERIFIZIERT** bis der r29-Gerätelauf die konkrete Shader-/Canvas-/Treiberursache aufzeichnet.
+- 45/45 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `b591c563578ab7c71ea54814948a4aa2f9e4988f3af3c580db34f7930ffc6a34`.
+
+## Iteration 0.13.7
+
+- **VERIFIZIERT (Gerät):** PotatoVoxel passiert mit r27 beide belegten Compilergrenzen und führt nun Modcode aus. Beim Fortsetzen stürzt `MeshCache.dir()` an `package.config:sub(...)` ab, weil Gen1Recomps offizieller `LegacyCompat.packageShim` zwar `path`, `cpath`, `preload`, `loaded` und `loaders`, aber absichtlich nicht die echte `package`-Tabelle und auch kein harmloses `config`-Feld bereitstellt.
+- **VERIFIZIERT (Paketquelltext):** PotatoVoxel verwendet nur das erste Zeichen von `package.config` zur Wahl des Pfadtrenners. Sein Cachepfad läuft anschließend über Gen1Recomps vorhandene virtuelle/scoped `love.filesystem`-, `io`- und `os`-Kompatibilität; ein echter Modullader ist dafür nicht erforderlich.
+- r28 ergänzt beim Erzeugen des offiziellen Legacy-Kompatibilitätsobjekts ausschließlich den bereits vom Host bekannten `package.config`-String in dessen datenisoliertem Paketshim. Die echte `package`-Tabelle, das echte `package.loaded`, Suchpfade und Loader bleiben verborgen; Gen1Recomps Sandbox wird nicht geöffnet.
+- Status: **TEILWEISE VERIFIZIERT** bis der nächste Gerätelauf den Cachepfad und nachfolgende Modinitialisierung bestätigt.
+- 45/45 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `2942bd5ff97386daa9328243d4b790dfccff8f9dd99963e66eb4c5aacde5d4ab`.
+
+## Iteration 0.13.6
+
+- **VERIFIZIERT (Gerät):** r26 entfernt die führende BOM erfolgreich; PotatoVoxel erreicht danach wie vorhergesagt `lib/VRXR.lua`. Dessen LuaJIT-`LL`/`ULL`-Syntax bleibt jedoch im love.js-Compilerfehler hängen.
+- Ursache der unvollständigen r26-Korrektur: Der Retry war zusätzlich an den erwarteten Fehlermeldungstext `near 'LL'/'ULL'` gebunden. Die reale VM formatiert den abgeschnittenen Fehler anders, obwohl derselbe bereits statisch belegte Quelltoken scheitert.
+- r27 normalisiert den tokenbegrenzten LuaJIT-Suffix deshalb nach jeder fehlgeschlagenen Textkompilierung, wenn und nur wenn die Quelle selbst ein passendes hexadezimales `LL`-/`ULL`-Literal enthält. Andere Quellen und andere Syntaxfehler bleiben unverändert.
+- Status: **TEILWEISE VERIFIZIERT** bis der nächste Gerätelauf die bereits reproduzierte zweite Kompatibilitätsgrenze bestätigt.
+- 45/45 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `ae0cedff6169ef62f3b710b42fc71a1b4c33ee6d1089365cd3b1a6ccaf379eef`.
+
+## Iteration 0.13.5
+
+- **VERIFIZIERT (vom Benutzer bereitgestelltes Original):** `potato_voxel-1.5.8.zip` hat SHA-256 `2d4b4b8768c95dea02a36dedfac5a397da359f853d2916f92dd8dfaf0abe8091`; ZIP-CRC und Paketstruktur sind intakt.
+- **VERIFIZIERT (Ursache des sichtbaren Fehlers):** `lib/BattleScene.lua` beginnt mit den Bytes `EF BB BF` (UTF-8-BOM). Gen1Recomps Mod-Namespace liest die Datei als String und kompiliert sie über `loadstring`; PUC Lua 5.1 in love.js meldet deshalb bereits bei Byte 1 `unexpected symbol near '<\\239>'`.
+- **VERIFIZIERT (zweite, danach erreichbare Grenze):** `lib/VRXR.lua` enthält die LuaJIT-Zahlenliterale `0x7fffffffffffffffLL` und `0x0001000000000000ULL`. PUC Lua 5.1 lehnt deren Suffixe ab. Nach BOM-Entfernung und Suffixnormalisierung kompilieren sämtliche 77 Lua-Dateien des Pakets im Lua-5.1-kompatiblen Testparser; ohne Normalisierung scheitern exakt diese beiden Dateien.
+- Adapter r26 wiederholt ausschließlich bereits fehlgeschlagene dynamische Textkompilierungen: zuerst ohne führende UTF-8-BOM und, nur bei einem `near 'LL'/'ULL'`-Compilerfehler, ohne den LuaJIT-64-Bit-Suffix. Paket, Gen1Recomp-Quellen, Player, love.js und WASM bleiben unverändert.
+- Die Ausrufezeichen auf der Berechtigungsseite sind laut `ManagerState.PERMISSION_ROWS` feste Warnsymbole für `engine_internals` und `filesystem`, keine Fähigkeitsfehler. Der echte Fehler war die davon getrennte Kompilierung.
+- Status: **TEILWEISE VERIFIZIERT** bis PotatoVoxel 1.5.8 mit r26 auf dem Gerät erneut startet. Der Files-App-Save-Export bleibt ausgeschlossen.
+- 45/45 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Importartefakt SHA-256: `641adf86d2a671d1ec537fab39bc2e5ce72ff471ed19f6d35ed5be4a697cc7b8`.
+- Detailprüfung: [`potatovoxel-lua-compat-0.13.5.md`](../architecture/potatovoxel-lua-compat-0.13.5.md).
+
+## Iteration 0.13.4
+
+- **VERIFIZIERT (Artefaktprüfung):** Das 0.13.3-Artefakt ist ein vollständiges, CRC-fehlerfreies ZIP mit identischem Inventar und derselben Root-`script.json`-Struktur wie das importierbare 0.13.2-Artefakt. Die Meldung „nicht unterstützte Skriptdatei“ stammt daher nicht von einer nachweisbaren ZIP-/Inventarbeschädigung.
+- **TECHNISCH UNBEKANNT:** 0.13.3 setzte den dokumentierten `buttonStyle` als Hierarchie-Modifikator auf `VStack`. Obwohl die Dokumentation Hierarchievererbung beschreibt, ist nicht belegt, dass der reale Scripting-Importer diese Platzierung akzeptiert; sie ist die einzige neue Quellcodeform vor dem Gerätefehler.
+- 0.13.4 setzt `buttonStyle="borderless"` deshalb direkt auf jeden betroffenen `Button`, exakt wie im offiziellen Scripting-Beispiel. Auf `VStack` verbleibt kein `buttonStyle`.
+- Für die Auslieferung wird zusätzlich ein versionsgebundener Dateiname verwendet, um Browser-/Download-Caching des generischen Artefaktnamens auszuschließen.
+- 44/44 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. SHA-256: `54aaedd77df54f1ac056734d456f61f1e7c84d05c7dc4c2f0fa18f9bd671a861`.
+
+## Iteration 0.13.3
+
+- **VERIFIZIERT (Gerätebefund):** In einer nativen `List` wurden die beiden Buttons derselben Mod-Zeile mit dem kontextabhängigen automatischen Buttonstil als gemeinsame Zeilenaktion behandelt. Beim Tippen auf „Aktivieren“ wurde deshalb auch die Entfernen-Bestätigung ausgelöst.
+- Mod- und Spielzeilen mit mehreren Aktionen verwenden nun den offiziell dokumentierten SwiftUI-/Scripting-Stil `buttonStyle="borderless"` auf der jeweiligen Button-Hierarchie. Dadurch besitzen Aktivieren/Deaktivieren, Entfernen sowie Spiel starten jeweils unabhängige Trefferflächen.
+- **TEILWEISE VERIFIZIERT:** Offizielle API-Dokumentation und ein statischer Regressionstest bestätigen die unabhängige Button-Konfiguration; die konkrete Trefferfläche benötigt die erneute Gerätebestätigung.
+- 44/44 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Importartefakt SHA-256: `9f425636512f97248494be2d54ff0e1b31f758ecd24f012c9ea019a48c96f806`.
+
+## Iteration 0.13.2
+
+- **VERIFIZIERT (offizieller Gen1Recomp-Pin):** Der Loader entdeckt Mods ausschließlich im laufzeitsichtbaren Layout `mods/<Ordner>/manifest.json`; der bisherige Hostspeicher unter `Documents/Gen1Recomp/Mods` war nicht automatisch sichtbar.
+- Neue Importe behalten deshalb ihr SHA-256-adressiertes Original-ZIP und sind standardmäßig für den nächsten Start aktiviert. Ältere Store-only-Einträge werden sicher als deaktiviert migriert und benötigen einmaligen Reimport.
+- Vor jedem Start werden Archiv-SHA-256, ZIP-Sicherheitsregeln, Extraktion/CRC sowie Manifest-ID/-Version erneut geprüft. Danach ergänzt ein eigener ZIP32-Overlay-Writer ausschließlich `mods/<id>/...` in eine transiente Kopie des Startpakets.
+- Der gepinnte Gen1Recomp-Payload auf Disk, Player, love.js und WASM bleiben unverändert und unabhängig updatebar. Das transiente Paket läuft durch dieselbe allowlistete Ressourcen-Bridge; Gen1Recomps offizieller Loader bleibt allein für Modsemantik, Abhängigkeiten und Konflikte verantwortlich.
+- Die UI unterscheidet gespeichert/deaktiviert, für den nächsten Start aktiviert und zuletzt nach `runtime.ready` laufzeitsichtbar. Entfernen publiziert zuerst den Index und bereinigt danach nur Moddateien und das Modarchiv.
+- Der Paket-Inventarcheck liest `unzip`-Ausgaben nun vollständig in temporäre Dateien, statt sie unter `pipefail` an früh beendendes `grep -q` zu leiten. Damit kann ein erfolgreicher Treffer nicht mehr durch `unzip`-SIGPIPE fälschlich als fehlende Runtime-Datei erscheinen.
+- **TEILWEISE VERIFIZIERT:** 43 reproduzierbare Tests und Standard-ZIP-Prüfung des Overlays belegen die Hostseite; der konkrete Drittanbieter-Mod im echten iOS-Lauf benötigt den Gerätetest.
+- Importartefakt: `Gen1Recomp.scripting`, SHA-256 `6a9adb91dd71c563496cb94b4b7ce7f43832856453d3af8e1e8a0811aae5cd67`.
+- Detailprüfung: [`mod-runtime-activation-0.13.2.md`](../architecture/mod-runtime-activation-0.13.2.md).
+- Der separate Save-Dateiexport bleibt zurückgestellt.
+
+## Iteration 0.13.1
+
+- Neue Spielverwaltung: Importierte ROMs können über `Aus Bibliothek entfernen` gelöscht werden.
+- Vor dem Entfernen erscheint eine native Bestätigung mit explizitem Hinweis, dass Spielstände und Mods erhalten bleiben.
+- Die Löschtransaktion publiziert zuerst den neuen Library-Index, synchronisiert dessen Backup und entfernt erst danach den content-addressed ROM-Ordner. Ein Indexfehler kann dadurch keine noch referenzierte ROM löschen; Backup-Recovery kann keinen gelöschten Eintrag wiederherstellen.
+- Saves, Mods, Profile und Diagnosen werden vom Entfernen nicht berührt.
+- Der separate Save-Dateiexport bleibt weiterhin zurückgestellt.
+
+## Iteration 0.13.0 Release Candidate
+
+- **VERIFIZIERT (Gerät):** r24 senkt normale synchrone Musikstarts auf 15–20 ms und den untersuchten Kampfmusikstart von 164 auf 43 ms.
+- **VERIFIZIERT (Gerät):** `spiralin` führt 216/216 Schritte in 3603 ms aus und trifft damit sein 60-Hz-Soll von 3600 ms praktisch exakt.
+- Boot, ROM-Import, Gameplay, Eingabe, Audio, persistente Saves/`CONTINUE`, Yellow-Mengenglyphe sowie Trainer-/Wildkampfstart sind geräteverifiziert.
+- `APP.runtimeEnabled` ist aktiviert. Die UI verwendet nun den regulären „Spiel starten“-Pfad und entfernt experimentelle Beschriftungen; ROM, Runtime und Payload werden weiterhin vor jedem Start geprüft.
+- Die temporäre Profilierung ist im Release standardmäßig deaktiviert. Hex-Escape-, QueueableSource-, IDBFS-, ChipSynth- und Übergangsadapter bleiben aktiv.
+- **NOCH ZU VERIFIZIEREN:** längere Audio-Sitzung ohne Unterlauf sowie wiederholte Hintergrund-/Vordergrund- und Save/Relaunch-Zyklen. Der separate Files-Save-Export bleibt auf Benutzerwunsch zurückgestellt.
+
+## Iteration 0.12.6
+
+- **VERIFIZIERT (Gerät):** Gen1Recomps eigene Diagnose meldet `worker=sync`. love.thread steht dem Musikpfad unter love.js nicht funktionsfähig zur Verfügung; jeder Songwechsel erzeugt PCM auf dem Renderthread.
+- **VERIFIZIERT (Gerät):** QueueableSource kostet 0 ms, während vier initiale 8192-Sample-Puffer zusammen 141–203 ms blockieren. Beim Trainerkampf wurden 164 ms gemessen.
+- r24 reduziert ausschließlich die ChipSynth-Musikpuffer-Granularität von 8192 auf 2048 Samples. Sample-Rate, PCM-Synthese, Musiktempo, Kanäle und Queue-Anzahl bleiben unverändert.
+- Erwartung: Initialer Vier-Puffer-Block ungefähr 35–50 ms statt 141–203 ms; laufende Synthesearbeit wird in ungefähr 9–13-ms-Einheiten amortisiert statt 35–50-ms-Einheiten. **NICHT VERIFIZIERT (Gerät)**.
+- Der r23-Übergang führte exakt 216 Adapter-Schritte aus; 128 Aufrufe benötigten 5402 ms. Der synchrone Audio-Queue-Aufbau während dieser Phase ist damit der nächste nachgewiesene Störfaktor.
+
+## Iteration 0.12.5
+
+- **VERIFIZIERT (Gerät):** QueueableSource-Erzeugung benötigt 0 ms; `ChipAudio.playMusic` benötigt beim Trainerkampf 160 ms und bei anderen Songwechseln 52–180 ms.
+- Für `audio.worker_push` erschien kein Ereignis. Das kann entweder synchronen Fallback oder eine im love.js-Build nicht über die erwartete Registry-Tabelle erreichbare Channel-Methode bedeuten; der Workerstatus war im r22-Bericht noch nicht enthalten.
+- r23 ergänzt `worker=<sync|starting|interp|jit|none>` aus Gen1Recomps eigener `ChipAudio.stats()`-Schnittstelle und zählt Adapter-Aufrufe sowie tatsächlich ausgeführte 60-Hz-Übergangsschritte.
+- Damit entscheidet ein letzter gezielter Datensatz zwischen synchroner PCM-Erzeugung, Worker-Übergabe und fehlerhafter Transition-Taktung. **BENCHMARK ERFORDERLICH**.
+
+## Iteration 0.12.4
+
+- **TEILWEISE VERIFIZIERT (Gerät):** Die r21-Übergangskorrektur macht den Kampfantritt spürbar schneller.
+- Der Benutzer grenzt den verbleibenden Hänger auf den Zeitpunkt unmittelbar vor Beginn der Übergangsanimation ein.
+- Der vorhandene Datensatz misst dort 140–150 ms synchronen Kampfmusikstart; Konstruktion und erster Draw sind vernachlässigbar.
+- r22 unterteilt den Musikpfad zusätzlich in `audio.chip_play`, `audio.queueable_constructor` und `audio.worker_push`, um QueueableSource-Erzeugung gegen Worker-/Channel-Übergabe abzugrenzen.
+- Profilberichte werden nicht mehr pro Ereignis geschrieben. Der Host sammelt die Phase-Bursts im Speicher und schreibt erst 2 Sekunden nach dem letzten Ereignis einen Snapshot. Damit kann Diagnose-I/O den gemessenen Kampfbeginn nicht mehr selbst stören.
+- Der noch verbleibende Musik-Unterpfad ist **BENCHMARK ERFORDERLICH**; keine spekulative Pufferverkleinerung oder Thread-Deaktivierung.
+
+## Iteration 0.12.3
+
+- **VERIFIZIERT (Gerät):** Der r20-Profiler isoliert den Engpass auf den Battle-Übergang. Konstruktion benötigt 0–3 ms, Musikstart 140–150 ms, `enter` 0 ms und erster Draw 1–6 ms.
+- Trainer-`spiralin`: 216 Soll-Frames in 6829 ms = 31,6 logische Frames/s statt 60.
+- Wild-`doublecircle`: 162 Soll-Frames in 6695–6801 ms = 23,8–24,2 logische Frames/s statt 60.
+- **VERIFIZIERT (Ursache):** Die framegezählten Übergänge liefen unter love.js damit in Zeitlupe; die restlichen Startphasen sind kein relevanter Engpass.
+- Adapter r21 taktet ausschließlich `BattleTransition:update` anhand einer monotonen Wanduhr auf 60 Hz und berücksichtigt die bestehende Battle-Speed-Option. Ein Sprung ist auf 250 ms begrenzt. Gameplay-, Kampfmechanik- und Audiotakt bleiben unangetastet.
+- Erwartete 1X-Dauer nach Korrektur: `doublecircle` ca. 2,7 s, `spiralin` ca. 3,6 s statt jeweils ca. 6,7–6,8 s. **NICHT VERIFIZIERT (Gerät)** bis zum r21-Test.
+
+## Iteration 0.12.2
+
+- **VERIFIZIERT (Gerät):** Speicherpersistenz und Gelbs Eich-Demo-Menge sind korrigiert.
+- Der separate Files-Save-Export ist auf ausdrücklichen Benutzerwunsch zurückgestellt; Laufzeit/Kampfruckler haben Priorität.
+- Adapter r20 misst Kampf-Konstruktion, Musikstart, Übergang, `BattleState:enter` und ersten Draw separat.
+- Der Host schreibt höchstens 100 streng präfixvalidierte Ereignisse nach `Documents/Gen1Recomp/Diagnostics/battle-profile.v1.json`.
+- Die statische Prüfung weist je nach Übergang bereits ca. 1,9–4,1 Sekunden beabsichtigtes Framebudget aus. Ob zusätzliche Geräte-Stalls auftreten, ist **BENCHMARK ERFORDERLICH**.
+- Detailprüfung: [`conformance-audit-0.12.2.md`](../architecture/conformance-audit-0.12.2.md).
+
+## Iteration 0.12.1
+
+- **VERIFIZIERT (Gerät):** 0.12.0 erhält den Spielstand nach vollständigem Scripting-Neustart; `CONTINUE` funktioniert.
+- Der Benutzer präzisierte Gelbs Eich-Demo-Ausgabe als `POKE BALL xc3x97`. **VERIFIZIERT (Ursache):** Gen1Recomp schreibt das UTF-8-Zeichen `×` als Lua-5.2-Hex-Escapes `\\xc3\\x97`; love.js' Lua-5.1-VM entfernt bei unbekannten Escapes die Backslashes und erzeugt daher wörtlich `xc3x97`.
+- Adapter r19 normalisiert Hex-Byte-Escapes beim Laden von `src.*`-Modulen zu gleichwertigen dreistelligen Lua-5.1-Dezimal-Escapes. Payloaddateien bleiben unverändert.
+- Der bestätigte 750-ms-IDBFS-Polling-Sync aus r18 wird durch einen 500-ms-debounced Sync ausschließlich nach Schreibzugriffen auf `/home/web_user/` ersetzt. Hintergrund-/`pagehide`-Flushes bleiben erhalten. Das entfernt regelmäßige IndexedDB-Scans als mögliche Quelle kleiner Kampf-/Begegnungsruckler.
+- **NICHT VERIFIZIERT (Gerät):** korrigierte `×1`-Darstellung und Rucklerreduktion.
+- Der sichtbare Files-Export bleibt gemäß Benutzervorgabe eine separate Save-/Backup-Funktion und ist nicht mit dem internen Runtime-Speicherpfad gekoppelt.
+
+## Iteration 0.12.0
+
+- **VERIFIZIERT (Gerät):** r17 startet Spiel, Karte, Steuerung und Audio ohne den bisherigen Music-Absturz.
+- **VERIFIZIERT (Gerät):** In-Game-Speichern meldet Erfolg, aber nach vollständigem Neustart fehlt `CONTINUE`.
+- **VERIFIZIERT (Quellprüfung):** Gen1Recomp schreibt korrekt in love.filesystems VFS; love.js persistiert `/home/web_user` per IDBFS. Der Host verwendete jedoch einen ephemeren WKWebView-Datenspeicher, und der offizielle Exit-Sync ist asynchron und beim Prozessende nicht zuverlässig.
+- r18 verwendet `ephemeral: false` und synchronisiert love.js-IDBFS nach Runtime-Start alle 750 ms sowie bei Hintergrund-/Seitenende. Überlappende Syncs werden serialisiert.
+- **BENCHMARK ERFORDERLICH:** langsame Trainer-/Wildkampfstarts. Keine spekulative Performanceänderung ohne Messung.
+- **NICHT VERIFIZIERT:** Die genaue fehlerhafte Pokéball-Anzahl-Glyphenfolge in Gelbs Eich-Demo; statisch ist die Menge numerisch `1`, die Darstellung zeichnet `×` plus Zahl.
+- Detailprüfung: [`conformance-audit-0.12.0.md`](../architecture/conformance-audit-0.12.0.md).
+
+## Iteration 0.11.3
+
+- **VERIFIZIERT (Gerät):** r16 reproduziert unverändert `Music.lua:308`; der nachgelagerte ChipAudio-Modulwrapper kontrolliert damit nicht zuverlässig das von Music verwendete Objekt.
+- Der gesamte Gen-1-Musikpfad wurde erneut geprüft: ROM-Songdefinition → `Music.startSong` → `ChipAudio.playMusic` → `love.audio.newQueueableSource` → Music-Zeile 308.
+- Adapter r17 erzeugt die vollständige Lua-Fassade jetzt direkt im nachweislich wirksamen normalize2-Konstruktoradapter. ChipAudio und Music erhalten von Anfang an dieselbe Fassade; der zeitabhängige ChipAudio-Require-Wrapper wurde entfernt.
+- Der Test simuliert exakt `function, Source`, prüft Auswahl, alle Kernweiterleitungen mit originalem `self` und die drei sicheren Modifier-Fallbacks.
+- **NICHT VERIFIZIERT:** Kartenstart, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.3.md`](../architecture/conformance-audit-0.11.3.md).
+
+## Iteration 0.11.2
+
+- **VERIFIZIERT (Gerät):** r15 reproduziert exakt den nil-Aufruf an `Music.lua:308`; das Source-Objekt lässt sich auf diesem Pfad nicht durch Feldzuweisung erweitern.
+- Adapter r16 mutiert das Runtimeobjekt nicht mehr. Er gibt Music eine eigene Lua-Fassade, die alle sieben nativen Kernoperationen mit korrektem originalem `self` weiterleitet.
+- Vorhandene optionale Modifikatoren werden weitergeleitet; nur fehlende `setLooping`, `setFilter` und `setPitch` degradieren als No-op. ChipAudio behält und befüllt weiterhin das originale native Objekt.
+- Der ausführbare Test verifiziert native Identität, Self-Bindung, Kernweiterleitungen, Rückgaben und optionale Fallbacks.
+- **NICHT VERIFIZIERT:** Kartenstart, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.2.md`](../architecture/conformance-audit-0.11.2.md).
+
+## Iteration 0.11.1
+
+- **VERIFIZIERT (Gerät):** r14 verhindert den früheren Funktionszugriff. Der nächste Fehler entsteht nun in `Music.lua:308`, weil der tabellenförmige love.js-QueueableSource-Proxy keine Methode `setLooping` besitzt.
+- **VERIFIZIERT (Quellprüfung):** Das Argument `src.setLooping` wird vor `pcall` ausgewertet; eine fehlende Methode kann daher nicht durch den upstream Schutz abgefangen werden.
+- Adapter r15 ergänzt bei einem mutierbaren Tabellenproxy nur die optionalen Modifikatoren `setLooping`, `setFilter` und `setPitch` als No-op. Looping wird bei Chip-Musik bereits von ChipSynth verarbeitet; Filter ist upstream ausdrücklich optional.
+- Kernmethoden für Queue, Wiedergabe und Zustand bleiben zwingend und werden nicht simuliert.
+- **NICHT VERIFIZIERT:** Kartenstart, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.1.md`](../architecture/conformance-audit-0.11.1.md).
+
+## Iteration 0.11.0
+
+- **VERIFIZIERT (Gerät):** Das STORE-Paket 0.10.9 lässt sich importieren; allgemeine Audioausgabe ist vorhanden. Der Funktionswert erreicht dennoch weiterhin `Music.applyVolume`.
+- Nach drei unveränderten Gerätebefunden werden keine weiteren spekulativen Konstruktor-Zeitpunktkorrekturen vorgenommen.
+- Adapter r14 validiert stattdessen den Rückgabevertrag am letzten stabilen Punkt vor Music: dem über den nachweislich aktiven Require-Adapter geladenen Export `ChipAudio.playMusic`.
+- Ungültige Rückgaben werden mit Typ und verfügbarer Funktionsherkunft als Fehler an `Music.startSong` zurückgegeben. Dessen vorhandener `pcall` verwirft den Song kontrolliert, statt den Funktionswert in `applyVolume` zu dereferenzieren.
+- **NICHT VERIFIZIERT:** Fortschritt über den Kartenaufbau, QueueableSource-Musik, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.11.0.md`](../architecture/conformance-audit-0.11.0.md).
+
+## Iteration 0.10.9
+
+- **VERIFIZIERT (Gerät):** Scripting lehnt das 0.10.8-Artefakt als nicht dekomprimierbar ab.
+- **VERIFIZIERT (lokal):** Info-ZIP und Python lesen alle 29 Einträge des abgelehnten Pakets einschließlich CRC-Prüfung fehlerfrei; eine lokale Beschädigung ist nicht reproduzierbar. Die konkrete Importerabweichung bleibt **TECHNISCH UNBEKANNT**.
+- 0.10.9 verwendet für den äußeren `.scripting`-Transport ausschließlich ZIP STORE. Dadurch entfällt die Dekompression im Scripting-Importer; Projektinhalt und Runtime r13 bleiben identisch.
+- Der reproduzierbare Pakettest verbietet jetzt komprimierte Einträge und prüft den normalize2-Adapter ausdrücklich als Pflichtdatei.
+- **NICHT VERIFIZIERT:** Geräteimport des STORE-Pakets und anschließender QueueableSource-Test.
+- Detailprüfung: [`conformance-audit-0.10.9.md`](../architecture/conformance-audit-0.10.9.md).
+
+## Iteration 0.10.8
+
+- **VERIFIZIERT (Gerät):** Audioausgabe ist grundsätzlich vorhanden, aber r12 reproduziert weiterhin `Music.lua:39` mit einem Funktionswert.
+- **VERIFIZIERT (Quellprüfung):** Auch der verzögerte r12-Guard blieb Teil von `normalize1`; love.js stellt für Anpassungen nach Initialisierung optionaler Module ausdrücklich `normalize2` bereit und führt dort bereits seine upstream Audio-Normalisierung aus.
+- Runtime r13 verschiebt den Guard vollständig in einen getrennt gehashten normalize2-Adapter. Der Resource-Resolver liefert ihn anstelle der unveränderten upstream Ressource genau an love.js' Post-Modul-Lebenszykluspunkt aus.
+- Ein eigener ausführbarer Test prüft gültige und versetzte Source-Rückgaben sowie den ungültigen Funktionswert am normalize2-Pfad. Beide upstream Normalizer bleiben als unveränderte, gehashte Dateien erhalten.
+- **NICHT VERIFIZIERT:** QueueableSource-Musik, r13-Geräteaktivierung, Saves, Lifecycle und längeres Gameplay.
+- Detailprüfung: [`conformance-audit-0.10.8.md`](../architecture/conformance-audit-0.10.8.md).
+
+## Iteration 0.10.7
+
+- **VERIFIZIERT (Gerät):** r11 änderte den `Music.lua:39`-Fehler nicht; der QueueableSource-Guard war auf dem Gerätepfad nicht aktiv.
+- **VERIFIZIERT (Quellprüfung):** r11 versuchte die Installation während `normalize1`, bevor `love.audio` als optionales LÖVE-Modul garantiert verfügbar ist. Ein ausgeführter Guard hätte den beobachteten Funktionswert nicht passieren lassen.
+- Adapter r12 installiert den Guard deshalb verzögert aus dem bestehenden Require-Adapter, sobald `love.audio.newQueueableSource` existiert, aber weiterhin vor dem Laden/Benutzen von `ChipAudio`.
+- Der ausführbare Lua-Test bildet die späte Audio-Modulinitialisierung nach und beweist Installation, Wiederherstellung eines späteren Source-Rückgabewerts und kontrollierte Zurückweisung des Funktionswerts.
+- **NICHT VERIFIZIERT:** r12-Aktivierung auf dem Gerät, Musik/SFX, weiterer Spielfortschritt, Saves und Lifecycle.
+- Detailprüfung: [`conformance-audit-0.10.7.md`](../architecture/conformance-audit-0.10.7.md).
+
+## Iteration 0.10.6
+
+- **VERIFIZIERT (Gerät):** 0.10.5 startet Gen1Recomp; der Gameplay-Controller erscheint und funktioniert. Der frühere Theme-Rail-Fehler blockiert den Start nicht mehr.
+- **TEILWEISE VERIFIZIERT (Gerät):** Ein neuer Spielstand erreicht den Overworld-Kartenaufbau.
+- **VERIFIZIERT (Gerät/Quellprüfung):** Der nächste Blocker ist ein Audio-Typbruch: `ChipAudio.playMusic` erhält von `love.audio.newQueueableSource` einen Lua-Funktionswert statt der dokumentierten Source und reicht ihn an `Music.applyVolume` weiter.
+- Adapter r11 prüft die Konstruktor-Rückgabewerte an der LÖVE-Grenze, übernimmt einen tatsächlich vorhandenen Source-Wert aus einer späteren Rückgabeposition und weist andernfalls den ungültigen Runtimewert kontrolliert zurück. Payload und Runtimebytes bleiben unverändert.
+- **NICHT VERIFIZIERT:** Musik/SFX, weiterer Spielfortschritt, Saves, Lifecycle und Langzeitspiel benötigen den Gerätetest mit r11.
+- Detailprüfung: [`conformance-audit-0.10.6.md`](../architecture/conformance-audit-0.10.6.md).
+
+## Iteration 0.10.5
+
+- **VERIFIZIERT (Quellprüfung):** Der 0.10.4-Fehler `Invalid host session configuration` war eine Hostregression: ein versehentlich asynchroner Script-Message-Handler verletzte Scripting's synchronen Bridge-Rückgabevertrag.
+- Runtime r10 stellt den synchronen Handler wieder her; späte Fehler werden fire-and-forget mit eigener Fehlerbehandlung persistiert. Ein Regressionstest sperrt den asynchronen Handler.
+- Der ROM-/Gameplay-Modus besitzt nun einen hosteigenen Multitouch-Controller für D-Pad, A, B, START und SELECT über die unveränderten Gen1Recomp-Standardtasten.
+- `nogame`, Payload-Gate und Launcher-Vorschau aktivieren den Controller nicht.
+- **VERIFIZIERT (Gerät):** r10 startet das Spiel; Controllerereignisse funktionieren und der Rail-Fix passiert die frühere Fehlerstelle.
+- **TEILWEISE VERIFIZIERT (Gerät):** Gameplay erreicht den Overworld-Kartenaufbau; Audio scheitert dort am in 0.10.6 adressierten Source-Typbruch. Saves und Lifecycle bleiben **NICHT VERIFIZIERT**.
+- Detailprüfung: [`conformance-audit-0.10.5.md`](../architecture/conformance-audit-0.10.5.md).
+
+## Iteration 0.10.4
+
+- Statt weiterer unsystematischer Einzelkorrekturen wurde der vollständige gepinnte Payload statisch gegen bekannte Lua-5.1-/LuaJIT-Abweichungen geprüft.
+- Adapter r9 korrigiert den exakten Fließkomma-Wrap in `Theme.versionRail` durch einen begrenzten Moduladapter mit explizitem Index-Modulo; die restliche Theme-Implementierung bleibt unverändert.
+- Frühe und späte Alert-/Konsolenfehler werden auch nach `Module.postrun` dauerhaft in `Diagnostics/gen1recomp-gameplay-runtime-error.v1.json` geschrieben.
+- **VERIFIZIERT (automatisiert/statisch):** Rail-Wrap, Timer, Bit, MD5, Load, Root-Cause-Erhaltung und das Inventar weiterer post-Lua-5.1-Konstrukte.
+- **NICHT VERIFIZIERT:** r9, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- Detailprüfung: [`conformance-audit-0.10.4.md`](../architecture/conformance-audit-0.10.4.md).
+
+## Iteration 0.10.3
+
+- **TEILWEISE VERIFIZIERT (Gerät):** Der vorherige `Data.lua:271`-Fehler erschien nicht erneut; ein Lauf erreichte stattdessen einen allgemeinen love.js-Fensteralarm.
+- **VERIFIZIERT (Gerät):** Nach Neustart zeichnete der Launcher bis `Theme.versionRail`; die statisch lückenlose Farbliste wurde mit einem ungültigen dynamischen Index angesprochen.
+- Adapter r8 normalisiert nicht-endliche oder rückwärts laufende `love.timer.getTime()`-Werte und wahrt damit LÖVEs numerischen, monotonen Timervertrag.
+- Der Harness übermittelt bei einem frühen `window.alert` bis zu acht begrenzte `console.error`-Zeilen über die bestehende Bridge. WASM bleibt opak.
+- **NICHT VERIFIZIERT:** Timerfix, früher Fensterfehler, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- Detailprüfung: [`conformance-audit-0.10.3.md`](../architecture/conformance-audit-0.10.3.md).
+
+## Iteration 0.10.2
+
+- **VERIFIZIERT (Gerät):** Der erhaltene Root Cause ist `Data.lua:271`: Gen1Recomp benötigt Lua 5.2s `load(string, name, mode, env)`, während love.js 11.5 Lua 5.1s Reader-only-`load` bereitstellt.
+- Adapter r7 ergänzt String-/Reader-Chunks, Modusprüfung und isolierte Environments über Lua 5.1 `loadstring`/`setfenv`, ohne Payload oder Runtime-Upstreams zu verändern.
+- **VERIFIZIERT (automatisiert):** isolierter Text-Chunk, Reader-Chunk und geschlossene Modusabwehr sowie alle bisherigen Bit-/MD5-/Diagnosetests.
+- **NICHT VERIFIZIERT:** Der neue Kompatibilitätspfad, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den nächsten Gerätetest.
+- Detailprüfung: [`conformance-audit-0.10.2.md`](../architecture/conformance-audit-0.10.2.md).
+
+## Iteration 0.10.1
+
+- **VERIFIZIERT (Gerät):** Der Bit-/StreamMD5-Blocker ist beim experimentellen Start beseitigt; ROM-Import und Übergabe erreichen das Gen-1-Game-Objekt.
+- **NICHT VERIFIZIERT:** `Game.load` scheitert vor der StateStack-Initialisierung. Upstreams `pcall` verdeckt den Root Cause, worauf der erste Draw nur `Game.stack == nil` meldet.
+- Adapter r6 bewahrt ausschließlich im Fehlerfall den ursprünglichen `Game.load`-Traceback für den nächsten Gerätetest; erfolgreiches Laden und Zeichnen bleiben unverändert.
+- Detailprüfung: [`conformance-audit-0.10.1.md`](../architecture/conformance-audit-0.10.1.md).
+
+## Iteration 0.10.0
+
+- **VERIFIZIERT (automatisiert):** Runtime `lovejs-11.5-r5` ersetzt nur die gebridgte Normalisierungsressource durch einen separat gehashten Host-Adapter. Upstream love.js, WASM, Player, Normalisierung und Gen1Recomp bleiben unverändert.
+- **VERIFIZIERT (automatisiert):** Die reine-Lua-Implementierung erfüllt die von Gen1Recomp verwendeten Bitoperationen; unverändertes upstream `StreamMD5.lua` besteht drei bekannte MD5-Vektoren.
+- **VERIFIZIERT (statisch):** Ein experimenteller Spielstart revalidiert genau einen erkannten Library-ROM nach Länge, SHA-256 und SHA-1, überträgt ihn schreibgeschützt und aktiviert ausschließlich Gen1Recomps offiziellen `POKEPORT_IMPORT_ROM`-Pfad.
+- **NICHT VERIFIZIERT:** Launcher r5, ROM-Import, Gameplay, Eingabe, Audio, Saves und Lifecycle benötigen den echten Gerätetest. Die App bezeichnet diesen Weg ausdrücklich als experimentell.
+- Detailprüfung: [`conformance-audit-0.10.0.md`](../architecture/conformance-audit-0.10.0.md).
+
+## Iteration 0.9.0
+
+Drei aufeinanderfolgende Schritte wurden umgesetzt:
+
+1. **Begrenztes Payload-Staging:** Der Netzwerkabruf besitzt zusätzlich zum Request-Timeout ein dokumentiertes `AbortSignal.timeout(180_000)`. Vor Download, Response-Lesen, Größen-/Hashprüfung, ZIP-Preflight, Metadatenprüfung, Schreiben, zweitem Hash und atomarer Publikation wird `Diagnostics/payload-stage-progress.v1.json` aktualisiert. Die UI zeigt dieselbe Phase; ein Hänger ist damit zeitlich begrenzt oder nach Prozessabbruch lokalisierbar.
+2. **Payload-Boot-Gate:** Der in 0.8.0 ergänzte, erneut größen-/SHA-256-geprüfte Bridge-Boot bleibt separat verfügbar und schreibt `gen1recomp-payload-boot.v1.json`. Er mountet weiterhin keine ROMs, Mods oder Saves.
+3. **Sichtbare Launcher-Vorschau:** Nach demselben fail-closed Payload-Boot kann exakt dieselbe WebView über die dokumentierte `WebViewController.present`-API fullscreen angezeigt werden. Der Bericht wird vor Darstellung gespeichert; beim Schließen wird die WebView entsorgt. Die Vorschau aktiviert keinen Core und besitzt noch keinen ROM-/Save-Bridgepfad.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — love.js/nogame ist geräteverifiziert. Begrenztes Staging, Payload-Boot und sichtbare Vorschau benötigen den neuen Gerätelauf.
+
+## Iteration 0.8.0
+
+- **Gerätebefund 0.7.0:** Kandidat `lovejs-11.5-r3` übertrug sämtliche Runtimepakete über `gen1HostBridge` und erreichte mit `nogame.love` eindeutig `Module.postrun`. Meilensteine `bridge.ready → resources.ready → player.loaded → runtime.ready`, Canvas 300×150, WASM- und IndexedDB-Präsenz wurden gemeldet. Das love.js-`nogame`-Boot-Gate ist damit **VERIFIZIERT** auf dem realen Gerät; es beweist weiterhin kein Gameplay.
+- Adapter r4 fordert seine Bootkonfiguration über `session.config` an. Derselbe gehashte Harness kann dadurch entweder das verifizierte `nogame`-Gate oder ein strikt getrenntes Gen1Recomp-Payload-Gate ausführen, ohne upstream Player oder Payload zu verändern.
+- Der bereits gespeicherte Payload 0.3.20 wird vor jedem Test erneut auf Bytezahl und SHA-256 geprüft und anschließend als opake Ressource `payload/gen1recomp-0.3.20.love` über die allowlistete 128-KiB-Bridge transportiert.
+- Das neue Diagnose-Gate mountet keine ROM, Mods oder Saves und erzeugt keinen aktiven Runtime-/Payloadpointer. Es prüft ausschließlich, ob der unveränderte Payload ohne Nutzerdaten bis `Module.postrun` initialisiert.
+- Wegen 24.908.860 Payloadbytes gelten getrennte 90-/105-Sekunden Runtime-/Host-Watchdogs. Der Bericht landet in `Diagnostics/gen1recomp-payload-boot.v1.json` und kennzeichnet `probe`, `payloadVersion`, Phase und Meilensteine.
+- Kandidat `lovejs-11.5-r4` wird seitlich neben r1–r3 installiert. Die updategebundene Runtime und der separat versionierte Payload bleiben unabhängig austauschbar und inaktiv.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — love.js-Boot und Resource-Bridge sind geräteverifiziert. Der erste unveränderte Gen1Recomp-Payload-Boot über die Bridge steht aus.
+
+## Iteration 0.7.0
+
+- **Gerätebefund 0.6.0:** `gen1HostBridge` selbst funktioniert (`bridge.ready`). Der lokale Browser-`fetch` scheiterte dagegen bereits beim Adapter-Preflight mit `TypeError: Load failed`; `resources.error` wurde korrekt über die Bridge zurückgemeldet. Ursache ist damit **VERIFIZIERT** auf lokale `file:`-Fetches eingegrenzt, bevor love.js oder WASM ausgeführt wurden.
+- Adapter r3 installiert einen eng allowlisteten Resource-Bridge-Pfad für exakt `nogame.love`, beide Normalizer und `11.5/love.wasm`. Andere Pfade, negative/unganzzahlige Offsets, leere oder über 128 KiB große Anforderungen werden abgelehnt.
+- Der Host liest die zuvor vollständig gehashten Kandidatendateien als opake Daten, liefert ausschließlich angeforderte Bereiche als Base64-Antwort und gibt weder Dateisystempfade noch beliebigen Dateizugriff an die WebView frei.
+- Der Harness ersetzt `fetch` nur für diese vier exakten Runtimepfade. Er setzt die geordneten 128-KiB-Teile wieder zusammen, cached sie im WebView-Speicher und liefert dem unveränderten upstream Player normale erfolgreiche `Response`-Objekte. `player.js` und `love.js` bleiben byteidentisch.
+- Der Host interpretiert oder instanziiert WASM weiterhin nicht, ruft keine Exporte auf und greift nicht auf linearen Speicher zu. WASM wird als opaker, updategebundener Runtimebestand über die Bridge transportiert; ausschließlich upstream love.js/Emscripten besitzt die interne Instanziierung.
+- Kandidat `lovejs-11.5-r3` wird mit Adapterversion 3 seitlich neben r1/r2 installiert und überschreibt keine frühere Version. Es bleibt ohne aktiven Pointer.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — Ursache des r2-Fehlers und Bridge-Erreichbarkeit sind geräteverifiziert; Chunk-Protokoll, Allowlist und Bytepins sind reproduzierbar getestet. Der r3-Transfer-/Boot-Test steht aus.
+
+## Iteration 0.6.0
+
+- **Gerätebefund 0.5.1:** `loadFile` und `waitForLoad` wurden abgeschlossen; der 40-Sekunden-Watchdog endete in `runtime-event`. Es kam kein einziges altes Terminalereignis an. Damit ist der Fehler auf die undifferenzierte WebView-/Playerstrecke eingegrenzt, aber noch nicht auf Ressourcenladen, Bridge oder Runtimeinitialisierung.
+- Der Adapter r2 verwendet jetzt das explizit versionierte Protokoll `gen1HostBridge` v1. Er sendet getrennte Meilensteine für Bridge-Handshake, lesbare Adapterressourcen, zurückgekehrtes `player.js` und `Module.postrun`; Fehler und Timeouts bleiben terminal.
+- Der Harness prüft `.love`, Normalizer und `love.js` vorab, greift aber gemäß der neuen Richtlinie **nicht** auf `love.wasm` zu. Ausschließlich der unveränderte upstream love.js-/Emscripten-Loader lädt und instanziiert sein eigenes WASM. Der Scripting-Host ruft keine Exporte auf, inspiziert keinen WASM-Speicher und patcht keine Runtimebytes.
+- Capability-Probe v3 prüft nur noch die Präsenz der Browser-WASM-API. Die frühere synthetische direkte Validierung/Instanziierung und SIMD-Probe ist entfernt und als historischer Gerätebefund dokumentiert, nicht als Aktivierungsgate.
+- Runtime `lovejs-11.5-r2` wird seitlich neben r1 installiert. Manifest und UI führen Adapterversion, Bridgeprotokoll, Vorgänger und die Richtlinie `reviewed-side-by-side-candidate`; vorhandene Runtimeversionen werden weder überschrieben noch automatisch aktiviert.
+- Der Endbericht enthält die erreichten `milestones` und eine feinere `stage`. Gen1Recomp, Saves, Mods und Nutzerdaten bleiben unberührt; `runtimeEnabled` bleibt `false`.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — Bridgevertrag, Bytepins, Update-Trennung und das Verbot direkter Host-WASM-Interaktion sind statisch getestet. Der r2-Gerätelauf steht aus.
+
+## Iteration 0.5.1
+
+- **Gerätebefund:** Capability-Probe v2 schrieb einen vollständigen Bericht, der lokales JavaScript, WebAssembly-Validierung/-Instanziierung einschließlich SIMD, WebGL 1/2 mit Readback, WebAudio-Konstruktion, IndexedDB-API, Touch und Gamepad-API bestätigt. `crossOriginIsolated` und `SharedArrayBuffer` sind auf diesem Gerät nicht verfügbar. Dieser Bericht ist **VERIFIZIERT**, aber ausdrücklich keine Runtime-Zertifizierung.
+- Der anschließend gestartete love.js-Test kehrte nicht zur UI zurück und erzeugte keinen `lovejs-boot.v1.json`. Deshalb ist noch **TECHNISCH UNBEKANNT**, ob er in `loadFile`, `waitForLoad`, beim Runtime-Event oder durch einen blockierten WebContent-Prozess hing.
+- 0.5.1 ergänzt einen hostseitigen, vom WebView-Harness unabhängigen 40-Sekunden-Watchdog um die gesamte Lade-/Eventkette. Somit hängt die Aktion auch dann nicht unbegrenzt, wenn WebView-JavaScript oder dessen Timer blockiert.
+- Während des Tests wird `Diagnostics/lovejs-boot-progress.v1.json` vor jeder Await-Phase geschrieben (`load-file`, `wait-for-load`, `runtime-event`). Bei regulärem Abschluss wird er durch den autoritativen Endbericht ersetzt und entfernt.
+- Fehler und Host-Timeout werden jetzt ebenfalls als `lovejs-boot.v1.json` gespeichert; dessen `stage` lokalisiert die blockierende Phase. Gameplay bleibt unverändert gesperrt.
+
+Status: **EXPERIMENTELL** — die Endlosschleife ist fail-closed begrenzt; die konkrete Blockierphase benötigt den erneuten Gerätetest.
+
+## Iteration 0.5.0
+
+- Der offizielle love.js-/LÖVE-11.5-Bestand aus Revision `9355186de22db13bd88bf2a0db75d2925647d036` ist reproduzierbar eingebettet: unverändertes `player.js`, `love.js`, `love.wasm`, `nogame.love`, beide Normalizer und Lizenzdatei.
+- `runtime-manifest.ts` bindet jede der acht Dateien einschließlich des separaten Host-Harness an SHA-256. Installation erfolgt aus `Script.directory` über `Transactions/runtime-lovejs-11.5-r1` nach `Cores/runtimes/lovejs-11.5-r1`; Quell- und Zielkopie werden vollständig gehasht.
+- Ein unvollständiges Transaktionsverzeichnis wird beim Start entfernt. Vor jedem Boot werden alle Kandidatendateien erneut geprüft; vorhandene unbekannte Zielordner werden nie überschrieben.
+- Der Host-Harness nutzt ausschließlich den dokumentierten lokalen `WebViewController.loadFile`-Pfad und einen einzigen `runtimeEvent`-Message-Handler. Der upstream Player wird nicht gepatcht und der Gen1Recomp-Payload wird weder kopiert noch gemountet, ausgewertet oder gestartet.
+- Das Boot-Gate startet ausschließlich das offizielle `nogame.love`, wartet höchstens 30 Sekunden auf den durch `Module.postrun` sichtbaren Player-Zustand und speichert einen datensparsamen Bericht in `Diagnostics/lovejs-boot.v1.json`.
+- `APP.runtimeEnabled` bleibt `false`; ein erfolgreiches `nogame`-Boot beweist ausdrücklich weder Gameplay noch Audio, Saves, Lifecycle oder Kompatibilität des Gen1Recomp-Payloads.
+
+Status: **EXPERIMENTELL / TEILWEISE VERIFIZIERT** — Provenienz, Byteinventar, Trennung, Transaktion und Sperren sind statisch/reproduzierbar geprüft. Ob WKWebView lokale Fetches von `.love`, Lua und WASM in genau diesem `loadFile`-Kontext zulässt und `postrun` erreicht, muss der echte Gerätetest zeigen.
+
+## Iteration 0.4.0
+
+- Der durch den Gerätetest bestätigte Free-Tier-Modimport ist jetzt als **VERIFIZIERT** dokumentiert.
+- Einstellungen können nach einer expliziten Release-Metadatenprüfung den exakt im Projekt gepinnten Gen1Recomp-Payload 0.3.20 herunterladen und ausschließlich als inaktiven Kandidaten speichern.
+- Vor Publikation werden feste URL/Version/Dateiname/Bytezahl/SHA-256, erlaubter finaler GitHub-Host, vollständige ZIP-Struktur sowie `src/core/Version.lua` geprüft. Kandidaten-Lua wird nie ausgeführt.
+- `engine`, `payloadHost` und `minShell` werden als Literale gelesen und gegen den eingebauten Vertrauenspin gegatet. Download, zweite Hashprüfung und content-separierte Publikation erfolgen in `Transactions` beziehungsweise `Cores/payloads/0.3.20`.
+- Unterbrochene Payload-Transaktionen werden beim nächsten Appstart verworfen. Ein vorhandener Kandidat wird vor Wiederverwendung erneut gehasht.
+- Es gibt weiterhin keinen aktiven Core-Pointer und keinen Startpfad: Der Kandidat bleibt `stored-runtime-gated`, bis love.js und sämtliche Geräte-Gates bestanden sind.
+
+Status: **TEILWEISE VERIFIZIERT** — Vertrauens-, Parsing-, Staging- und Aktivierungssperren sind statisch beziehungsweise durch Tests belegt; der Binärdownload und die Ablage benötigen den echten Gerätetest.
+
+
+## Iteration 0.3.3
+
+- **Gerätebefund:** Die vollständig Free-Tier-kompatible Eigenextraktion erreichte die Manifestprüfung; die alte Sammelmeldung konnte dort entweder ein fehlendes ZIP-Record oder die zusätzliche Host-`stat().type === "file"`-Annahme für `main.lua` bedeuten. Die Quellprüfung identifizierte diese Host-Typannahme als unnötige Abweichung vom upstream Vertrag.
+- Der Check folgt jetzt wieder dem upstream Gen1Recomp-Vertrag: `entry` muss im Manifest ausdrücklich vorhanden und ein sicherer relativer Pfad sein. Das dazugehörige, bereits zentral/lokal/CRC-geprüfte ZIP-Record muss eine Datei sein und das geschriebene Transaktionsziel muss existieren.
+- Damit hängt die Freigabe nicht mehr von einer möglicherweise hostversionsabhängigen `FileStat.type`-Zeichenfolge ab. Fehlermeldungen unterscheiden nun „fehlt im ZIP/ist Ordner“ von „geprüft, aber nicht geschrieben“.
+- Der zuvor erfundene Fallback auf `main.lua` bei fehlendem `entry` wurde entfernt; offizielles Gen1Recomp verlangt `manifest.entry`.
+
+Status: **TEILWEISE VERIFIZIERT** — der Gerätebefund ist lokalisiert und der Check an upstream angepasst; der konkrete Import benötigt die erneute Gerätebestätigung.
+
+
+## Iteration 0.3.2
+
+- **Gerätebefund:** Scripting klassifiziert die verwendete `Archive`-API als PRO. Diese API und alle `FileManager.zip/unzip`-Wege wurden vollständig aus dem Produktcode und dem Hostvertrag entfernt.
+- ZIP-Lesen und -Entpacken ist jetzt vollständig im Projekt implementiert: EOCD/Zentralverzeichnis, lokale Header, Stored-Einträge, RFC-1951-DEFLATE (ungepackte, feste und dynamische Huffman-Blöcke), Daten-Deskriptoren, Größenprüfung und CRC-32.
+- Zentrale und lokale Dateinamen, Flags, Kompressionsmethoden, Größen und CRC müssen übereinstimmen. Jeder Eintrag wird weiterhin nur an einen vorab normalisierten Zielpfad geschrieben.
+- Der Free-Tier-Regressionstest sperrt nun dauerhaft `Archive.openForMode`, 7z-Archive sowie `FileManager.zip/unzip` zusätzlich zu `BackgroundKeeper`.
+- Standardvektor-CRC, dynamisches/festes/leeres DEFLATE, Stored-/Deflate-/Descriptor-ZIPs und widersprüchliche lokale Header sind getestet.
+
+Status: **TEILWEISE VERIFIZIERT** — die Eigenimplementierung besteht reproduzierbare Tests und benötigt keine bekannte PRO-API; der konkrete Modimport muss erneut auf dem Gerät bestätigt werden.
+
+
+## Iteration 0.3.1
+
+> Historischer Zwischenstand: Die dort ergänzte `Archive.entries()`-Querprüfung erwies sich auf dem Gerät als PRO-pflichtig und ist in 0.3.2 vollständig entfernt.
+
+- Reagiert auf den auf dem echten Gerät bestätigten Mod-Import-Abbruch: Die bisher zusammengefasste Meldung deutete entweder auf das zu knappe 4.096-Eintragslimit oder beschädigte Verzeichnisgrenzen. Das sichere Limit steigt auf 32.768; beide Ursachen haben jetzt getrennte Meldungen.
+- Trennt die Fehlermeldungen für Eintragslimit und beschädigte Zentralverzeichnisgrenzen, damit weitere Gerätebefunde eindeutig sind.
+- Liest ein Modarchiv nur noch einmal als `Data` und verwendet dieselben Bytes für SHA-256 und ZIP-Preflight; dadurch entfällt eine zweite vollständige Dateilesung.
+- Ergänzt ein 200:1-Entpackverhältnis-Limit und gleicht komprimierte wie entpackte Größen zusätzlich mit Scripting `Archive.entries()` ab.
+- Regressionstests decken mehr als 4.096 Einträge und Dekompressionsbomben ab.
+- Mod-Importfehler nennen jetzt die genaue Phase und schreiben einen datensparsamen Bericht nach `Diagnostics/mod-import-last-failure.v1.json`; Diagnosefehler können den ursprünglichen Importfehler nicht mehr verdecken.
+- Nach erfolgreicher Index-Publikation gilt fehlgeschlagene temporäre Bereinigung nicht mehr fälschlich als fehlgeschlagene Installation; die Start-Recovery übernimmt den Rest.
+
+Status: **TEILWEISE VERIFIZIERT** — der ursprüngliche Fehler ist durch Gerätefeedback belegt; der frühere Grenzwert und die neue Annahme von mehr als 4.096 Einträgen sind reproduzierbar getestet. Ob genau dieser Grenzwert das konkrete ZIP blockierte, zeigt erst der erneute Geräteimport beziehungsweise die nun eindeutige Meldung.
+
+
+## Iteration 0.3.0
+
+- Vier dokumentationskonforme Bottom-Tabs: Spiele, Mods, Diagnose und Einstellungen, jeweils mit eigenem `NavigationStack`.
+- Lokaler Mod-ZIP-Import mit Central-Directory-Preflight, Größenlimits, Symlink-/Traversal-/Duplikat-Sperren, Manifest-Basiskontrolle, SHA-256 und unveränderlichem `id/version/hash`-Speicher. Pakete werden ausdrücklich noch nicht aktiviert.
+- Sichtbares Komponenten-Inventar für Scripting-Shell, Gen1Recomp-Payload und love.js; die Release-Prüfung ist nutzerinitiiert und nur lesend.
+- Update- und Rollback-Architektur sowie eine explizite Konformitätsprüfung liegen unter `docs/architecture/`.
+- Runtime und Netzwerk-Aktivierung bleiben deaktiviert, bis die dokumentierten Geräte-Gates bestanden sind.
+
+Status: **TEILWEISE VERIFIZIERT** — Quellcode/Tests bestanden und die Bottom-Tabs starten auf dem echten Gerät; der erste Mod-ZIP-Test meldete den inzwischen getrennt behandelten Eintragslimit-/Zentralverzeichnisfehler.
+
+
+## Implementiert
+
+| Bereich | Implementierung | Evidenzstatus |
+|---|---|---|
+| Sichtbarer Root | `Documents/Gen1Recomp` mit Library, Cores, Profiles, Saves, Mods, Generated, Cache, Transactions, Diagnostics, Recovery, Inbox und Exports | VERIFIZIERT gegen dokumentierte freie FileManager-API; Gerätetest ausstehend |
+| Content-Import | Picker → Größenprüfung → SHA-1/SHA-256 → Stage → erneuter SHA-256 → Publish → Index | implementiert; Gerätetest ausstehend |
+| Import-Recovery | persistentes `import-pending.v1.json`; veröffentlichten Content in Index übernehmen oder unpubliziertes Stage verwerfen | implementiert und zustandsweise geprüft; Kill-Test ausstehend |
+| Content-Identität | kanonische US-Hashes für Red, Blue, Yellow aus upstream v0.3.18; unbekannter Inhalt wird nicht als kompatibel markiert | VERIFIZIERT / Unit-Test |
+| Content Store | `Library/content/<sha256>/original.gb|original.bin` plus `content.json` | implementiert |
+| Library-Index | validiertes Schema, `.tmp`, `.bak`, Restore bei beschädigtem/fehlendem Primärindex; 0.1-Einträge werden aus dem gespeicherten Original neu erkannt und verlustfrei ergänzt | implementiert |
+| Capability-Probe v3 | lokales `loadFile` mit relativer JS-Subresource, reine WASM-API-Präsenz ohne direkte Validierung/Instanziierung, WebGL-Readback, AudioContext-Konstruktion, Worker/SAB/Isolation/OffscreenCanvas, IndexedDB-/Gamepad-/Touch-API | BRIDGE-RICHTLINIE VERIFIZIERT; keine Runtime-Zertifizierung |
+| Runtime-Gate | maschinenlesbare Blockiergründe; Start bleibt aus | VERIFIZIERT im Buildgraph |
+| Free Tier | keine bekannte Pro-API; `BackgroundKeeper`-Scan | VERIFIZIERT statisch |
+| Gepinnter love.js-Kandidat | offizieller LÖVE-11.5-Bestand, acht SHA-256-gebundene Dateien, transaktionale Installation und vollständige Revalidierung vor Boot | TEILWEISE VERIFIZIERT; Geräte-Boot ausstehend |
+| Runtime-Bridge | `gen1HostBridge` v1 mit Meilensteinen, Sessionkonfiguration und allowlistetem 128-KiB-Ressourcentransport; upstream Runtime und Gen1Recomp bleiben unverändert | love.js/nogame VERIFIZIERT; Payload-Gate EXPERIMENTELL |
+| Buildprüfung | Node strict typecheck, enger dokumentationsbasierter Scripting-Hostvertrag, Global-vs-Modul-Grenzcheck, TSX-Bundlegraph, 35 Tests | VERIFIZIERT lokal |
+| Testpaket | deterministisches ZIP mit `.scripting`-Endung, `script.json` im Root, Integritätstest und SHA-256-Sidecar | VERIFIZIERT; `npm run check` erkennt ein fehlendes oder veraltetes Paket |
+
+## Verifizierter Gerätebefund
+
+Version 0.2.1 importierte irrtümlich globale Host-APIs aus dem Modul `scripting`. Die echte App meldete deshalb `DocumentPicker` als fehlenden Export; das importierte `FileManager` war zur Laufzeit `undefined`. Version 0.2.2 entfernt diese Imports. Offizielle Beispiele bestätigen die Trennung: UI-/React-Symbole kommen aus `scripting`, während `DocumentPicker`, `FileManager`, `Crypto` und `WebViewController` globale Hostobjekte sind. Der Buildcheck blockiert diese fehlerhafte Importform nun dauerhaft.
+
+Status: **VERIFIZIERT durch realen Gerätelauf und offizielle Beispiele; in 0.2.2 behoben.**
+
+## Bewusst blockiert
+
+Ein Start-Button wird erst freigeschaltet, wenn **alle** folgenden Artefakte/Tests vorhanden sind:
+
+1. Gerätebestätigung des reproduzierbaren, gepinnten love.js-11.5-Kandidaten;
+2. `loadFile`-/Read-Access-Test für dessen lokale `.love`-/Lua-/WASM-Subresources;
+3. love.js-`nogame`-Boot bis zum eindeutigen `postrun`-Handshake;
+4. WebAudio-Funktion nach User-Gesture sowie Aussetzer-/Lifecycle-Test;
+5. VFS-Save → sichtbarer Host-Commit mit Generation, Hash und ACK;
+6. Relaunch-, App-Kill- und WebContent-Kill-Recovery;
+7. Golden-Parität für Start, Bewegung, Map, Battle, Save/Load;
+8. reale Memory-/Frame-/Startzeit-Messungen auf mindestens zwei Geräteklassen.
+
+`config.ts` hält `runtimeEnabled: false`. Ein Capability-API-Häkchen allein darf dieses Flag nicht ändern.
+
+## Nächster implementierbarer Schritt
+
+0.9.0 muss zuerst das begrenzte Payload-Staging abschließen. Danach folgen **Gen1Recomp-Payload Boot testen** und bei Erfolg **Launcher-Vorschau öffnen**. Erst ein bestätigter sichtbarer Launcher erlaubt die nächste getrennte Stufe: einen einzelnen verifizierten Library-ROM-Datensatz über eine neue, schreibgeschützte Import-Bridge bereitzustellen. Erst wenn `Diagnostics/lovejs-boot.v1.json` den Status `ready` meldet, darf der nächste Adapter den bereits separat und unveränderlich gestagten Gen1Recomp-0.3.20-Payload als lokales love.js-Paket zuführen. Auch dieser Schritt bleibt ein Diagnose-Gate ohne Spielstart in „Spiele“; Audio, Save-Bridge und Lifecycle werden danach einzeln geprüft.

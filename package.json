@@ -1,0 +1,23 @@
+{
+  "name": "gen1recomp-scripting-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:scripting": "tsc -p tsconfig.scripting.json --noEmit",
+    "check:scripting": "npm run typecheck:scripting && node tools/check-scripting.mjs",
+    "check:code": "npm run typecheck && npm run check:scripting && npm test",
+    "check:package": "bash tools/package-scripting.sh --check",
+    "package:scripting": "npm run check:code && bash tools/package-scripting.sh",
+    "check": "npm run check:code && npm run check:package"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "esbuild": "^0.28.2",
+    "fengari": "^0.1.5",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

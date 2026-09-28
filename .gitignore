@@ -1,0 +1,15 @@
+node_modules/
+coverage/
+dist/
+.DS_Store
+*.rom
+*.gb
+*.gbc
+*.gba
+*.sav
+*.srm
+*.state
+*.ipa
+*.apk
+*.love
+runtime-artifacts/
