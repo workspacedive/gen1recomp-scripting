@@ -550,7 +550,41 @@ do
     if name == "src.core.Game" and type(module) == "table"
         and not rawget(module, "__hostLoadDiagnostic") then
       module.__hostLoadDiagnostic = true
-      local originalLoad, originalDraw = module.load, module.draw
+      local originalLoad, originalUpdate, originalDraw = module.load, module.update, module.draw
+      local phaseWindowStarted
+      local updateStats = { calls = 0, total = 0, maximum = 0 }
+      local drawStats = { calls = 0, total = 0, maximum = 0 }
+      local function phaseClock()
+        if love and love.timer and type(love.timer.getTime) == "function" then
+          return love.timer.getTime()
+        end
+        return os.clock()
+      end
+      local function recordPhase(stats, elapsed)
+        stats.calls = stats.calls + 1
+        stats.total = stats.total + elapsed
+        if elapsed > stats.maximum then stats.maximum = elapsed end
+      end
+      local function resetPhase(stats)
+        stats.calls, stats.total, stats.maximum = 0, 0, 0
+      end
+      local function flushPhases(now)
+        phaseWindowStarted = phaseWindowStarted or now
+        local window = now - phaseWindowStarted
+        if window < 5 then return end
+        local heap = 0
+        local ok, measured = pcall(collectgarbage, "count")
+        if ok and type(measured) == "number" then heap = measured end
+        print(string.format(
+          "[gen1-profile] phase=runtime.phases window_ms=%.3f update_calls=%d update_total_ms=%.3f update_max_ms=%.3f draw_calls=%d draw_total_ms=%.3f draw_max_ms=%.3f heap_kb=%.0f",
+          window * 1000,
+          updateStats.calls, updateStats.total * 1000, updateStats.maximum * 1000,
+          drawStats.calls, drawStats.total * 1000, drawStats.maximum * 1000,
+          heap))
+        phaseWindowStarted = now
+        resetPhase(updateStats)
+        resetPhase(drawStats)
+      end
       module.load = function(self, ...)
         local arguments = pack(...)
         local results = pack(xpcall(function()
@@ -564,12 +598,29 @@ do
         end
         return unpackValues(results, 2, results.n)
       end
+      if type(originalUpdate) == "function" then
+        module.update = function(self, ...)
+          local arguments = pack(...)
+          local started = phaseClock()
+          local results = pack(originalUpdate(self,
+            unpackValues(arguments, 1, arguments.n)))
+          recordPhase(updateStats, phaseClock() - started)
+          return unpackValues(results, 1, results.n)
+        end
+      end
       module.draw = function(self, ...)
         local loadError = rawget(self, "__hostLoadError")
         if loadError then
           error("Gen1Recomp game boot failed before the first draw:\n" .. loadError, 0)
         end
-        return originalDraw(self, ...)
+        local arguments = pack(...)
+        local started = phaseClock()
+        local results = pack(originalDraw(self,
+          unpackValues(arguments, 1, arguments.n)))
+        local finished = phaseClock()
+        recordPhase(drawStats, finished - started)
+        flushPhases(finished)
+        return unpackValues(results, 1, results.n)
       end
     elseif name == "src.ui.kit.Theme" and type(module) == "table"
         and not rawget(module, "__hostRailCompatibility") then

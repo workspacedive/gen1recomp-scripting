@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.14`
+Stand: 2026-09-28 · App-Version `0.13.15`
+
+## Iteration 0.13.15
+
+- **VERIFIZIERT (Gerät):** r35 zeichnet Browser-Framefenster zuverlässig auf. Das bereitgestellte Profil fällt von zunächst 37,8–53,0 FPS auf zwei zusammenhängende Fünf-Sekunden-Fenster mit nur 7,1–7,4 FPS (`avg_ms` 135–141 ms); Maximalstillstände erreichen 759 ms. Auch angrenzende Fenster bleiben bei rund 23 FPS. Der Slow-Motion-Effekt ist daher reale, länger anhaltende Main-Thread-/Rendering-Sättigung und nicht nur ein einzelner gelegentlicher Frame oder ein reines Anzeigegefühl.
+- Im Profil fehlen weiterhin Lua-`frame.window`-Ereignisse. Der `love.timer.step`-Hook ist auf diesem konkreten love.js-Pfad damit **NICHT VERIFIZIERT** und wird nicht als Beleg für FixedStep-Clamping verwendet.
+- r36 misst nun allgemein die in Gen1Recomps `Game.update` und `Game.draw` verbrachte Zeit als Fünf-Sekunden-Aggregat (`phase=runtime.phases`): Aufrufszahl, Gesamt-/Maximalzeit und Lua-Heap. Es werden keine Modmethoden, Mod-IDs oder modinternen Konstanten instrumentiert. Zusammen mit dem unabhängigen Browserprofil trennt der nächste Lauf update-/Meshing-/GC-lastige Fenster von draw-/WebGL-lastigen Fenstern.
+- GC-, FixedStep-, Qualitäts- oder Schedulerparameter bleiben unverändert; die Auswahl einer Optimierung ist weiterhin **BENCHMARK ERFORDERLICH**.
+- 46/46 Tests sowie Type-, Scripting-, Paket- und Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `18046e60f2ffccff3b79140535d64d7f48457ca3693dd5af2043fc34d72b8a17`.
 
 ## Iteration 0.13.14
 
