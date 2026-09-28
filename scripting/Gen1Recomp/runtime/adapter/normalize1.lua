@@ -584,3 +584,20 @@ do
     return module
   end
 end
+
+-- Preserve shader compiler diagnostics even when capability probes correctly
+-- use pcall and fall back. love.js reports some fatal graphics failures only
+-- through its JavaScript console; the host diagnostic bridge records this
+-- bounded line without changing success or failure semantics.
+do
+  local graphics = love.graphics
+  local nativeNewShader = graphics and graphics.newShader
+  if nativeNewShader then
+    graphics.newShader = function(...)
+      local ok, shader = pcall(nativeNewShader, ...)
+      if ok then return shader end
+      print("[gen1-graphics] newShader failed: " .. tostring(shader))
+      error(shader, 2)
+    end
+  end
+end

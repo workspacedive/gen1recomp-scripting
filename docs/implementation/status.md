@@ -1,6 +1,15 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.7`
+Stand: 2026-09-28 · App-Version `0.13.8`
+
+## Iteration 0.13.8
+
+- Der r28-Gerätelauf passiert `package.config`; PotatoVoxel registriert und zeigt seine Optionen. Trotz `VOXEL = HIGH/POTATO` bleibt die Darstellung 2D, `3D-BTL = ON` endet wiederholt im allgemeinen love.js-Alert vor Fensterinitialisierung.
+- Das automatisch übermittelte r28-Diagnostikobjekt enthält nur den Alerttext: Der Browser-Wrapper hatte `console.error`, aber nicht die von LÖVE für diesen nativen Ausnahmeweg verwendeten normalen Log-/Warnkanäle gepuffert. Die eigentliche Grafikursache ist deshalb weiterhin **TECHNISCH UNBEKANNT**.
+- r29 puffert begrenzt die letzten 16 `console.log`-, `console.warn`- und `console.error`-Zeilen und hängt sie an den vorhandenen `runtime.error`-Datensatz. Fehlgeschlagene Shader-Kompilation wird am Hostadapter protokolliert, auch wenn ein Mod den Fehler erwartungsgemäß per `pcall` in einen 2D-Fallback umwandelt.
+- Derselbe identische JavaScript-Alert wird pro Sitzung nur einmal angezeigt; weitere Vorkommen werden weiterhin diagnostisch gemeldet, aber nicht mehr als unendliche modale Alertfolge geöffnet.
+- Dies ist eine Diagnose- und Bedienbarkeitskorrektur, keine behauptete 3D-Grafikkorrektur. Status: **TEILWEISE VERIFIZIERT** bis der r29-Gerätelauf die konkrete Shader-/Canvas-/Treiberursache aufzeichnet.
+- 45/45 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `b591c563578ab7c71ea54814948a4aa2f9e4988f3af3c580db34f7930ffc6a34`.
 
 ## Iteration 0.13.7
 

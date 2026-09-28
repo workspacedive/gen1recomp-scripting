@@ -87,31 +87,47 @@
   };
   window.__gen1Bridge = bridge;
 
-  var consoleErrors = [];
-  var nativeConsoleError = console.error.bind(console);
-  console.error = function () {
-    var line = Array.prototype.map.call(arguments, function (value) {
+  var consoleLines = [];
+  function printableConsoleLine(values) {
+    return Array.prototype.map.call(values, function (value) {
       try { return String(value); } catch (_) { return '[unprintable]'; }
     }).join(' ');
-    consoleErrors.push(line.slice(0, 1000));
-    if (consoleErrors.length > 8) consoleErrors.shift();
+  }
+  function rememberConsoleLine(kind, line) {
+    consoleLines.push(kind + ': ' + line.slice(0, 1000));
+    if (consoleLines.length > 16) consoleLines.shift();
+  }
+  var nativeConsoleError = console.error.bind(console);
+  console.error = function () {
+    rememberConsoleLine('error', printableConsoleLine(arguments));
     nativeConsoleError.apply(console, arguments);
+  };
+  var nativeConsoleWarn = console.warn.bind(console);
+  console.warn = function () {
+    rememberConsoleLine('warn', printableConsoleLine(arguments));
+    nativeConsoleWarn.apply(console, arguments);
   };
   var nativeConsoleLog = console.log.bind(console);
   console.log = function () {
-    var line = Array.prototype.map.call(arguments, function (value) {
-      try { return String(value); } catch (_) { return '[unprintable]'; }
-    }).join(' ');
+    var line = printableConsoleLine(arguments);
+    rememberConsoleLine('log', line);
     if (line.indexOf('[gen1-profile] ') === 0) {
       bridge.send('runtime.profile', line.slice(15, 1000), { line: line.slice(0, 1000) });
     }
     nativeConsoleLog.apply(console, arguments);
   };
   var nativeAlert = window.alert.bind(window);
+  var displayedAlerts = Object.create(null);
   window.alert = function (message) {
-    var detail = 'window alert: ' + String(message);
-    if (consoleErrors.length) detail += ' | console: ' + consoleErrors.join(' | ');
+    var text = String(message);
+    var detail = 'window alert: ' + text;
+    if (consoleLines.length) detail += ' | console: ' + consoleLines.join(' | ');
     bridge.send('runtime.error', detail.slice(0, 6000));
+    if (displayedAlerts[text]) {
+      nativeConsoleError('Suppressed repeated runtime alert:', text);
+      return;
+    }
+    displayedAlerts[text] = true;
     return nativeAlert(message);
   };
 

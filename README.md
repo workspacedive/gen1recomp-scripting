@@ -2,7 +2,7 @@
 
 Architektur- und Implementierungsbasis für einen **Free-Tier-kompatiblen** Gen1Recomp-Host in der [Scripting iOS App](https://scripting.fun/).
 
-> **Ehrlicher Status:** Die Scripting-App 0.13.7 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r28. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. Importierte Mods werden über das offizielle `mods/<id>/`-Layout laufzeitsichtbar. r28 ergänzt zu den belegten Lua-Dialektgrenzen ausschließlich `package.config` im datenisolierten offiziellen Legacy-Paketshim; PotatoVoxel 1.5.8 benötigt den erneuten Gerätetest (**TEILWEISE VERIFIZIERT**).
+> **Ehrlicher Status:** Die Scripting-App 0.13.8 startet den gepinnten Gen1Recomp-0.3.20-Payload über love.js/LÖVE 11.5 r29. Boot, Gameplay, Touch-Eingabe, Audio, persistente Saves und zentrale Spielabläufe sind auf dem echten Gerät **VERIFIZIERT**. Importierte Mods werden über das offizielle `mods/<id>/`-Layout laufzeitsichtbar. PotatoVoxel 1.5.8 passiert inzwischen seine Lua-Dialekt- und Legacy-`package.config`-Grenzen und registriert Optionen, aber die 3D-Pipeline bleibt auf dem Testgerät inaktiv. r29 zeichnet die bislang fehlende begrenzte LÖVE-/Shader-Konsole auf und unterdrückt identische Alert-Endlosschleifen; die eigentliche Grafikursache bleibt bis zum r29-Gerätelog **TECHNISCH UNBEKANNT**.
 
 ## Warum kein schneller Rewrite?
 
