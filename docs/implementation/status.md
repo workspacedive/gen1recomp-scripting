@@ -1,6 +1,14 @@
 # Implementierungsstand der Scripting-App
 
-Stand: 2026-09-28 · App-Version `0.13.11`
+Stand: 2026-09-28 · App-Version `0.13.12`
+
+## Iteration 0.13.12
+
+- r32 zeigte unverändert denselben nativen Alert. Da die r32-Guard-Meldung fehlt, erreicht PotatoVoxel in seiner Legacy-Sandbox nicht zuverlässig die später ersetzte globale `love.graphics.newCanvas`-Funktion.
+- r33 installiert denselben konservativen Readable-Depth-Guard zusätzlich an Gen1Recomps offiziellem `LegacyCompat.new()`-/`Sandbox.loveFacade`-Override. Das ist die exakte API-Grenze, die der Mod sieht; die echte Grafikmodultabelle bleibt lesend erreichbar, während nur `newCanvas` für explizit lesbare Depth-/Stencil-Ziele vor der nativen love.js-Bindung abgefangen wird.
+- Eine Regression erzeugt einen isolierten LegacyCompat-Shim und belegt: lesbares `depth24` erreicht den nativen Konstruktor nicht, nicht lesbares `depth24` dagegen schon. Paketshim-/Modulcache-Isolation bleibt separat geprüft.
+- VOXEL-/3D-BTL-Ausgabe bleibt bis zum r33-Gerätelauf **TEILWEISE VERIFIZIERT**.
+- 46/46 Tests und alle Paket-/Reproduzierbarkeitsgates bestanden. Artefakt-SHA-256: `f6603aad5d9270a63b491a07535481eb7668f1766954c956bb04ba044d25d4cd`.
 
 ## Iteration 0.13.11
 

@@ -247,6 +247,31 @@ do
           if type(packageShim) == "table" and rawget(packageShim, "config") == nil then
             packageShim.config = HOST_PACKAGE_CONFIG
           end
+          -- Sandbox.loveFacade resolves per-mod LegacyCompat overrides before
+          -- the real love module. Install the web-readable-depth guard at that
+          -- exact boundary as well: some LÖVE module bindings bypass later
+          -- assignment on the global love.graphics table in the device build.
+          local compatLove = type(compat) == "table" and compat.love or nil
+          local graphics = love and love.graphics
+          local nativeNewCanvas = graphics and graphics.newCanvas
+          if type(compatLove) == "table" and type(nativeNewCanvas) == "function" then
+            local graphicsFacade = setmetatable({}, { __index = graphics })
+            graphicsFacade.newCanvas = function(...)
+              local settings = select(3, ...)
+              local format = type(settings) == "table" and settings.format or nil
+              local wantsReadable = type(settings) == "table" and settings.readable == true
+              local depthOrStencil = type(format) == "string"
+                and (format:match("^depth") ~= nil or format:match("stencil") ~= nil)
+              if wantsReadable and depthOrStencil then
+                print("[gen1-graphics] legacy sandbox skipped unsupported readable Canvas format: "
+                  .. format)
+                error("The " .. format
+                  .. " readable Canvas format is not supported by your graphics drivers.", 2)
+              end
+              return nativeNewCanvas(...)
+            end
+            compatLove.graphics = graphicsFacade
+          end
           return compat
         end
       end

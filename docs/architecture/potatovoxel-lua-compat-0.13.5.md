@@ -57,6 +57,10 @@ Der r30-Gerätetest korrigiert eine Annahme der ersten Vorprüfung: LÖVE 11 bie
 
 Der r31-Gerätelog enthält erneut den nativen Alert, aber nicht die unmittelbar davor erwartete Adaptermeldung. Die lesbare Capability-Tabelle des gepinnten love.js liefert somit ein falsches Positiv. Da ein nativer Test selbst den nicht abfangbaren Alert auslöst, behandelt der love.js-spezifische Adapter explizit lesbare Depth-/Stencil-Formate konservativ als nicht verfügbar. Das betrifft nicht `depth = true` oder explizit nicht lesbare Depth-Canvases; PotatoVoxels dokumentierter interner Fallback bleibt nutzbar. Lesbare Wasserreflexionen werden auf diesem Webpfad nicht vorgetäuscht.
 
+## r33: Guard an der tatsächlichen Legacy-Sandbox-Grenze
+
+Da r32 weder den Aufruf verhinderte noch seine Guard-Meldung schrieb, reicht das Ersetzen der globalen `love.graphics.newCanvas`-Tabellenfunktion in diesem love.js-Build nicht aus. r33 setzt zusätzlich einen Graphics-Facade in das von `LegacyCompat.new()` gelieferte `compat.love`. Gen1Recomps offizielle `Sandbox.loveFacade` priorisiert exakt dieses modbezogene Override vor `_G.love`. Nur `newCanvas` wird abgefangen; alle übrigen Grafikfunktionen werden über `__index` an das offizielle LÖVE-Grafikmodul weitergereicht. Damit bleibt die Korrektur innerhalb der vorhandenen Sandboxarchitektur.
+
 ## Evidenzstatus
 
 - Ursachenanalyse und Parser-Reproduktion: **VERIFIZIERT**.

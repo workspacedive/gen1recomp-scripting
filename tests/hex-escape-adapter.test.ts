@@ -94,7 +94,10 @@ local fixture = [=[return "\\xc3\\x97", "\\\\xc3"]=]
 local chipSynthFixture = [=[return { MUSIC_BUFFER_SAMPLES = 8192 }]=]
 local legacyCompatFixture = [=[
 return { new = function()
-  return { globals = { package = { path = "", loaded = {}, loaders = {} } } }
+  return {
+    globals = { package = { path = "", loaded = {}, loaders = {} } },
+    love = {},
+  }
 end }
 ]=]
 local transitionFixture = [=[
@@ -120,8 +123,13 @@ _lfs_read = function(path)
   if path == "src/core/ChipSynth.lua" then return chipSynthFixture end
   if path == "src/render/BattleTransition.lua" then return transitionFixture end
 end
-local now, lines = 0, {}
-love = { timer = { getTime = function() return now end } }
+local now, lines, nativeCanvasCalls = 0, {}, 0
+love = {
+  timer = { getTime = function() return now end },
+  graphics = {
+    newCanvas = function() nativeCanvasCalls = nativeCanvasCalls + 1 return {} end,
+  },
+}
 print = function(line) lines[#lines + 1] = line end
 package.loaders = { function() end, function() end }
 ${shim}
@@ -131,10 +139,18 @@ local times, escaped = chunk()
 assert(times == string.char(195, 151), "normalized bytes")
 assert(escaped == string.char(92) .. "xc3", "escaped literal")
 local LegacyCompat = assert(package.loaders[2]("src.mods.LegacyCompat"))()
-local packageShim = LegacyCompat.new().globals.package
+local compat = LegacyCompat.new()
+local packageShim = compat.globals.package
 assert(type(packageShim.config) == "string" and #packageShim.config > 0,
   "legacy package config")
 assert(packageShim.loaded ~= package.loaded, "real module cache stays hidden")
+local canvasOK, canvasMessage = pcall(compat.love.graphics.newCanvas, 32, 32,
+  { format = "depth24", readable = true })
+assert(not canvasOK and canvasMessage:match("readable Canvas format"),
+  "legacy graphics boundary rejects readable depth")
+assert(nativeCanvasCalls == 0, "legacy guard does not enter native newCanvas")
+assert(compat.love.graphics.newCanvas(32, 32, { format = "depth24", readable = false }))
+assert(nativeCanvasCalls == 1, "legacy guard preserves non-readable depth")
 local chipSynth = assert(package.loaders[2]("src.core.ChipSynth"))()
 assert(chipSynth.MUSIC_BUFFER_SAMPLES == 2048, "sync PCM work is frame-sized")
 local transition = assert(package.loaders[2]("src.render.BattleTransition"))()
@@ -143,7 +159,8 @@ local state = transition.new(game, function() end, {})
 now = 0.05
 transition.update(state, 1 / 60)
 assert(state.updates == 3, "wall-clock pacing advances three 60 Hz steps")
-assert(#lines == 0, "release adapter does not emit profile traffic")
+assert(#lines == 1 and lines[1]:match("legacy sandbox skipped"),
+  "release adapter emits only the exercised graphics diagnostic")
 `
   const state = lauxlib.luaL_newstate()
   lualib.luaL_openlibs(state)
